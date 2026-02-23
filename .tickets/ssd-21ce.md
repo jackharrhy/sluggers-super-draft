@@ -1,6 +1,6 @@
 ---
 id: ssd-21ce
-status: open
+status: closed
 deps: []
 links: [ssd-ec8e]
 created: 2026-02-23T01:41:31Z
