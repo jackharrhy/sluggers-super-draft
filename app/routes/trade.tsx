@@ -143,13 +143,22 @@ const PlayerList = ({
           captainId !== undefined &&
           player.id === captainId;
         return (
-          <a href={`/player/${player.id}`} key={player.id}>
+          <a
+            href={`/player/${player.id}`}
+            key={player.id}
+            className="relative"
+          >
             <PlayerIcon
               player={player}
               size="lg"
               isStarred={player.lineup?.isStarred ?? false}
               isCaptain={isCaptain}
             />
+            {player.lineup?.fieldingPosition && (
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-600/90 text-white rounded-full whitespace-nowrap">
+                {player.lineup.fieldingPosition}
+              </span>
+            )}
           </a>
         );
       })}
@@ -188,6 +197,12 @@ export default function TradePage({
   const toPlayers = trade.tradePlayers
     .filter((tp) => tp.fromTeamId === trade.toTeam.id)
     .map((tp) => tp.player);
+
+  const fromStarters = fromPlayers.filter((p) => p.lineup?.fieldingPosition);
+  const toStarters = toPlayers.filter((p) => p.lineup?.fieldingPosition);
+  const hasStarters =
+    trade.status === "pending" &&
+    (fromStarters.length > 0 || toStarters.length > 0);
 
   const statusColors = {
     pending: "bg-yellow-400/35 border-yellow-400/40",
@@ -310,6 +325,42 @@ export default function TradePage({
           </div>
         )}
       </div>
+
+      {/* Lineup Warning */}
+      {hasStarters && (
+        <div className="w-full text-amber-300 text-sm bg-amber-900/20 border border-amber-500/50 rounded-md p-3">
+          <p className="font-semibold mb-1">Lineup Warning</p>
+          <p>
+            This trade includes players currently in starting lineups.
+            {fromStarters.length > 0 && (
+              <>
+                {" "}
+                {trade.fromTeam.name}:{" "}
+                {fromStarters
+                  .map(
+                    (p) => `${p.name} (${p.lineup?.fieldingPosition})`,
+                  )
+                  .join(", ")}
+                .
+              </>
+            )}
+            {toStarters.length > 0 && (
+              <>
+                {" "}
+                {trade.toTeam.name}:{" "}
+                {toStarters
+                  .map(
+                    (p) => `${p.name} (${p.lineup?.fieldingPosition})`,
+                  )
+                  .join(", ")}
+                .
+              </>
+            )}{" "}
+            Affected lineups will need to be updated after the trade is
+            accepted.
+          </p>
+        </div>
+      )}
 
       {/* Action Section (only for participants on pending trades) */}
       {(canAccept || canDeny) && (

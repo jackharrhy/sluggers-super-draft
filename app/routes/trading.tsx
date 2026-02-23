@@ -176,13 +176,22 @@ const PlayerList = ({
           captainId !== undefined &&
           player.id === captainId;
         return (
-          <a href={`/player/${player.id}`} key={player.id}>
+          <a
+            href={`/player/${player.id}`}
+            key={player.id}
+            className="relative"
+          >
             <PlayerIcon
               player={player}
               size="lg"
               isStarred={player.lineup?.isStarred ?? false}
               isCaptain={isCaptain}
             />
+            {player.lineup?.fieldingPosition && (
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-600/90 text-white rounded-full whitespace-nowrap">
+                {player.lineup.fieldingPosition}
+              </span>
+            )}
           </a>
         );
       })}

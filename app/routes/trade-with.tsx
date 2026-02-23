@@ -212,7 +212,7 @@ function TeamPlayerSelection({
               type="button"
               onClick={() => !isCaptain && onTogglePlayer(player.id)}
               disabled={isCaptain}
-              className={`p-2 transition-all border border-cell-gray/50 bg-cell-gray/40 rounded-md ${
+              className={`relative p-2 transition-all border border-cell-gray/50 bg-cell-gray/40 rounded-md ${
                 isCaptain
                   ? "opacity-50 cursor-not-allowed grayscale"
                   : isSelected
@@ -226,6 +226,11 @@ function TeamPlayerSelection({
                 isStarred={player.lineup?.isStarred ?? false}
                 isCaptain={isCaptain}
               />
+              {player.lineup?.fieldingPosition && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 py-0.5 text-[10px] font-bold leading-none bg-amber-600/90 text-white rounded-full whitespace-nowrap">
+                  {player.lineup.fieldingPosition}
+                </span>
+              )}
             </button>
           );
         })}
@@ -268,6 +273,22 @@ export default function TradeWith({
     (myTeamSelection.selectedPlayerIds.length > 0 ||
       otherTeamSelection.selectedPlayerIds.length > 0) &&
     !isSubmitting;
+
+  // Check if any selected players are in the starting lineup
+  const myStartersSelected = myTeam.players.filter(
+    (p) =>
+      p &&
+      myTeamSelection.selectedPlayerIds.includes(p.id) &&
+      p.lineup?.fieldingPosition,
+  );
+  const otherStartersSelected = otherTeam.players.filter(
+    (p) =>
+      p &&
+      otherTeamSelection.selectedPlayerIds.includes(p.id) &&
+      p.lineup?.fieldingPosition,
+  );
+  const hasStartersSelected =
+    myStartersSelected.length > 0 || otherStartersSelected.length > 0;
 
   return (
     <div className="flex flex-col gap-6 items-center">
@@ -318,6 +339,21 @@ export default function TradeWith({
             Type @ to mention teams or players
           </p>
         </div>
+
+        {hasStartersSelected && (
+          <div className="w-full text-amber-300 text-sm bg-amber-900/20 border border-amber-500/50 rounded-md p-3">
+            <p className="font-semibold mb-1">Lineup Warning</p>
+            <p>
+              {myStartersSelected.length > 0 && otherStartersSelected.length > 0
+                ? "Both teams have"
+                : myStartersSelected.length > 0
+                  ? "Your team has"
+                  : `${otherTeam.name} has`}{" "}
+              starting players selected for this trade. Affected lineups will
+              need to be updated after the trade is accepted.
+            </p>
+          </div>
+        )}
 
         <Form method="post">
           <input
