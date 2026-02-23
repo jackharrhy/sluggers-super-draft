@@ -44,6 +44,7 @@ export async function getLeaderboardData(
       team: {
         with: {
           captain: true,
+          conference: true,
         },
       },
       lineup: true,

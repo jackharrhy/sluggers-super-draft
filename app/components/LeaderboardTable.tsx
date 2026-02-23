@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { PlayerIcon } from "~/components/PlayerIcon";
 import { TeamLogo } from "~/components/TeamLogo";
+import { ConferencePin } from "~/components/ConferencePin";
 import type { PlayerWithStats } from "~/utils/leaderboard.server";
 
 // Stat columns configuration - same as match page, with Hit% first
@@ -115,6 +116,7 @@ export function LeaderboardTable({ players }: LeaderboardTableProps) {
                     size="xs"
                   />
                   {player.team.abbreviation}
+                  {player.team.conference && <ConferencePin conference={player.team.conference} />}
                 </Link>
               ) : (
                 <span className="text-green-300/50">Free</span>
