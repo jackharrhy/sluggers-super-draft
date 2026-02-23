@@ -14,6 +14,17 @@ import { db } from "~/database/db";
 import { formatTimeAgo } from "~/utils/time";
 import { ConferencePin } from "~/components/ConferencePin";
 import { getStandingsData } from "~/utils/standings.server";
+import { Events } from "~/components/Events";
+import { desc, eq, or, inArray, and } from "drizzle-orm";
+import {
+  eventDraft,
+  eventTrade,
+  eventTradePreferencesUpdate,
+  eventMatchStateChange,
+  tradePlayers,
+  matches as matchesTable,
+  events,
+} from "~/database/schema";
 
 export async function loader({
   params: { teamId },
@@ -28,15 +39,158 @@ export async function loader({
   const user = await getUser(request);
   const canEdit = checkCanEdit(user, team.userId);
 
-  const [{ mergedContext: mentionContext }, standingsData] = await Promise.all([
-    resolveMentionsMultiple(db, [team.lookingFor, team.willingToTrade]),
-    getStandingsData(db),
-  ]);
+  const teamIdNum = Number(teamId);
+
+  // Fetch standings + team events in parallel
+  const [standingsData, draftEventIds, tradePrefsEventIds, teamMatchIds, teamTradeIds] =
+    await Promise.all([
+      getStandingsData(db),
+      // Draft events where this team drafted a player
+      db
+        .select({ eventId: eventDraft.eventId })
+        .from(eventDraft)
+        .where(eq(eventDraft.teamId, teamIdNum)),
+      // Trade preferences update events for this team
+      db
+        .select({ eventId: eventTradePreferencesUpdate.eventId })
+        .from(eventTradePreferencesUpdate)
+        .where(eq(eventTradePreferencesUpdate.teamId, teamIdNum)),
+      // Matches involving this team
+      db
+        .select({ id: matchesTable.id })
+        .from(matchesTable)
+        .where(
+          or(
+            eq(matchesTable.teamAId, teamIdNum),
+            eq(matchesTable.teamBId, teamIdNum),
+          ),
+        ),
+      // Trades involving this team
+      db
+        .select({ tradeId: tradePlayers.tradeId })
+        .from(tradePlayers)
+        .where(
+          or(
+            eq(tradePlayers.fromTeamId, teamIdNum),
+            eq(tradePlayers.toTeamId, teamIdNum),
+          ),
+        ),
+    ]);
 
   const standingsPosition = standingsData.standings.findIndex(
-    (row) => row.teamId === Number(teamId),
+    (row) => row.teamId === teamIdNum,
   );
   const rank = standingsPosition >= 0 ? standingsPosition + 1 : null;
+
+  // Get match state change event IDs (finished only)
+  const matchEventIds =
+    teamMatchIds.length > 0
+      ? await db
+          .select({ eventId: eventMatchStateChange.eventId })
+          .from(eventMatchStateChange)
+          .where(
+            and(
+              inArray(
+                eventMatchStateChange.matchId,
+                teamMatchIds.map((m) => m.id),
+              ),
+              eq(eventMatchStateChange.toState, "finished"),
+            ),
+          )
+      : [];
+
+  // Get trade event IDs
+  const uniqueTradeIds = [...new Set(teamTradeIds.map((t) => t.tradeId))];
+  const tradeEventIds =
+    uniqueTradeIds.length > 0
+      ? await db
+          .select({ eventId: eventTrade.eventId })
+          .from(eventTrade)
+          .where(inArray(eventTrade.tradeId, uniqueTradeIds))
+      : [];
+
+  // Combine all event IDs
+  const allEventIds = [
+    ...draftEventIds.map((e) => e.eventId),
+    ...tradePrefsEventIds.map((e) => e.eventId),
+    ...matchEventIds.map((e) => e.eventId),
+    ...tradeEventIds.map((e) => e.eventId),
+  ];
+
+  // Query all events with full relations
+  const teamEvents =
+    allEventIds.length > 0
+      ? await db.query.events.findMany({
+          where: inArray(events.id, allEventIds),
+          with: {
+            user: true,
+            draft: {
+              with: {
+                player: {
+                  with: {
+                    lineup: true,
+                  },
+                },
+                team: true,
+              },
+            },
+            trade: {
+              with: {
+                trade: {
+                  with: {
+                    fromTeam: true,
+                    toTeam: true,
+                    tradePlayers: {
+                      with: {
+                        player: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            matchStateChange: {
+              with: {
+                match: {
+                  with: {
+                    teamA: true,
+                    teamB: true,
+                  },
+                },
+              },
+            },
+            tradePreferencesUpdate: {
+              with: {
+                team: true,
+              },
+            },
+          },
+          orderBy: [desc(events.createdAt)],
+        })
+      : [];
+
+  // Resolve mentions for trade texts and trade preferences
+  const mentionTexts = [
+    team.lookingFor,
+    team.willingToTrade,
+    ...teamEvents
+      .filter((e) => e.trade?.trade?.proposalText)
+      .map((e) => e.trade!.trade!.proposalText),
+    ...teamEvents
+      .filter((e) => e.trade?.trade?.responseText)
+      .map((e) => e.trade!.trade!.responseText),
+    ...teamEvents
+      .filter((e) => e.tradePreferencesUpdate?.lookingFor)
+      .map((e) => e.tradePreferencesUpdate!.lookingFor),
+    ...teamEvents
+      .filter((e) => e.tradePreferencesUpdate?.willingToTrade)
+      .map((e) => e.tradePreferencesUpdate!.willingToTrade),
+  ];
+
+  const { mergedContext: mentionContext } = await resolveMentionsMultiple(
+    db,
+    mentionTexts,
+  );
 
   return {
     team: {
@@ -44,6 +198,7 @@ export async function loader({
     },
     canEdit,
     rank,
+    teamEvents,
     mentionContext: {
       players: Array.from(mentionContext.players.entries()),
       teams: Array.from(mentionContext.teams.entries()),
@@ -52,7 +207,7 @@ export async function loader({
 }
 
 export default function Team({
-  loaderData: { team, canEdit, mentionContext, rank },
+  loaderData: { team, canEdit, mentionContext, rank, teamEvents },
 }: Route.ComponentProps) {
   // Reconstruct Map from serialized entries
   const context = {
@@ -166,6 +321,11 @@ export default function Team({
           Edit
         </Link>
       )}
+
+      <div className="w-full max-w-2xl">
+        <h2 className="text-xl font-semibold mb-4">Team History</h2>
+        <Events events={teamEvents} mentionContext={context} />
+      </div>
     </div>
   );
 }
