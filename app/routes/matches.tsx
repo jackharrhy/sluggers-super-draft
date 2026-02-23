@@ -16,6 +16,21 @@ import {
   type MatchDayData,
 } from "~/components/MatchDayCard";
 
+function formatCountdown(targetDate: Date, now: Date): string | null {
+  const diffMs = targetDate.getTime() - now.getTime();
+  if (diffMs <= 0) return null;
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const totalHours = Math.floor(totalMinutes / 60);
+  const days = Math.floor(totalHours / 24);
+  const hours = totalHours % 24;
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) return `Starts in ${days}d ${hours}h`;
+  if (hours > 0) return `Starts in ${hours}h ${minutes}m`;
+  return `Starts in ${minutes}m`;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const url = new URL(request.url);
   const sortOrder = url.searchParams.get("sort") ?? "asc";
@@ -71,16 +86,60 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const standingsData = await getStandingsData(db);
 
+  // Identify featured match days
+  const now = new Date();
+
+  const liveMatchDay = allMatchDays.find((md) =>
+    md.matches.some((m) => m.state === "live"),
+  );
+
+  // Previous: last match day (by orderInSeason) where ALL matches are finished
+  const previousMatchDay = [...allMatchDays]
+    .reverse()
+    .find(
+      (md) =>
+        md.matches.length > 0 &&
+        md.matches.every((m) => m.state === "finished") &&
+        md.id !== liveMatchDay?.id,
+    );
+
+  // Upcoming: first match day (by orderInSeason) where ALL matches are upcoming
+  const upcomingMatchDay = allMatchDays.find(
+    (md) =>
+      md.matches.length > 0 &&
+      md.matches.every((m) => m.state === "upcoming") &&
+      md.id !== liveMatchDay?.id,
+  );
+
+  const upcomingCountdown =
+    upcomingMatchDay?.date
+      ? formatCountdown(new Date(upcomingMatchDay.date), now)
+      : null;
+
+  // IDs to exclude from the main list
+  const featuredIds = new Set(
+    [liveMatchDay?.id, previousMatchDay?.id, upcomingMatchDay?.id].filter(
+      (id): id is number => id != null,
+    ),
+  );
+
   return {
     matchDays: allMatchDays,
     orphanMatches,
     standings: serializeStandingsData(standingsData),
     filters: { sortOrder, showCompleted },
+    featured: {
+      liveMatchDay: liveMatchDay ?? null,
+      previousMatchDay: previousMatchDay ?? null,
+      upcomingMatchDay: upcomingMatchDay ?? null,
+      upcomingCountdown,
+      featuredIds: [...featuredIds],
+    },
   };
 }
 
 export default function Matches({ loaderData }: Route.ComponentProps) {
-  const { matchDays, orphanMatches, standings, filters } = loaderData;
+  const { matchDays, orphanMatches, standings, filters, featured } = loaderData;
   const [searchParams] = useSearchParams();
 
   const hasContent = matchDays.length > 0 || orphanMatches.length > 0;
@@ -93,17 +152,11 @@ export default function Matches({ loaderData }: Route.ComponentProps) {
     );
   }
 
-  const liveMatchDay = matchDays.find(
-    (md) => getMatchDayState(md as MatchDayData) === "live",
+  const featuredIdSet = new Set(featured.featuredIds);
+
+  let filteredMatchDays = matchDays.filter(
+    (md) => !featuredIdSet.has(md.id),
   );
-
-  let filteredMatchDays = [...matchDays];
-
-  if (liveMatchDay) {
-    filteredMatchDays = filteredMatchDays.filter(
-      (md) => md.id !== liveMatchDay.id,
-    );
-  }
 
   if (!filters.showCompleted) {
     filteredMatchDays = filteredMatchDays.filter((md) => {
@@ -145,9 +198,46 @@ export default function Matches({ loaderData }: Route.ComponentProps) {
     return str ? `?${str}` : "";
   };
 
+  const showPrevious = !featured.liveMatchDay && featured.previousMatchDay;
+
   return (
     <div className="space-y-6">
-      {liveMatchDay && <MatchDayCard matchDay={liveMatchDay as MatchDayData} />}
+      {(featured.liveMatchDay || showPrevious || featured.upcomingMatchDay) && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          {featured.liveMatchDay && (
+            <MatchDayCard
+              matchDay={featured.liveMatchDay as MatchDayData}
+            />
+          )}
+          {showPrevious && (
+            <div className="relative">
+              <span className="absolute -top-2.5 left-3 z-10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-gray-600/80 text-gray-300 border border-gray-500/50">
+                Previous
+              </span>
+              <MatchDayCard
+                matchDay={featured.previousMatchDay as MatchDayData}
+              />
+            </div>
+          )}
+          {featured.upcomingMatchDay && (
+            <div className="relative">
+              <div className="absolute -top-2.5 left-3 z-10 flex items-center gap-2">
+                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-blue-500/30 text-blue-300 border border-blue-400/50">
+                  Up Next
+                </span>
+                {featured.upcomingCountdown && (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-blue-500/20 text-blue-200 border border-blue-400/40">
+                    {featured.upcomingCountdown}
+                  </span>
+                )}
+              </div>
+              <MatchDayCard
+                matchDay={featured.upcomingMatchDay as MatchDayData}
+              />
+            </div>
+          )}
+        </div>
+      )}
 
       {standings.standings.length > 0 && (
         <div>
