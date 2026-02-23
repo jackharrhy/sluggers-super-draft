@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { TeamPlayerList } from "~/components/TeamPlayerList";
 import { TEAM_SIZE } from "~/consts";
 import { TeamLogo } from "~/components/TeamLogo";
+import { getStandingsData } from "~/utils/standings.server";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const allTeams = await db.query.teams.findMany({
@@ -68,10 +69,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     return a.conference.name.localeCompare(b.conference.name);
   });
 
-  return { groupedTeams };
+  const standingsData = await getStandingsData(db);
+  const rankByTeamId = new Map(
+    standingsData.standings.map((row, idx) => [row.teamId, idx + 1]),
+  );
+
+  return { groupedTeams, rankByTeamId: Array.from(rankByTeamId.entries()) };
 }
 
 export default function TeamsNames({ loaderData }: Route.ComponentProps) {
+  const rankByTeamId = new Map(loaderData.rankByTeamId);
   return (
     <div className="flex flex-col items-center justify-center gap-8">
       {loaderData.groupedTeams.map((group) => (
@@ -102,7 +109,12 @@ export default function TeamsNames({ loaderData }: Route.ComponentProps) {
                 key={team.id}
               >
                 <div className="w-full flex flex-col items-center gap-1">
-                  <p className="text-lg font-rodin font-bold">{team.name}</p>
+                  <p className="text-lg font-rodin font-bold flex items-center gap-1.5">
+                    {rankByTeamId.has(team.id) && (
+                      <span className="text-sm font-rodin text-gray-400">#{rankByTeamId.get(team.id)}</span>
+                    )}
+                    {team.name}
+                  </p>
                   <p className="text-sm text-gray-200/80">{team.user?.name}</p>
                 </div>
                 <div className="flex flex-col items-center justify-center gap-4 border-2 border-cell-gray/50 bg-cell-gray/40 rounded-lg p-4 w-60 max-w-full transition-colors group-hover:bg-cell-gray/60">
