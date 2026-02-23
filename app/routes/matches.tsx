@@ -222,11 +222,11 @@ export default function Matches({ loaderData }: Route.ComponentProps) {
           {featured.upcomingMatchDay && (
             <div className="relative">
               <div className="absolute -top-2.5 left-3 z-10 flex items-center gap-2">
-                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-blue-500/30 text-blue-300 border border-blue-400/50">
+                <span className="px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider rounded bg-purple-500/30 text-purple-300 border border-purple-400/50">
                   Up Next
                 </span>
                 {featured.upcomingCountdown && (
-                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-blue-500/20 text-blue-200 border border-blue-400/40">
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-purple-500/20 text-purple-200 border border-purple-400/40">
                     {featured.upcomingCountdown}
                   </span>
                 )}

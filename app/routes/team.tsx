@@ -205,17 +205,29 @@ export async function loader({
   );
 
   // Determine prev/next team navigation order
-  // Use standings order if the team appears in standings, otherwise fall back to all teams by ID
-  let orderedTeamIds: number[];
-  if (standingsData.standings.length > 0 && standingsPosition >= 0) {
-    orderedTeamIds = standingsData.standings.map((row) => row.teamId);
-  } else {
-    const allTeams = await db
-      .select({ id: teamsTable.id })
-      .from(teamsTable)
-      .orderBy(asc(teamsTable.id));
-    orderedTeamIds = allTeams.map((t) => t.id);
+  // Group by conference (alphabetical by name, null conference last), teams within each by ID
+  const allTeamsForNav = await db.query.teams.findMany({
+    columns: { id: true, conferenceId: true },
+    with: { conference: { columns: { name: true } } },
+    orderBy: (teams, { asc }) => asc(teams.id),
+  });
+
+  // Group by conference, then sort: conferences alphabetically, null last
+  const confGroups = new Map<number | null, { name: string | null; teamIds: number[] }>();
+  for (const t of allTeamsForNav) {
+    const key = t.conferenceId;
+    if (!confGroups.has(key)) {
+      confGroups.set(key, { name: t.conference?.name ?? null, teamIds: [] });
+    }
+    confGroups.get(key)!.teamIds.push(t.id);
   }
+  const sortedGroups = Array.from(confGroups.values()).sort((a, b) => {
+    if (a.name === null && b.name === null) return 0;
+    if (a.name === null) return 1;
+    if (b.name === null) return -1;
+    return a.name.localeCompare(b.name);
+  });
+  const orderedTeamIds = sortedGroups.flatMap((g) => g.teamIds);
 
   const currentIndex = orderedTeamIds.indexOf(teamIdNum);
   const prevTeamId =
