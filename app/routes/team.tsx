@@ -16,7 +16,7 @@ import { ConferencePin } from "~/components/ConferencePin";
 import { getStandingsData } from "~/utils/standings.server";
 import { Events } from "~/components/Events";
 import { TeamStandings } from "~/components/TeamStandings";
-import { desc, eq, or, inArray, and } from "drizzle-orm";
+import { asc, desc, eq, or, inArray, and } from "drizzle-orm";
 import {
   eventDraft,
   eventTrade,
@@ -25,6 +25,7 @@ import {
   tradePlayers,
   matches as matchesTable,
   events,
+  teams as teamsTable,
 } from "~/database/schema";
 
 export async function loader({
@@ -203,6 +204,29 @@ export async function loader({
     mentionTexts,
   );
 
+  // Determine prev/next team navigation order
+  // Use standings order if the team appears in standings, otherwise fall back to all teams by ID
+  let orderedTeamIds: number[];
+  if (standingsData.standings.length > 0 && standingsPosition >= 0) {
+    orderedTeamIds = standingsData.standings.map((row) => row.teamId);
+  } else {
+    const allTeams = await db
+      .select({ id: teamsTable.id })
+      .from(teamsTable)
+      .orderBy(asc(teamsTable.id));
+    orderedTeamIds = allTeams.map((t) => t.id);
+  }
+
+  const currentIndex = orderedTeamIds.indexOf(teamIdNum);
+  const prevTeamId =
+    currentIndex >= 0
+      ? orderedTeamIds[(currentIndex - 1 + orderedTeamIds.length) % orderedTeamIds.length]
+      : null;
+  const nextTeamId =
+    currentIndex >= 0
+      ? orderedTeamIds[(currentIndex + 1) % orderedTeamIds.length]
+      : null;
+
   return {
     team: {
       ...teamWithFullPlayers,
@@ -211,6 +235,8 @@ export async function loader({
     rank,
     teamStandings,
     teamEvents,
+    prevTeamId,
+    nextTeamId,
     mentionContext: {
       players: Array.from(mentionContext.players.entries()),
       teams: Array.from(mentionContext.teams.entries()),
@@ -219,7 +245,7 @@ export async function loader({
 }
 
 export default function Team({
-  loaderData: { team, canEdit, mentionContext, rank, teamStandings, teamEvents },
+  loaderData: { team, canEdit, mentionContext, rank, teamStandings, teamEvents, prevTeamId, nextTeamId },
 }: Route.ComponentProps) {
   // Reconstruct Map from serialized entries
   const context = {
@@ -257,15 +283,27 @@ export default function Team({
 
   return (
     <div className="flex flex-col gap-4 items-center">
-      <div className="flex flex-col items-center gap-1">
-        <h1 className="text-2xl font-rodin font-bold flex items-center gap-2">
-          {rank && (
-            <span className="text-lg font-rodin text-gray-400">#{rank}</span>
-          )}
-          {team.name}
-          {team.conference && <ConferencePin conference={team.conference} />}
-        </h1>
-        <p className="text-gray-200/80">{team.user?.name}</p>
+      <div className="flex items-center gap-4">
+        {prevTeamId != null && (
+          <Link to={`/team/${prevTeamId}`} className="text-gray-400 hover:text-gray-200 transition-colors">
+            <span className="text-lg">&larr;</span>
+          </Link>
+        )}
+        <div className="flex flex-col items-center gap-1">
+          <h1 className="text-2xl font-rodin font-bold flex items-center gap-2">
+            {rank && (
+              <span className="text-lg font-rodin text-gray-400">#{rank}</span>
+            )}
+            {team.name}
+            {team.conference && <ConferencePin conference={team.conference} />}
+          </h1>
+          <p className="text-gray-200/80">{team.user?.name}</p>
+        </div>
+        {nextTeamId != null && (
+          <Link to={`/team/${nextTeamId}`} className="text-gray-400 hover:text-gray-200 transition-colors">
+            <span className="text-lg">&rarr;</span>
+          </Link>
+        )}
       </div>
 
       {teamStandings && (
