@@ -13,6 +13,7 @@ import { resolveMentionsMultiple } from "~/utils/mentions.server";
 import { db } from "~/database/db";
 import { formatTimeAgo } from "~/utils/time";
 import { ConferencePin } from "~/components/ConferencePin";
+import { getStandingsData } from "~/utils/standings.server";
 
 export async function loader({
   params: { teamId },
@@ -27,16 +28,22 @@ export async function loader({
   const user = await getUser(request);
   const canEdit = checkCanEdit(user, team.userId);
 
-  const { mergedContext: mentionContext } = await resolveMentionsMultiple(db, [
-    team.lookingFor,
-    team.willingToTrade,
+  const [{ mergedContext: mentionContext }, standingsData] = await Promise.all([
+    resolveMentionsMultiple(db, [team.lookingFor, team.willingToTrade]),
+    getStandingsData(db),
   ]);
+
+  const standingsPosition = standingsData.standings.findIndex(
+    (row) => row.teamId === Number(teamId),
+  );
+  const rank = standingsPosition >= 0 ? standingsPosition + 1 : null;
 
   return {
     team: {
       ...teamWithFullPlayers,
     },
     canEdit,
+    rank,
     mentionContext: {
       players: Array.from(mentionContext.players.entries()),
       teams: Array.from(mentionContext.teams.entries()),
@@ -45,7 +52,7 @@ export async function loader({
 }
 
 export default function Team({
-  loaderData: { team, canEdit, mentionContext },
+  loaderData: { team, canEdit, mentionContext, rank },
 }: Route.ComponentProps) {
   // Reconstruct Map from serialized entries
   const context = {
@@ -85,6 +92,9 @@ export default function Team({
     <div className="flex flex-col gap-4 items-center">
       <div className="flex flex-col items-center gap-1">
         <h1 className="text-2xl font-rodin font-bold flex items-center gap-2">
+          {rank && (
+            <span className="text-lg font-rodin text-gray-400">#{rank}</span>
+          )}
           {team.name}
           {team.conference && <ConferencePin conference={team.conference} />}
         </h1>
