@@ -20,6 +20,7 @@ export async function getTeamWithPlayers(teamId: string | number) {
       },
       user: true,
       captain: true,
+      conference: true,
     },
   });
 

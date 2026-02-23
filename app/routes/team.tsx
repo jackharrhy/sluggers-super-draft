@@ -12,6 +12,7 @@ import {
 import { resolveMentionsMultiple } from "~/utils/mentions.server";
 import { db } from "~/database/db";
 import { formatTimeAgo } from "~/utils/time";
+import { ConferencePin } from "~/components/ConferencePin";
 
 export async function loader({
   params: { teamId },
@@ -83,7 +84,10 @@ export default function Team({
   return (
     <div className="flex flex-col gap-4 items-center">
       <div className="flex flex-col items-center gap-1">
-        <h1 className="text-2xl font-rodin font-bold">{team.name}</h1>
+        <h1 className="text-2xl font-rodin font-bold flex items-center gap-2">
+          {team.name}
+          {team.conference && <ConferencePin conference={team.conference} />}
+        </h1>
         <p className="text-gray-200/80">{team.user?.name}</p>
       </div>
 

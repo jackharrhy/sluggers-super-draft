@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { Lineup } from "~/components/Lineup";
 import { PlayerIcon } from "~/components/PlayerIcon";
 import { TEAM_SIZE } from "~/consts";
+import { ConferencePin } from "~/components/ConferencePin";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const allTeams = await db.query.teams.findMany({
@@ -112,7 +113,10 @@ export default function TeamsLineups({ loaderData }: Route.ComponentProps) {
                   key={team.id}
                 >
                   <div className="w-full flex flex-col items-center gap-1">
-                    <p className="text-lg font-rodin font-bold">{team.name}</p>
+                    <p className="text-lg font-rodin font-bold flex items-center gap-1.5">
+                      {team.conference && <ConferencePin conference={team.conference} />}
+                      {team.name}
+                    </p>
                     <p className="text-sm text-gray-200/80">
                       {team.user?.name}
                     </p>
