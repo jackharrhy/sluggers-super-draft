@@ -17,6 +17,7 @@ export type StandingsRow = {
   teamName: string;
   teamAbbreviation: string;
   captainStatsCharacter: string | null;
+  conference: { id: number; name: string; color: string | null } | null;
   matchDayResults: Map<number, MatchDayResult>;
   wins: number;
   losses: number;
@@ -51,12 +52,14 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
         with: {
           user: true,
           captain: true,
+          conference: true,
         },
       },
       teamB: {
         with: {
           user: true,
           captain: true,
+          conference: true,
         },
       },
     },
@@ -83,6 +86,7 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
           teamName: match.teamA.name,
           teamAbbreviation: match.teamA.abbreviation,
           captainStatsCharacter: match.teamA.captain?.statsCharacter ?? null,
+          conference: match.teamA.conference ?? null,
           matchDayResults: new Map(),
           wins: 0,
           losses: 0,
@@ -121,6 +125,7 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
           teamName: match.teamB.name,
           teamAbbreviation: match.teamB.abbreviation,
           captainStatsCharacter: match.teamB.captain?.statsCharacter ?? null,
+          conference: match.teamB.conference ?? null,
           matchDayResults: new Map(),
           wins: 0,
           losses: 0,
