@@ -15,6 +15,7 @@ import { formatTimeAgo } from "~/utils/time";
 import { ConferencePin } from "~/components/ConferencePin";
 import { getStandingsData } from "~/utils/standings.server";
 import { Events } from "~/components/Events";
+import { TeamStandings } from "~/components/TeamStandings";
 import { desc, eq, or, inArray, and } from "drizzle-orm";
 import {
   eventDraft,
@@ -81,6 +82,16 @@ export async function loader({
     (row) => row.teamId === teamIdNum,
   );
   const rank = standingsPosition >= 0 ? standingsPosition + 1 : null;
+  const teamStandingsRow = standingsPosition >= 0 ? standingsData.standings[standingsPosition] : null;
+  const teamStandings = teamStandingsRow
+    ? {
+        matchDays: standingsData.matchDays,
+        row: {
+          ...teamStandingsRow,
+          matchDayResults: Array.from(teamStandingsRow.matchDayResults.entries()),
+        },
+      }
+    : null;
 
   // Get match state change event IDs (finished only)
   const matchEventIds =
@@ -198,6 +209,7 @@ export async function loader({
     },
     canEdit,
     rank,
+    teamStandings,
     teamEvents,
     mentionContext: {
       players: Array.from(mentionContext.players.entries()),
@@ -207,7 +219,7 @@ export async function loader({
 }
 
 export default function Team({
-  loaderData: { team, canEdit, mentionContext, rank, teamEvents },
+  loaderData: { team, canEdit, mentionContext, rank, teamStandings, teamEvents },
 }: Route.ComponentProps) {
   // Reconstruct Map from serialized entries
   const context = {
@@ -255,6 +267,15 @@ export default function Team({
         </h1>
         <p className="text-gray-200/80">{team.user?.name}</p>
       </div>
+
+      {teamStandings && (
+        <div className="w-full max-w-2xl">
+          <TeamStandings
+            matchDays={teamStandings.matchDays}
+            row={teamStandings.row}
+          />
+        </div>
+      )}
 
       {(team.lookingFor || team.willingToTrade) && (
         <div className="flex flex-col gap-4 border border-cell-gray/50 bg-cell-gray/30 rounded-lg p-4 w-full max-w-2xl">
