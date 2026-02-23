@@ -151,7 +151,7 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
 
   // Calculate W/L ratio for each row
   for (const row of standingsMap.values()) {
-    row.wlRatio = row.wins - row.losses;
+    row.wlRatio = (row.wins - row.losses) / 2;
   }
 
   // Get matchdays that have at least one finished match
