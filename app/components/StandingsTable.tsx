@@ -153,23 +153,34 @@ export function StandingsTable({ data }: StandingsTableProps) {
                         idx === 0 && "border-l border-cell-gray/50",
                       )}
                     >
-                      <span
-                        className={cn(
-                          "font-rodin",
-                          result.isWin ? "text-green-300" : "text-gray-300/80",
-                        )}
+                      <Link
+                        to={`/match/${result.matchId}`}
+                        className="hover:underline"
                       >
-                        {result.userScore}
-                      </span>
-                      <span className="text-gray-200/50 font-bold mx-1">-</span>
-                      <span
-                        className={cn(
-                          "font-rodin",
-                          !result.isWin ? "text-red-300" : "text-gray-300/80",
-                        )}
-                      >
-                        {result.opponentScore}
-                      </span>
+                        <span
+                          className={cn(
+                            "font-rodin",
+                            result.isWin
+                              ? "text-green-300"
+                              : "text-gray-300/80",
+                          )}
+                        >
+                          {result.userScore}
+                        </span>
+                        <span className="text-gray-200/50 font-bold mx-1">
+                          -
+                        </span>
+                        <span
+                          className={cn(
+                            "font-rodin",
+                            !result.isWin
+                              ? "text-red-300"
+                              : "text-gray-300/80",
+                          )}
+                        >
+                          {result.opponentScore}
+                        </span>
+                      </Link>
                     </td>
                   );
                 })}

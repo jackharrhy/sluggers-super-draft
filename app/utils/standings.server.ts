@@ -3,6 +3,7 @@ import { matches, matchDays } from "~/database/schema";
 import type { Database } from "~/database/db";
 
 export type MatchDayResult = {
+  matchId: number;
   matchDayId: number;
   matchDayName: string | null;
   userScore: number;
@@ -99,6 +100,7 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
       const isWinA = match.teamAScore > match.teamBScore;
 
       rowA.matchDayResults.set(match.matchDayId, {
+        matchId: match.id,
         matchDayId: match.matchDayId,
         matchDayName: matchDay.name,
         userScore: match.teamAScore,
@@ -138,6 +140,7 @@ export async function getStandingsData(db: Database): Promise<StandingsData> {
       const isWinB = match.teamBScore > match.teamAScore;
 
       rowB.matchDayResults.set(match.matchDayId, {
+        matchId: match.id,
         matchDayId: match.matchDayId,
         matchDayName: matchDay.name,
         userScore: match.teamBScore,
