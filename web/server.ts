@@ -2,6 +2,7 @@ import * as http from 'node:http'
 import { createRequestListener } from 'remix/node-fetch-server'
 
 import { router } from './app/router.ts'
+import { closeAppRuntime } from './app/platform/runtime.ts'
 
 const port = process.env.PORT ? Number.parseInt(process.env.PORT, 10) : 44100
 
@@ -24,13 +25,16 @@ server.listen(port, () => {
 
 let shuttingDown = false
 
-function shutdown() {
+async function shutdown() {
   if (shuttingDown) {
     return
   }
 
   shuttingDown = true
-  server.close(() => process.exit(0))
+  server.close(async () => {
+    await closeAppRuntime()
+    process.exit(0)
+  })
   server.closeAllConnections()
 }
 
