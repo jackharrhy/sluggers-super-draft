@@ -95,6 +95,7 @@ The matching decomp is an upstream research program. Starworks consumes reviewed
 | --- | --- | --- |
 | [Dolphin Emulator](https://github.com/dolphin-emu/dolphin) | Wii emulation, extracted-filesystem boot, profiles, controller configuration, capture surface, and the possible future fork base. | GPL-2.0-or-later. |
 | [Dolphin Memory Engine](https://github.com/aldelaro5/Dolphin-memory-engine) | Cross-platform Dolphin process/memory access lineage used by several community tools. | MIT. |
+| [Python Dolphin Memory Engine](https://github.com/henriquegemignani/py-dolphin-memory-engine) | Python bindings for process discovery and emulated-memory access; v1.3.1 publishes Windows, Linux x86-64, macOS Intel, and macOS Apple Silicon wheels. | MIT. |
 | [Dolphin Emulator website](https://dolphin-emu.org/) | Releases, documentation, and supported emulator behavior. | Project documentation/release terms. |
 
 A pinned stock Dolphin is the initial runtime. A future fork stays a separately governed GPL component and requires a measured decision gate.

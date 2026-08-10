@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "game": {
+    "gameId": "RMBE01",
+    "revision": 0,
+    "mainDolSha1": "08236f3164360f08075459f1f7a76b16e25fe734"
+  },
+  "provenance": {
+    "symbolSource": "https://github.com/Whodeyy1234/mss-decomp",
+    "symbolCommit": "fdd3cb8cfde224577a8b63e40c4b72178b01983f",
+    "reviewNote": "The proposed appended DOL reservation is collision-free against the known RMBE01 DOL image and legacy low-memory hook area. A real-game boot and arena-boundary observation remain mandatory before it is promoted from candidate to supported."
+  },
+  "addressSpace": {
+    "start": "0x80000000",
+    "endExclusive": "0x81800000"
+  },
+  "knownAllocations": [
+    {
+      "id": "legacy-gecko-and-autoteam-low-memory",
+      "start": "0x80001800",
+      "endExclusive": "0x80004000",
+      "source": "MSS-AutoTeam writes its generated hook at 0x800021F0; this range is excluded rather than reused."
+    },
+    {
+      "id": "rmbe01-main-dol-known-sections",
+      "start": "0x80004000",
+      "endExclusive": "0x807A4E80",
+      "source": "mss-decomp RMBE01 symbol map at fdd3cb8"
+    }
+  ],
+  "reservations": [
+    {
+      "id": "starworks-bridge-v1",
+      "start": "0x807A5000",
+      "endExclusive": "0x807A7000",
+      "sizeBytes": 8192,
+      "alignmentBytes": 4096,
+      "kind": "appended-dol-section",
+      "status": "candidate-pending-live-boot"
+    }
+  ]
+}
