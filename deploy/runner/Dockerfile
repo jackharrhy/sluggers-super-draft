@@ -6,6 +6,8 @@ FROM python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f14
 
 COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /source
+COPY contracts/fixtures ./contracts/fixtures
+COPY contracts/generated ./contracts/generated
 COPY runner ./runner
 ENV UV_PROJECT_ENVIRONMENT=/opt/starworks
 RUN uv sync --project /source/runner --frozen --no-dev --no-editable
@@ -20,10 +22,8 @@ RUN apt-get update \
 
 COPY --from=runner-build /usr/local /usr/local
 COPY --from=runner-build /opt/starworks /opt/starworks
-COPY contracts/generated /opt/starworks-contracts/generated
 
-ENV PATH="/opt/starworks/bin:${PATH}" \
-    STARWORKS_CONTRACTS_DIR=/opt/starworks-contracts
+ENV PATH="/opt/starworks/bin:${PATH}"
 
 LABEL org.opencontainers.image.title="Starworks experimental Linux runner" \
       org.opencontainers.image.description="Dolphin 2606, Selkies, FFmpeg, and the Starworks Python runner" \

@@ -6,6 +6,20 @@
 
 **Architectural source of truth:** [`PLAN.md`](../../PLAN.md)
 
+## Implementation status
+
+As of 2026-08-10, Milestones 0–7 are implemented and verified with generated
+fixtures, unit tests, PostgreSQL integrations, and synthetic process/bridge
+tests. Milestone 8's overlay, independent FFmpeg recording/publishing, health
+reporting, and experimental Linux image are implemented; its lawful-game,
+hardware bridge, input, and real RTMP acceptance runs remain explicit external
+gates. Milestone 9's production topology, observability, release packaging, and
+isolated backup/restore tooling are implemented; each real deployment must
+still perform its own restore and credential-revocation drills.
+
+No pending hardware or game-data gate should be interpreted as a reason to
+weaken a fingerprint, expected-byte, nonce, tenancy, or credential check.
+
 ## Planning assumptions
 
 - Existing repositories are references and migration sources, not fixed components.
@@ -358,6 +372,57 @@ This milestone begins after the no-op builder and stat profile model are stable.
 - Overlay data follows the accepted event stream.
 - Capture failure does not corrupt match telemetry.
 - The optional Linux container can boot a supported local build and complete the bridge handshake on documented hardware.
+
+## Milestone 9 — Production hardening and release engineering
+
+### Production topology
+
+- Pin third-party runtime images by descriptive tag and OCI manifest digest.
+- Keep PostgreSQL and Garage on a private network and expose only Traefik.
+- Put a read-only Docker API proxy between Traefik and the host socket.
+- Run the web and migration containers with read-only roots, dropped
+  capabilities, no-new-privileges, and explicit temporary filesystems.
+- Keep `/internal/metrics` off the public Traefik router.
+
+### Recovery and observability
+
+- Expose shallow health, dependency readiness, and token-protected aggregate
+  Prometheus metrics.
+- Report match/build/bridge failures, telemetry review states, stale runners,
+  active leases, and independent capture/publishing health without tenant
+  labels.
+- Create a logical PostgreSQL plus Garage S3 backup set with checksums.
+- Restore every backup into isolated, project-scoped PostgreSQL and Garage
+  volumes and verify application tables plus object counts.
+- Surface the latest tenant audit records in the existing league operations
+  workspace.
+- Document and continuously test runner-station revocation through credentials,
+  leases, attempts, match recovery, lifecycle events, and audit records.
+
+### Distribution
+
+- Package the native Python runner as a wheel containing the generated contract
+  schemas it needs outside a source checkout.
+- Install and validate that wheel in a clean tool environment in CI.
+- Publish the wheel and SHA-256 file from version tags and publish the matching
+  web image.
+- Document installation, update, recovery, supported-platform, compatibility,
+  site-admin league-request, backup, monitoring, and incident workflows.
+
+### Acceptance criteria
+
+- `/readyz` proves PostgreSQL and the configured Garage bucket from the running
+  Compose web image.
+- Unauthorized metrics requests reveal no endpoint configuration or tenant
+  data; an authorized scrape exposes every required operational category.
+- An empty and non-empty Garage bucket plus the complete PostgreSQL schema pass
+  the isolated restore drill.
+- CI runs all contract, web, database, runner, lint, audit, Compose, wheel, and
+  container-definition checks.
+- A clean runner wheel validates its bundled contracts.
+- Production release is blocked until the target deployment's restore and
+  revocation drills pass and the intended runner platform satisfies the
+  external acceptance matrix.
 
 ## Continuous reverse-engineering track
 

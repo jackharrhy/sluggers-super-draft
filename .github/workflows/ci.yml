@@ -86,7 +86,7 @@ jobs:
           tool_dir="$(mktemp -d)"
           bin_dir="$(mktemp -d)"
           UV_TOOL_DIR="$tool_dir" UV_TOOL_BIN_DIR="$bin_dir" \
-            uv tool install --python 3.12 dist/runner/*.whl
+            uv tool install --python 3.12 --with 'pyside6>=6.10,<7' dist/runner/*.whl
           "$bin_dir/starworks-runner" validate-contracts
 
       - name: Validate Compose topologies
