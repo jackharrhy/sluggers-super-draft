@@ -55,6 +55,9 @@ jobs:
           npm ci --prefix contracts
           npm ci --prefix web
 
+      - name: Install browser test runtime
+        run: npx --prefix web playwright install --with-deps chromium
+
       - name: Install runner dependencies
         run: uv sync --project runner --locked --group test
 
@@ -121,3 +124,33 @@ jobs:
         with:
           name: starworks-runner-wheel
           path: dist/runner/*.whl
+
+  runner-platforms:
+    name: Runner · ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-14, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: runner/uv.lock
+
+      - name: Install runner dependencies
+        run: uv sync --project runner --locked --group test
+
+      - name: Test runner on native host
+        run: uv run --project runner --group test pytest -q
+
+      - name: Build runner wheel on native host
+        run: uv build --project runner --wheel --out-dir dist/runner
