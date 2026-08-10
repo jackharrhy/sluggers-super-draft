@@ -29,6 +29,10 @@ DATABASE_URL=postgres://starworks:starworks@127.0.0.1:5432/starworks \
 League creation is deliberately site-admin-only. A new league starts private and produces a
 one-time Discord invitation for its first administrator. There is no public registration route.
 
+The preserved application's data enters through a dry-run-first, idempotent adapter documented in
+[`docs/migration/legacy-super-draft.md`](docs/migration/legacy-super-draft.md). Its old database and
+files are source material, not Starworks contracts.
+
 Starworks is released under the [MIT License](LICENSE). Dependencies and prior
 art keep their own licenses; absence from the codebase does not mean absence
 from the community map.
