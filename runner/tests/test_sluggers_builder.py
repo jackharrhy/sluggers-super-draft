@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 import io
+import json
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
+
 from starworks_runner.contracts import validate_contract
 from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
+from starworks_runner.games.sluggers.content import (
+    ContentPackInput,
+    StaticTargetCatalog,
+    StaticValueTarget,
+)
 from starworks_runner.games.sluggers.dolphin import DolphinLauncher
 from starworks_runner.games.sluggers.errors import (
     BuildIntegrityError,
@@ -291,3 +298,94 @@ def test_corrupt_cache_is_not_silently_reused(tmp_path: Path) -> None:
 
     with pytest.raises(BuildIntegrityError, match="Cached output failed verification"):
         service.build(request)
+
+
+def test_published_stat_content_build_is_deterministic_and_removable(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    original_image = b"synthetic image"
+    image.write_bytes(original_image)
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    manifest, operations = content_documents(clean)
+    data_path = clean / "files/dt_na.dat"
+    target = StaticValueTarget(
+        target_id="synthetic-mario-slap-power",
+        operation="set-character-stat",
+        character_id="mario",
+        rule_key=None,
+        gameplay_target="character.batting.slapPower",
+        resource="dt-na-dat",
+        codec="u16-be",
+        target_path=PurePosixPath("files/dt_na.dat"),
+        target_offset=0,
+        expected_bytes=b"cl",
+        supported_input_sha256=(sha256_file(data_path),),
+        enum_values={},
+    )
+    content = ContentPackInput(
+        manifest=manifest,
+        operation_bundle=operations,
+        target_catalog=StaticTargetCatalog("0.1.0", (target,), ()).validated(),
+    )
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+    )
+
+    first = service.build(
+        BuildRequest(
+            image_path=image, cache_root=tmp_path / "cache", content_pack=content
+        )
+    )
+    second = service.build(
+        BuildRequest(
+            image_path=image, cache_root=tmp_path / "cache", content_pack=content
+        )
+    )
+    clean_result = service.build(
+        BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+    )
+
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert first.manifest == second.manifest
+    assert (
+        first.manifest["contentPackSha256"]
+        != "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    )
+    assert first.manifest["patchReceipts"][0]["targetPath"] == "files/dt_na.dat"
+    assert first.manifest["warnings"] == []
+    assert (first.game_directory / "files/dt_na.dat").read_bytes() == b"\x00`ean dat"
+    assert clean_result.build_directory != first.build_directory
+    assert (
+        clean_result.game_directory / "files/dt_na.dat"
+    ).read_bytes() == b"clean dat"
+    assert image.read_bytes() == original_image
+
+
+def content_documents(clean: Path) -> tuple[dict[str, object], dict[str, object]]:
+    fixtures = Path(__file__).resolve().parents[2] / "contracts/fixtures/valid"
+    manifest = json.loads((fixtures / "content-pack-manifest.json").read_text())
+    operations = json.loads((fixtures / "adapter-operation-bundle.json").read_text())
+    manifest["targetGame"]["supportedRevisions"][0]["mainDolSha256"] = sha256_file(
+        clean / "sys/main.dol"
+    )
+    manifest["rulesetRevisionId"] = operations["rulesetRevisionId"]
+    manifest["assets"] = []
+    manifest["assignments"] = [
+        {
+            "assignmentType": "character-stats",
+            "characterId": "mario",
+            "statProfileRevisionId": manifest["statProfileRevisionId"],
+        }
+    ]
+    return manifest, operations

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "kind": "sluggers-static-target-catalog",
+  "adapterVersion": "0.1.0",
+  "target": {
+    "gameId": "RMBE01",
+    "region": "NTSC-U",
+    "revision": 0
+  },
+  "valueTargets": [],
+  "assetTargets": [],
+  "provisioningNote": "Production offsets and original bytes remain gated on a reviewed lawful RMBE01 fingerprint and independent format research. Synthetic catalogs exercise the complete compiler without distributing game data."
+}
