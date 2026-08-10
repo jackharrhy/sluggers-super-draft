@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "adapterVersion": "0.1.0",
+  "target": {
+    "gameId": "RMBE01",
+    "revision": 0
+  },
+  "protocol": {
+    "version": 1,
+    "controlBlockSymbol": "StarworksBridgeV1",
+    "tickSymbol": "StarworksBridgeTick",
+    "memoryMap": "memory_map.v1.json"
+  },
+  "bridgeSource": {
+    "path": "bridge/bridge_v1.c",
+    "sha256": "0bd1838c1db55eb9aaa8e9eccdba0f21c755751e003289b53161881a481cf4f6",
+    "license": "MIT",
+    "status": "source-ready-artifact-pending"
+  },
+  "toolchain": {
+    "developmentCompiler": "Kamek plus NXP CodeWarrior Special Edition for MPC55xx/MPC56xx v2.10",
+    "endUserStrategy": "hash-pinned-precompiled-artifact",
+    "kamekSource": "https://github.com/Treeki/Kamek",
+    "kamekCommit": "c6d21f458f6c0d7c4106f7d2228f80d8321b9174",
+    "kamekLicense": "MIT",
+    "decision": "Compile in a trusted release environment and distribute only reviewed artifacts. End users never install a compiler or CodeWarrior."
+  },
+  "artifacts": [],
+  "patchPlans": [],
+  "releaseGates": [
+    "Provision a reviewed clean RMBE01 Rev 0 fingerprint from a lawful dump.",
+    "Select and document a clean-room hook site and its exact original bytes.",
+    "Insert and verify the required PowerPC cache and ordering barriers.",
+    "Compile the bridge in the trusted toolchain and review exported symbols.",
+    "Boot the patched build and complete the nonce/event test in pinned Dolphin."
+  ]
+}
