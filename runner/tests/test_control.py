@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from starworks_runner.control import (
     HttpResponse,
     RunnerApiError,

@@ -284,7 +284,9 @@ class RunnerStateStore:
                 (attempt_id,),
             ).fetchone()
             if not active or active["attempt_nonce"] != attempt_nonce:
-                raise ActiveRunConflict("Telemetry does not belong to the active attempt")
+                raise ActiveRunConflict(
+                    "Telemetry does not belong to the active attempt"
+                )
             prior = self._connection.execute(
                 "select envelope_json from telemetry_spool where attempt_id = ? and sequence = ?",
                 (attempt_id, sequence),
@@ -346,9 +348,7 @@ class RunnerStateStore:
             for row in rows
         ]
 
-    def acknowledge_telemetry(
-        self, attempt_id: str, sequences: list[int]
-    ) -> None:
+    def acknowledge_telemetry(self, attempt_id: str, sequences: list[int]) -> None:
         if not sequences:
             return
         with self._lock, self._connection:

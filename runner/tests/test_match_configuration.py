@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from starworks_runner.match_configuration import compile_match_configuration
 
 

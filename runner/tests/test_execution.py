@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from starworks_runner.execution import bind_match_execution
 from starworks_runner.synthetic_executor import SyntheticSluggersExecutor
 

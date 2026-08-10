@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from starworks_runner.state import (
     ActiveRunConflict,
     RunnerStateStore,

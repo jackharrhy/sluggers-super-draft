@@ -169,9 +169,7 @@ def _valid_stat_value(definition: dict[str, Any], value: object) -> bool:
         return False
     if data_type == "integer" and type(value) is not int:
         return False
-    return float(definition["minimum"]) <= float(value) <= float(
-        definition["maximum"]
-    )
+    return float(definition["minimum"]) <= float(value) <= float(definition["maximum"])
 
 
 def _strings(value: object) -> list[str]:
