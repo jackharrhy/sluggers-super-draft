@@ -230,6 +230,7 @@ function createRuntime(draft: DraftApplication): AppRuntime {
   }
   let cookies = { httpOnly: true, path: '/', sameSite: 'Lax' as const, secrets: ['draft-controller-test'] }
   return {
+    broadcast: {} as AppRuntime['broadcast'],
     configuration: {} as ConfigurationApplication,
     content: {} as AppRuntime['content'],
     draft,

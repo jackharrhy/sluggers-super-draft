@@ -2,6 +2,10 @@ import * as assert from 'remix/assert'
 import { createCookie } from 'remix/cookie'
 import { describe, it } from 'remix/test'
 
+import { BroadcastOverlaySchema, type BroadcastOverlay } from '@starworks/contracts'
+import broadcastOverlayFixture from '../../../contracts/fixtures/valid/broadcast-overlay.json' with { type: 'json' }
+
+import type { BroadcastApplication } from '../broadcast/service.ts'
 import type { DiscordOAuthClient } from '../platform/discord-oauth.ts'
 import type { ConfigurationApplication } from '../configuration/service.ts'
 import { IdentityService } from '../platform/identity-service.ts'
@@ -64,6 +68,34 @@ describe('root controller', () => {
     assert.equal(response.headers.get('x-correlation-id'), CORRELATION_ID)
   })
 
+  it('serves the public broadcast contract and browser-source overlay without a session', async () => {
+    let overlay = BroadcastOverlaySchema.parse(broadcastOverlayFixture)
+    let runtime = createTestRuntime({
+      broadcast: { async publicOverlay() { return overlay } },
+    })
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+
+    let dataResponse = await router.fetch(new Request('http://localhost' + routes.broadcastData.href({
+      leagueSlug: overlay.league.slug,
+      matchId: overlay.match.id,
+    })))
+    assert.equal(dataResponse.status, 200)
+    assert.equal(dataResponse.headers.get('cache-control'), 'no-store')
+    assert.equal(dataResponse.headers.get('x-content-type-options'), 'nosniff')
+    assert.deepEqual(await dataResponse.json(), overlay)
+
+    let pageResponse = await router.fetch(new Request('http://localhost' + routes.broadcastOverlay.href({
+      leagueSlug: overlay.league.slug,
+      matchId: overlay.match.id,
+    })))
+    assert.equal(pageResponse.status, 200)
+    let html = await pageResponse.text()
+    assert.match(html, /Daisy Comets/)
+    assert.match(html, /Rosalina Stars/)
+    assert.match(html, /data-broadcast-overlay/)
+    assert.match(html, /broadcast-overlay\.ts/)
+  })
+
   it('lets a site administrator create a private league and reveals its one-time invitation', async () => {
     let admin = siteAdminIdentity()
     let provisioned: LeagueDetail = {
@@ -112,6 +144,7 @@ describe('root controller', () => {
 
 function createTestRuntime(
   options: {
+    broadcast?: BroadcastApplication
     identity?: SessionIdentity | null
     repository?: Partial<PlatformRepository>
     token?: string
@@ -168,6 +201,7 @@ function createTestRuntime(
     secrets: ['controller-test-cookie-secret'],
   }
   return {
+    broadcast: options.broadcast ?? unexpectedBroadcast(),
     configuration: {} as ConfigurationApplication,
     content: {} as AppRuntime['content'],
     draft: {} as AppRuntime['draft'],
@@ -179,6 +213,14 @@ function createTestRuntime(
     runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
     telemetry: {} as AppRuntime['telemetry'],
+  }
+}
+
+function unexpectedBroadcast(): BroadcastApplication {
+  return {
+    async publicOverlay(): Promise<BroadcastOverlay> {
+      throw new Error('Unexpected broadcast request')
+    },
   }
 }
 

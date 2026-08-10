@@ -16,6 +16,7 @@ import {
   matches,
   matchAttempts,
   people,
+  publicationSettings,
   rosterRevisions,
   rulesetRevisions,
   rulesets,
@@ -32,6 +33,7 @@ import {
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { hashSecret } from '../platform/security.ts'
+import { BroadcastService } from '../broadcast/service.ts'
 import { TelemetryService } from './service.ts'
 
 let databaseUrl = process.env.STARWORKS_TEST_DATABASE_URL
@@ -102,6 +104,26 @@ test(
       ))
       assert.equal(correctionAudit?.metadata.beforeValue, 2)
       assert.equal(correctionAudit?.metadata.afterValue, 3)
+
+      let broadcast = new BroadcastService(connection.database, () => new Date('2026-08-10T15:01:00Z'))
+      await assert.rejects(
+        broadcast.publicOverlay(fixture.leagueSlug, fixture.matchId),
+        (error: unknown) => error instanceof PlatformError && error.code === 'not_found',
+      )
+      await connection.database.update(publicationSettings).set({
+        leagueVisible: true,
+        statsVisible: true,
+      }).where(eq(publicationSettings.leagueId, fixture.leagueId))
+      let overlay = await broadcast.publicOverlay(fixture.leagueSlug, fixture.matchId)
+      assert.equal(overlay.updatedAt, '2026-08-10T15:01:00.000Z')
+      assert.equal(overlay.inning, 1)
+      assert.equal(overlay.half, 'bottom')
+      assert.equal(overlay.teams[0].runs, 2)
+      assert.equal(overlay.teams[0].hits, 3)
+      assert.equal(overlay.teams[1].runs, 1)
+      assert.equal(overlay.players.find((player) => player.characterId === 'away-1')?.homeRuns, 1)
+      assert.equal(overlay.recentEvents[0]?.eventType, 'game-ended')
+      assert.equal('attemptNonce' in overlay, false)
 
       await service.confirm(fixture.admin, fixture.leagueId, fixture.attemptId)
       let [attempt] = await connection.database.select().from(matchAttempts).where(eq(matchAttempts.id, fixture.attemptId))
@@ -243,7 +265,9 @@ async function createFixture(database: ReturnType<typeof createDatabase>['databa
   let homeRoster = Array.from({ length: 9 }, (_, index) => `home-${index + 1}`)
   let awayRoster = Array.from({ length: 9 }, (_, index) => `away-${index + 1}`)
   await database.insert(people).values({ displayName: 'Telemetry Fixture Admin', id: adminPersonId, isSiteAdmin: true })
-  await database.insert(leagues).values({ createdByPersonId: adminPersonId, id: leagueId, name: 'Telemetry Fixture', slug: `telemetry-${leagueId}` })
+  let leagueSlug = `telemetry-${leagueId}`
+  await database.insert(leagues).values({ createdByPersonId: adminPersonId, id: leagueId, name: 'Telemetry Fixture', slug: leagueSlug })
+  await database.insert(publicationSettings).values({ leagueId })
   await database.insert(seasons).values({ id: seasonId, leagueId, name: 'Season One', slug: 'season-one', status: 'active' })
   await database.insert(leagueTeams).values([
     { id: homeTeamId, leagueId, name: 'Home Stars', seasonId, slug: 'home-stars' },
@@ -282,7 +306,7 @@ async function createFixture(database: ReturnType<typeof createDatabase>['databa
   return {
     admin, attemptId, attemptNonce, awayTeamId, correlationId,
     credential: `starworks_runner_${credentialId}.${credentialSecret}`,
-    homeTeamId, leagueId, leaseId, matchId, seasonId, stationId,
+    homeTeamId, leagueId, leagueSlug, leaseId, matchId, seasonId, stationId,
   }
 }
 
