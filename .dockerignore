@@ -8,4 +8,5 @@ deploy
 docs
 legacy
 node_modules
+**/node_modules
 runner
