@@ -2,46 +2,64 @@
 
 ## Decision
 
-Starworks will keep maintainable bridge source and use a reviewed Kamek release
-pipeline, but runners will consume only hash-pinned precompiled artifacts and
-strict patch plans. No league operator needs a compiler, CodeWarrior, .NET, or
-a PowerPC SDK.
+Starworks compiles its clean-room PowerPC bridge with pinned LLVM/Clang/LLD
+22.1.8 and ships only a reviewed, hash-pinned artifact plus a strict patch
+plan. League operators do not need a compiler, CodeWarrior, Kamek, or a
+PowerPC SDK.
 
-## Evidence
+Kamek remains valuable prior art and a possible future module system, but its
+documented C/C++ flow depends on the proprietary NXP CodeWarrior compiler. The
+minimal Starworks bridge does not need that dependency.
 
-The current upstream Kamek revision reviewed for this spike is
-`c6d21f458f6c0d7c4106f7d2228f80d8321b9174`. Kamek is MIT and its linker now
-targets .NET 10 across Windows and non-Windows systems. Its documented C/C++
-flow still requires NXP CodeWarrior Special Edition for MPC55xx/MPC56xx 2.10,
-including `license.dat`; `kamek.h` intentionally rejects other compilers.
-Neither .NET nor CodeWarrior is installed in the current development
-environment, and proprietary compiler material cannot be placed in this OSS
-repository or assumed on an end-user machine.
+## Reviewed release
 
-The Python approach is deliberately less ambitious: it does not compile code.
-It verifies a reviewed artifact hash, verifies the complete input file hash,
-checks the exact original bytes at every write, rejects overlapping or
-out-of-range writes, computes the expected final hash, writes a new file, and
-promotes it atomically. Synthetic tests exercise success, modified hooks,
-modified artifacts, overlaps, in-place writes, and final-hash mismatches.
+The `RMBE01` Rev 0 release uses:
 
-This combination preserves Kamek's maintainable source and symbol workflow
-without turning its proprietary build dependency into a runner dependency.
+- clean `main.dol` SHA-256
+  `3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151`;
+- a DOL section at `0x80001900..0x80003000`, after the observed low-memory
+  `STUBHAXX` marker and before the OS exception/runtime tables;
+- main-loop call site `0x8039A688` (`main.dol+0x33A388`), guarded by original
+  instruction `48170c5d`;
+- bridge entry `0x80002A00`, preserving the original call to `0x8050B2E4`;
+- artifact SHA-256
+  `86f373bc4ec8741bd966b8232702f839206195988a782da93c0f323022cef09d`;
+- patched `main.dol` SHA-256
+  `077211c054c8bf977d4f387ad4945a7baeb0aadf2a95d2a132dd4d6e78b472e2`.
 
-On the current Darwin 25.5 arm64 development host, five guarded applications
-to an 8 MiB synthetic DOL averaged 13.6 ms and took at most 16.7 ms. The probe
-found neither `dotnet` nor `mwcceppc`, while the precompiled path required
-neither. These numbers are evidence for the spike, not a platform performance
-guarantee; `evaluate-patch-toolchains` reproduces the measurement.
+The release builder verifies LLVM 22.1.8, the exact exported symbol addresses
+and sizes, the compiled `.text` hash, the complete retail input hash, and every
+original byte before producing the artifact and plan. The artifact contains
+only Starworks code, zero-initialized bridge storage, and DOL metadata; it does
+not contain retail game bytes.
 
-## Clean-room boundary
+## Runtime evidence
 
-`bridge_v1.c` is written solely from the Starworks protocol. The guarded branch
-encoder implements the public PowerPC relative-branch format. No hook body,
-expected byte sequence, or address is copied from an unlicensed Sluggers tool.
+On macOS arm64, Dolphin 2606 loaded the managed patched DOL and used its built-in
+GDB remote stub for bounded memory access. Python initialized the control block,
+continued the paused CPU, negotiated attempt epoch 1, consumed synthetic event
+sequence 1, and observed heartbeat 121. The game continued through its opening
+sequence after the probe.
 
-The repository does not yet contain a retail hook plan or compiled bridge
-artifact. Picking those values without a lawful clean dump would produce false
-confidence. The adapter manifest therefore records explicit release gates for
-the clean-room hook, compiled artifact, symbol review, cache barriers, and live
-Dolphin boot.
+The official GDB stub is the first-class transport because it works without
+re-signing Dolphin or attaching to another process. Unix-domain sockets are
+used on macOS/Linux and the built-in TCP port is available on Windows. Dolphin
+Memory Engine remains an optional legacy backend on platforms where its process
+attachment model is supported.
+
+## Guarded application
+
+Patch-plan schema v2 can append one reviewed artifact slice at the exact input
+EOF in addition to exact-byte-guarded in-place writes. It rejects unknown input
+hashes, changed hook bytes, artifact hash/size mismatches, overlapping artifact
+or target ranges, non-EOF appends, out-of-range writes, and unexpected final
+hashes. The source dump and source extraction are never modified.
+
+Rebuild the artifact only in a trusted maintainer environment with a lawful
+reviewed DOL:
+
+```shell
+uv run --project runner python runner/tools/build_sluggers_bridge.py \
+  --base-dol /private/path/to/clean/main.dol \
+  --output-root runner/src/starworks_runner/games/sluggers
+```

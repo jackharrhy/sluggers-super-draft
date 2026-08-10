@@ -23,6 +23,7 @@ from starworks_runner.games.sluggers.bridge.memory import (
     BridgeMemory,
     ByteArrayMemoryTransport,
     DolphinMemoryEngineTransport,
+    GdbRemoteMemoryTransport,
 )
 from starworks_runner.games.sluggers.bridge.synthetic import SyntheticGameBridge
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
@@ -167,7 +168,7 @@ def test_checked_in_memory_map_is_collision_free_and_matches_protocol() -> None:
 
 def test_memory_map_collision_fails_closed(tmp_path: Path) -> None:
     raw = MemoryMap.load().raw
-    raw["reservations"][0]["start"] = "0x807A4E00"
+    raw["reservations"][0]["start"] = "0x80001880"
     path = tmp_path / "collision.json"
     path.write_text(json.dumps(raw), encoding="utf-8")
 
@@ -197,10 +198,47 @@ def test_dme_process_backend_attaches_and_is_hidden_behind_transport() -> None:
     backend = FakeDmeBackend()
     transport = DolphinMemoryEngineTransport(backend)
     transport.attach()
-    transport.write(0x807A5000, b"SWB1")
+    address = BridgeLayout().base_address
+    transport.write(address, b"SWB1")
 
     assert backend.hooked is True
-    assert transport.read(0x807A5000, 4) == b"SWB1"
+    assert transport.read(address, 4) == b"SWB1"
+
+
+def rsp_reply(payload: bytes) -> bytes:
+    checksum = sum(payload) & 0xFF
+    return b"+" + b"$" + payload + f"#{checksum:02x}".encode("ascii")
+
+
+class FakeRspSocket:
+    def __init__(self, incoming: bytes) -> None:
+        self.incoming = bytearray(incoming)
+        self.sent: list[bytes] = []
+
+    def sendall(self, value: bytes) -> None:
+        self.sent.append(value)
+
+    def recv(self, size: int) -> bytes:
+        value = bytes(self.incoming[:size])
+        del self.incoming[:size]
+        return value
+
+    def close(self) -> None:
+        pass
+
+
+def test_gdb_remote_transport_reads_writes_and_continues() -> None:
+    backend = FakeRspSocket(rsp_reply(b"53574231") + rsp_reply(b"OK") + b"+")
+    transport = GdbRemoteMemoryTransport(connection=backend)  # type: ignore[arg-type]
+
+    assert transport.read(BridgeLayout().base_address, 4) == b"SWB1"
+    transport.write(BridgeLayout().base_address + 4, b"test")
+    transport.continue_execution()
+
+    sent = b"".join(backend.sent)
+    assert b"$m80001900,4#" in sent
+    assert b"$M80001904,4:74657374#" in sent
+    assert b"$c#63" in sent
 
 
 def test_polling_overhead_is_measured() -> None:

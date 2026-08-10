@@ -95,10 +95,19 @@ The matching decomp is an upstream research program. Starworks consumes reviewed
 | --- | --- | --- |
 | [Dolphin Emulator](https://github.com/dolphin-emu/dolphin) | Wii emulation, extracted-filesystem boot, profiles, controller configuration, capture surface, and the possible future fork base. | GPL-2.0-or-later. |
 | [Dolphin Memory Engine](https://github.com/aldelaro5/Dolphin-memory-engine) | Cross-platform Dolphin process/memory access lineage used by several community tools. | MIT. |
-| [Python Dolphin Memory Engine](https://github.com/henriquegemignani/py-dolphin-memory-engine) | Python bindings for process discovery and emulated-memory access; v1.3.1 publishes Windows, Linux x86-64, macOS Intel, and macOS Apple Silicon wheels. | MIT. |
+| [Python Dolphin Memory Engine](https://github.com/henriquegemignani/py-dolphin-memory-engine) | Optional Python process-attachment backend. The v1.3.1 package is retained only as a legacy Windows/Linux extra; it could not attach to stock Dolphin 2606 on macOS without changing application signing. | MIT. |
 | [Dolphin Emulator website](https://dolphin-emu.org/) | Releases, documentation, and supported emulator behavior. | Project documentation/release terms. |
 
 A pinned stock Dolphin is the initial runtime. A future fork stays a separately governed GPL component and requires a measured decision gate.
+
+Stock Dolphin 2606's built-in GDB remote stub is Starworks' primary transport:
+Unix-domain sockets on macOS/Linux and TCP on Windows. This is a documented
+Dolphin facility and avoids platform-specific process attachment or re-signing
+the emulator.
+
+| Tool | Relevance to Starworks | License/status observed |
+| --- | --- | --- |
+| [LLVM](https://github.com/llvm/llvm-project) | Trusted PowerPC bridge compiler/linker. Starworks pins LLVM/Clang/LLD 22.1.8 and distributes the reviewed artifact, not the compiler, to runners. | Apache-2.0 WITH LLVM-exception. |
 
 ## League sites, bots, editors, and analytics
 

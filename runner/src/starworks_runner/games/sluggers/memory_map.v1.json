@@ -8,7 +8,7 @@
   "provenance": {
     "symbolSource": "https://github.com/Whodeyy1234/mss-decomp",
     "symbolCommit": "fdd3cb8cfde224577a8b63e40c4b72178b01983f",
-    "reviewNote": "The proposed appended DOL reservation is collision-free against the known RMBE01 DOL image and legacy low-memory hook area. A real-game boot and arena-boundary observation remain mandatory before it is promoted from candidate to supported."
+    "reviewNote": "The exact Redump-matched DOL and a live Dolphin 2606 GDB observation rejected the former 0x807A5000 stack-overlapping candidate. The supported reservation preserves the STUBHAXX marker below it and ends before the live OS table at 0x80003000. It intentionally replaces, and cannot coexist with, legacy Gecko or AutoTeam code in the same low-memory cave."
   },
   "addressSpace": {
     "start": "0x80000000",
@@ -16,10 +16,16 @@
   },
   "knownAllocations": [
     {
-      "id": "legacy-gecko-and-autoteam-low-memory",
-      "start": "0x80001800",
+      "id": "wii-low-memory-and-stubhaxx-marker",
+      "start": "0x80000000",
+      "endExclusive": "0x80001900",
+      "source": "Live Dolphin 2606 observation preserves the STUBHAXX marker at 0x80001804; Starworks begins after the marker."
+    },
+    {
+      "id": "wii-exception-and-runtime-tables",
+      "start": "0x80003000",
       "endExclusive": "0x80004000",
-      "source": "MSS-AutoTeam writes its generated hook at 0x800021F0; this range is excluded rather than reused."
+      "source": "Live Dolphin 2606 observation found exception handlers, arena metadata, and runtime state throughout this range."
     },
     {
       "id": "rmbe01-main-dol-known-sections",
@@ -31,12 +37,21 @@
   "reservations": [
     {
       "id": "starworks-bridge-v1",
-      "start": "0x807A5000",
-      "endExclusive": "0x807A7000",
-      "sizeBytes": 8192,
-      "alignmentBytes": 4096,
+      "start": "0x80001900",
+      "endExclusive": "0x80003000",
+      "sizeBytes": 5888,
+      "alignmentBytes": 256,
       "kind": "appended-dol-section",
-      "status": "candidate-pending-live-boot"
+      "status": "reviewed-live-accepted-dolphin-2606"
+    }
+  ],
+  "hooks": [
+    {
+      "id": "starworks-main-loop-v1",
+      "address": "0x8039A688",
+      "targetAddress": "0x8050B2E4",
+      "originalBytesHex": "48170c5d",
+      "source": "RMBE01 main at mss-decomp fdd3cb8; reversible Dolphin 2606 probe counted 61 calls during a three-second startup window and restored the original instruction before the game reached the Wii Remote safety screen."
     }
   ]
 }

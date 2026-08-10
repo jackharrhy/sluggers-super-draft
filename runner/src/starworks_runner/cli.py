@@ -22,11 +22,17 @@ from starworks_runner.contracts import (
     validate_contract,
 )
 from starworks_runner.desktop import default_state_path
+from starworks_runner.games.sluggers.adapter import AdapterManifest
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
-from starworks_runner.games.sluggers.bridge.layout import BridgeLayout
+from starworks_runner.games.sluggers.bridge.layout import (
+    BridgeLayout,
+    BridgeProtocolError,
+    ControlBlock,
+)
 from starworks_runner.games.sluggers.bridge.memory import (
     ByteArrayMemoryTransport,
     DolphinMemoryEngineTransport,
+    GdbRemoteMemoryTransport,
 )
 from starworks_runner.games.sluggers.bridge.synthetic import SyntheticGameBridge
 from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
@@ -93,8 +99,8 @@ def create_parser() -> argparse.ArgumentParser:
     build_parser.add_argument("--adapter-operations", type=Path)
     build_parser.add_argument("--content-assets", type=Path)
     build_parser.add_argument("--static-targets", type=Path)
-    build_parser.add_argument("--adapter-version", default="0.1.0")
-    build_parser.add_argument("--compiler-version", default="0.1.0")
+    build_parser.add_argument("--adapter-version")
+    build_parser.add_argument("--compiler-version", default="22.1.8")
 
     fingerprint_parser = subparsers.add_parser(
         "fingerprint-sluggers",
@@ -109,6 +115,9 @@ def create_parser() -> argparse.ArgumentParser:
     launch_parser.add_argument("--build-directory", type=Path, required=True)
     launch_parser.add_argument("--dolphin", type=Path, required=True)
     launch_parser.add_argument("--profile", type=Path, required=True)
+    launch_gdb = launch_parser.add_mutually_exclusive_group()
+    launch_gdb.add_argument("--gdb-socket", type=Path)
+    launch_gdb.add_argument("--gdb-port", type=int)
     launch_parser.add_argument("--wait", action="store_true")
 
     probe_parser = subparsers.add_parser(
@@ -117,8 +126,14 @@ def create_parser() -> argparse.ArgumentParser:
     probe_parser.add_argument("--adapter-build-sha256", required=True)
     probe_parser.add_argument("--game-build-sha256", required=True)
     probe_parser.add_argument("--attempt-nonce", required=True)
+    probe_gdb = probe_parser.add_mutually_exclusive_group()
+    probe_gdb.add_argument("--gdb-socket", type=Path)
+    probe_gdb.add_argument("--gdb-port", type=int)
+    probe_parser.add_argument("--gdb-host", default="127.0.0.1")
     probe_parser.add_argument(
-        "--memory-base", type=lambda value: int(value, 0), default=0x807A5000
+        "--memory-base",
+        type=lambda value: int(value, 0),
+        default=BridgeLayout().base_address,
     )
     probe_parser.add_argument("--timeout-seconds", type=float, default=5.0)
     probe_parser.add_argument("--poll-seconds", type=float, default=1.0)
@@ -130,7 +145,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     patcher_parser = subparsers.add_parser(
         "evaluate-patch-toolchains",
-        help="benchmark precompiled patch application and report Kamek prerequisites",
+        help="benchmark precompiled patch application and report LLVM availability",
     )
     patcher_parser.add_argument("--size-mib", type=int, default=8)
     patcher_parser.add_argument("--iterations", type=int, default=5)
@@ -221,6 +236,12 @@ def run(arguments: argparse.Namespace) -> int:
         cache = arguments.cache.expanduser().resolve()
         tool = DtkDiscTool(_resolve_dtk(arguments.dtk, cache))
         registry = SupportedBaseRegistry.load(arguments.supported_bases)
+        adapter_manifest = AdapterManifest.load()
+        adapter_version = arguments.adapter_version or adapter_manifest.adapter_version
+        if adapter_version != adapter_manifest.adapter_version:
+            raise SluggersAdapterError(
+                "--adapter-version must match the installed reviewed adapter manifest"
+            )
         if bool(arguments.content_pack_manifest) != bool(arguments.adapter_operations):
             raise SluggersAdapterError(
                 "--content-pack-manifest and --adapter-operations must be provided together"
@@ -233,13 +254,17 @@ def run(arguments: argparse.Namespace) -> int:
                 assets_root=arguments.content_assets,
                 target_catalog_path=arguments.static_targets,
             )
-        result = GameBuildService(tool, registry).build(
+        result = GameBuildService(
+            tool,
+            registry,
+            trusted_patch_set=adapter_manifest.trusted_patch_set(),
+        ).build(
             BuildRequest(
                 image_path=arguments.image,
                 cache_root=cache,
                 content_pack_sha256=arguments.content_pack_sha256,
                 content_pack=content_pack,
-                adapter_version=arguments.adapter_version,
+                adapter_version=adapter_version,
                 compiler_version=arguments.compiler_version,
             )
         )
@@ -283,15 +308,48 @@ def run(arguments: argparse.Namespace) -> int:
         return 0
     if arguments.command == "launch-sluggers":
         launch = DolphinLauncher(arguments.dolphin).launch(
-            arguments.build_directory, arguments.profile
+            arguments.build_directory,
+            arguments.profile,
+            gdb_socket=arguments.gdb_socket,
+            gdb_port=arguments.gdb_port,
         )
         print(json.dumps({"command": launch.command, "pid": launch.process.pid}))
         if arguments.wait:
             return launch.process.wait()
         return 0
     if arguments.command == "probe-bridge":
-        transport = DolphinMemoryEngineTransport()
+        if arguments.gdb_socket:
+            transport = GdbRemoteMemoryTransport(socket_path=arguments.gdb_socket)
+        elif arguments.gdb_port:
+            transport = GdbRemoteMemoryTransport(
+                host=arguments.gdb_host,
+                port=arguments.gdb_port,
+            )
+        else:
+            transport = DolphinMemoryEngineTransport()
         transport.attach()
+        if isinstance(transport, GdbRemoteMemoryTransport):
+            transport.continue_execution()
+            ready_deadline = time.monotonic() + arguments.timeout_seconds
+            while True:
+                try:
+                    bridge_entry = transport.read(0x80002A00, 4)
+                except BridgeProtocolError:
+                    bridge_entry = b""
+                if bridge_entry == bytes.fromhex("9421fff0"):
+                    break
+                if time.monotonic() >= ready_deadline:
+                    raise BridgeProtocolError(
+                        "Patched Sluggers bridge did not load before the probe timeout"
+                    )
+                time.sleep(0.05)
+            transport.write(
+                arguments.memory_base,
+                ControlBlock.initial(
+                    arguments.adapter_build_sha256,
+                    arguments.game_build_sha256,
+                ).pack(),
+            )
         client = BridgeClient(
             transport,
             expected_adapter_build_sha256=arguments.adapter_build_sha256,
@@ -405,13 +463,14 @@ def run(arguments: argparse.Namespace) -> int:
                 "maxSeconds": max(durations),
                 "endUserCompilerRequired": False,
             },
-            "kamek": {
-                "dotnetPath": shutil.which("dotnet"),
-                "codeWarriorCompilerPath": shutil.which("mwcceppc"),
+            "trustedCompiler": {
+                "clangPath": shutil.which("clang"),
+                "lldPath": shutil.which("ld.lld"),
+                "reviewedVersion": "22.1.8",
                 "trustedReleaseEnvironmentRequired": True,
                 "endUserCompilerRequired": False,
             },
-            "selectedApproach": "trusted-kamek-build-plus-precompiled-runner-artifact",
+            "selectedApproach": "trusted-llvm-build-plus-precompiled-runner-artifact",
         }
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,8 +51,17 @@ class DolphinLauncher:
         return output
 
     def command_for(
-        self, build_directory: Path, user_directory: Path
+        self,
+        build_directory: Path,
+        user_directory: Path,
+        *,
+        gdb_socket: Path | None = None,
+        gdb_port: int | None = None,
     ) -> tuple[str, ...]:
+        if gdb_socket is not None and gdb_port is not None:
+            raise DolphinLaunchError("Choose either a Dolphin GDB socket or TCP port")
+        if gdb_port is not None and not 1 <= gdb_port <= 65535:
+            raise DolphinLaunchError("Dolphin GDB port must be between 1 and 65535")
         resolved_build = build_directory.expanduser().resolve()
         manifest_path = resolved_build / "game-build-manifest.json"
         try:
@@ -82,20 +92,49 @@ class DolphinLauncher:
         main_dol = game_directory / "sys/main.dol"
         profile = user_directory.expanduser().resolve()
         profile.mkdir(parents=True, exist_ok=True)
-        return (
+        command = [
             str(self.executable),
             "--batch",
             "--user",
             str(profile),
-            "--exec",
-            str(main_dol),
+        ]
+        if gdb_socket is not None:
+            command.extend(
+                (
+                    "-C",
+                    f"Dolphin.General.GDBSocket={gdb_socket.expanduser().resolve()}",
+                )
+            )
+        elif gdb_port is not None:
+            command.extend(("-C", f"Dolphin.General.GDBPort={gdb_port}"))
+        command.extend(
+            (
+                "--exec",
+                str(main_dol),
+            )
         )
+        return tuple(command)
 
-    def launch(self, build_directory: Path, user_directory: Path) -> DolphinLaunch:
+    def launch(
+        self,
+        build_directory: Path,
+        user_directory: Path,
+        *,
+        gdb_socket: Path | None = None,
+        gdb_port: int | None = None,
+    ) -> DolphinLaunch:
         self.verify()
-        command = self.command_for(build_directory, user_directory)
+        command = self.command_for(
+            build_directory,
+            user_directory,
+            gdb_socket=gdb_socket,
+            gdb_port=gdb_port,
+        )
         try:
-            process = subprocess.Popen(command)
+            process = subprocess.Popen(
+                command,
+                start_new_session=os.name != "nt",
+            )
         except OSError as error:
             raise DolphinLaunchError(f"Unable to launch Dolphin: {error}") from error
         return DolphinLaunch(process=process, command=command)

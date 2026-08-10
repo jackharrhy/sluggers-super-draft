@@ -48,7 +48,7 @@ tool directory:
 uv run --project runner starworks-runner install-dtk --tool-directory .starworks/tools
 ```
 
-Then create a no-op managed build from a user-selected, clean image:
+Then create a bridge-enabled managed build from a user-selected, clean image:
 
 ```shell
 uv run --project runner starworks-runner build-sluggers \
@@ -86,7 +86,8 @@ Managed extracted builds are launched by pointing Dolphin at their
 uv run --project runner starworks-runner launch-sluggers \
   --build-directory .starworks/cache/builds/BUILD_KEY \
   --dolphin /path/to/Dolphin \
-  --profile .starworks/profiles/station-1
+  --profile .starworks/profiles/station-1 \
+  --gdb-socket /tmp/starworks-station-1.sock
 ```
 
 Bridge protocol v1 is documented in
@@ -97,12 +98,23 @@ no game data or Dolphin process:
 uv run --project runner starworks-runner benchmark-bridge --iterations 10000
 ```
 
-With a bridge-enabled build running, `probe-bridge` uses the pinned Python
-Dolphin Memory Engine 1.3.1 transport to attach, validate the adapter and game
-build IDs, negotiate a one-attempt nonce, and consume only events attributed to
-that attempt. Version 1.3.1 provides wheels for Windows x86-64, Linux x86-64,
-macOS Intel, and macOS Apple Silicon. Each supported platform still requires a
-real Dolphin integration test before release.
+With a bridge-enabled build starting paused, `probe-bridge` connects to
+Dolphin 2606's built-in GDB remote stub, initializes the bounded bridge control
+block, continues the CPU, validates the adapter and game build IDs, negotiates
+a one-attempt nonce, and consumes only events attributed to that attempt:
+
+```shell
+uv run --project runner starworks-runner probe-bridge \
+  --gdb-socket /tmp/starworks-station-1.sock \
+  --adapter-build-sha256 ARTIFACT_SHA256 \
+  --game-build-sha256 GAME_BUILD_SHA256 \
+  --attempt-nonce URL_SAFE_NONCE_OF_AT_LEAST_32_CHARACTERS
+```
+
+Unix-domain sockets are used on macOS/Linux. On Windows, launch and probe with
+the same `--gdb-port`; the probe defaults to `127.0.0.1`. The optional
+`legacy-dme` extra retains Dolphin Memory Engine for supported Windows/Linux
+setups, but it is not the primary path and is not used on macOS.
 
 The patch-toolchain spike can be reproduced locally:
 
@@ -111,10 +123,9 @@ uv run --project runner starworks-runner evaluate-patch-toolchains \
   --size-mib 8 --iterations 5
 ```
 
-It benchmarks the hash- and byte-guarded precompiled-artifact path and reports
-whether the Kamek development prerequisites are present. The selected approach
-keeps Kamek and CodeWarrior in a trusted release environment; they are never
-runner or operator dependencies. See
+It benchmarks the hash- and byte-guarded precompiled-artifact path. The selected
+release builder uses pinned LLVM/Clang/LLD 22.1.8; compilers remain maintainer
+dependencies and are never runner or operator dependencies. See
 `docs/game-adapter/patch-toolchain-spike.md` for the evidence and release gates.
 
 ## Capture and RTMP
