@@ -1,4 +1,8 @@
-# Sluggers Super Draft
+# Starworks
+
+Starworks is a multi-league platform for managing Mario Super Sluggers leagues, drafts, teams, game runners, stat tracking, and broadcasts.
+
+See the [architecture and product plan](PLAN.md), the [phased delivery plan](docs/plans/2026-08-10-starworks-platform.md), and the [prior-art/community map](PRIOR_ART.md).
 
 ## setting up
 
