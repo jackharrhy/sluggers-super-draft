@@ -94,3 +94,27 @@ whether the Kamek development prerequisites are present. The selected approach
 keeps Kamek and CodeWarrior in a trusted release environment; they are never
 runner or operator dependencies. See
 `docs/game-adapter/patch-toolchain-spike.md` for the evidence and release gates.
+
+## Capture and RTMP
+
+The native runner uses independent FFmpeg workers for recording and RTMP. A
+publishing failure therefore reports degraded capture health without stopping
+the game or its durable telemetry spool. Stream URLs and keys are supplied only
+through a runner-local environment variable and are omitted from status output.
+
+This synthetic source verifies the recording path without Dolphin or game data:
+
+```shell
+uv run --project runner starworks-runner capture \
+  --video-backend lavfi \
+  --video-input 'testsrc=size=1280x720:rate=30' \
+  --record /tmp/starworks-capture-test.mkv \
+  --duration-seconds 3
+```
+
+For a real station, select the platform input (`avfoundation` on macOS,
+`gdigrab` on Windows, or `x11grab` on Linux), add its audio backend, and publish
+with `--rtmp-url-environment STARWORKS_RTMP_URL`. The environment value is
+necessarily handed to FFmpeg at process launch, but Starworks never persists or
+prints it. Headless OBS remains a later option for scenes that cannot be
+expressed as a browser-source overlay plus FFmpeg capture.
