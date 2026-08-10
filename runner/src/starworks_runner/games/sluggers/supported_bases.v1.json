@@ -2,6 +2,15 @@
   "schemaVersion": 1,
   "gameId": "RMBE01",
   "region": "NTSC-U",
-  "revisions": [],
-  "provisioningNote": "No retail game fingerprint is guessed or copied into Starworks. A project maintainer must inspect a lawfully dumped, Redump-matched RMBE01 Rev 0 image and review the generated hashes before adding the first production entry."
+  "revisions": [
+    {
+      "name": "Mario Super Sluggers (USA) (En,Fr,Es) Rev 0",
+      "revision": 0,
+      "discHeaderSha256": "77d0ea06cf31785fe7ceefc68d4b23a5302a75961b94a0cbaa9280f85019a37f",
+      "mainDolSha256": "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151",
+      "dataArchiveSha256": "810a0ee7928a8a2f23aee7e74d56d9b7eb8b218dfe9353fe85efcc07b8163705",
+      "fstSha256": "48bf2e7e65a46017386f3d7ddc272824c05bde4a200512333d932e2a7dfa29df"
+    }
+  ],
+  "provisioningNote": "Provisioned from a maintainer-owned, lossless RMBE01 Rev 0 ISO that produced an exact Redump match with pinned decomp-toolkit 1.8.3. The registry contains fingerprints only and no game data."
 }
