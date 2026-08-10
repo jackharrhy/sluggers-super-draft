@@ -50,3 +50,18 @@ uv run --project runner starworks-runner launch-sluggers \
   --dolphin /path/to/Dolphin \
   --profile .starworks/profiles/station-1
 ```
+
+Bridge protocol v1 is documented in
+`docs/game-adapter/bridge-protocol-v1.md`. Its polling path can be measured with
+no game data or Dolphin process:
+
+```shell
+uv run --project runner starworks-runner benchmark-bridge --iterations 10000
+```
+
+With a bridge-enabled build running, `probe-bridge` uses the pinned Python
+Dolphin Memory Engine 1.3.1 transport to attach, validate the adapter and game
+build IDs, negotiate a one-attempt nonce, and consume only events attributed to
+that attempt. Version 1.3.1 provides wheels for Windows x86-64, Linux x86-64,
+macOS Intel, and macOS Apple Silicon. Each supported platform still requires a
+real Dolphin integration test before release.

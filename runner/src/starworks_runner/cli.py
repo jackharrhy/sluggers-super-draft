@@ -4,9 +4,17 @@ import argparse
 import json
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
+from starworks_runner.games.sluggers.bridge.client import BridgeClient
+from starworks_runner.games.sluggers.bridge.layout import BridgeLayout
+from starworks_runner.games.sluggers.bridge.memory import (
+    ByteArrayMemoryTransport,
+    DolphinMemoryEngineTransport,
+)
+from starworks_runner.games.sluggers.bridge.synthetic import SyntheticGameBridge
 from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
 from starworks_runner.games.sluggers.dolphin import DolphinLauncher
 from starworks_runner.games.sluggers.errors import SluggersAdapterError
@@ -76,6 +84,23 @@ def create_parser() -> argparse.ArgumentParser:
     launch_parser.add_argument("--dolphin", type=Path, required=True)
     launch_parser.add_argument("--profile", type=Path, required=True)
     launch_parser.add_argument("--wait", action="store_true")
+
+    probe_parser = subparsers.add_parser(
+        "probe-bridge", help="attach to Dolphin and negotiate bridge protocol v1"
+    )
+    probe_parser.add_argument("--adapter-build-sha256", required=True)
+    probe_parser.add_argument("--game-build-sha256", required=True)
+    probe_parser.add_argument("--attempt-nonce", required=True)
+    probe_parser.add_argument(
+        "--memory-base", type=lambda value: int(value, 0), default=0x807A5000
+    )
+    probe_parser.add_argument("--timeout-seconds", type=float, default=5.0)
+    probe_parser.add_argument("--poll-seconds", type=float, default=1.0)
+
+    benchmark_parser = subparsers.add_parser(
+        "benchmark-bridge", help="measure the synthetic bridge polling path"
+    )
+    benchmark_parser.add_argument("--iterations", type=int, default=10_000)
     return parser
 
 
@@ -159,6 +184,68 @@ def run(arguments: argparse.Namespace) -> int:
         print(json.dumps({"command": launch.command, "pid": launch.process.pid}))
         if arguments.wait:
             return launch.process.wait()
+        return 0
+    if arguments.command == "probe-bridge":
+        transport = DolphinMemoryEngineTransport()
+        transport.attach()
+        client = BridgeClient(
+            transport,
+            expected_adapter_build_sha256=arguments.adapter_build_sha256,
+            expected_game_build_sha256=arguments.game_build_sha256,
+            layout=BridgeLayout(base_address=arguments.memory_base),
+        )
+        acknowledged = client.negotiate(
+            arguments.attempt_nonce, timeout_seconds=arguments.timeout_seconds
+        )
+        deadline = time.monotonic() + arguments.poll_seconds
+        events = []
+        while time.monotonic() < deadline:
+            events.extend(client.poll_events())
+            time.sleep(0.01)
+        print(
+            json.dumps(
+                {
+                    "acknowledgedEpoch": acknowledged.acknowledged_epoch,
+                    "heartbeat": client.read_control().heartbeat,
+                    "events": [
+                        {
+                            "sequence": event.sequence,
+                            "frame": event.frame,
+                            "eventType": event.event_type.name.lower(),
+                            "payloadValue": event.payload_value,
+                        }
+                        for event in events
+                    ],
+                    "polling": client.metrics.report_value(),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0
+    if arguments.command == "benchmark-bridge":
+        if arguments.iterations <= 0:
+            raise SluggersAdapterError("iterations must be positive")
+        layout = BridgeLayout()
+        transport = ByteArrayMemoryTransport(layout)
+        adapter_build = "a" * 64
+        game_build = "b" * 64
+        game = SyntheticGameBridge(transport, adapter_build, game_build, layout=layout)
+        client = BridgeClient(
+            transport,
+            expected_adapter_build_sha256=adapter_build,
+            expected_game_build_sha256=game_build,
+            layout=layout,
+        )
+        client.negotiate(
+            "synthetic_attempt_nonce_0123456789",
+            progress=game.observe_runner_request,
+            sleep=lambda _: None,
+        )
+        game.tick(emit_synthetic=True, payload_value=1)
+        for _ in range(arguments.iterations):
+            client.poll_events()
+        print(json.dumps(client.metrics.report_value(), indent=2, sort_keys=True))
         return 0
     raise AssertionError(f"Unhandled command {arguments.command}")
 
