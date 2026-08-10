@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { administrativeRoles, runnerOperationRoles, scoringRoles } from '../platform/repository.ts'
 import type { LeagueOperationsDashboard } from '../league-operations/service.ts'
+import type { NotificationDashboard } from '../notifications/service.ts'
 import type { RunnerOperationsDashboard } from '../runner/admin-service.ts'
 import type { SeasonStatistics, TelemetryAttemptSummary } from '../telemetry/service.ts'
 import { routes } from '../routes.ts'
@@ -15,6 +16,7 @@ interface LeagueOperationsPageProps {
   identity: SessionIdentity
   league: LeagueDetail
   leagueOperations: LeagueOperationsDashboard
+  notificationDashboard: NotificationDashboard
   oneTimeCredential?: string
   seasonStatistics: Array<{ name: string; seasonId: string; statistics: SeasonStatistics }>
   telemetry: TelemetryAttemptSummary[]
@@ -22,7 +24,7 @@ interface LeagueOperationsPageProps {
 
 export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) {
   return () => {
-    let { dashboard, error, identity, league, leagueOperations, oneTimeCredential, seasonStatistics, telemetry } = handle.props
+    let { dashboard, error, identity, league, leagueOperations, notificationDashboard, oneTimeCredential, seasonStatistics, telemetry } = handle.props
     let teams = dashboard.seasons.flatMap((season) => season.teams)
     let mayAdminister = identity.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
     let mayOperateRunner = identity.isSiteAdmin || league.roles.some((role) => runnerOperationRoles.has(role))
@@ -43,6 +45,31 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
         </header>
 
         {error ? <p role="alert" mix={errorStyle}>{error}</p> : null}
+        <section mix={[cardStyle, notificationStyle]} aria-labelledby="discord-notifications-heading">
+          <div>
+            <p mix={eyebrowStyle}>First-class notifications</p>
+            <h2 id="discord-notifications-heading">Discord delivery</h2>
+            <p mix={mutedStyle}>
+              {notificationDashboard.channelId
+                ? `Channel ${notificationDashboard.channelId} · ${notificationDashboard.sent} sent · ${notificationDashboard.pending} pending · ${notificationDashboard.failed} failed`
+                : 'No league channel configured. Starworks continues normally without notification delivery.'}
+            </p>
+            {!notificationDashboard.botConfigured
+              ? <p mix={warningStyle}>The server has no Discord bot token; configured messages remain in the durable outbox.</p>
+              : null}
+          </div>
+          {mayAdminister ? <div mix={notificationActionsStyle}>
+            <form action={routes.leagues.operations.configureDiscord.href({ leagueSlug: league.slug })} method="post" mix={inlineFormStyle}>
+              <label>Discord channel ID<input name="channelId" pattern="[0-9]{17,20}" defaultValue={notificationDashboard.channelId ?? ''} placeholder="Leave blank to disable" mix={inputStyle} /></label>
+              <button type="submit" mix={buttonStyle}>Save Discord channel</button>
+            </form>
+            {notificationDashboard.pending || notificationDashboard.failed ? (
+              <form action={routes.leagues.operations.retryDiscord.href({ leagueSlug: league.slug })} method="post">
+                <button type="submit" mix={secondaryButtonStyle}>Retry queued messages</button>
+              </form>
+            ) : null}
+          </div> : null}
+        </section>
         <RosterOperations identity={identity} league={league} mayAdminister={mayAdminister} operations={leagueOperations} />
         <TelemetryOperations
           attempts={telemetry}
@@ -340,6 +367,10 @@ const heroStyle = css({ display: 'grid', gap: '24px' })
 const linkRowStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '18px' })
 const errorStyle = css({ background: '#4b1822', border: '1px solid #d75b70', borderRadius: '12px', marginTop: '28px', padding: '14px 18px' })
 const credentialStyle = css({ borderColor: '#f7c948', marginTop: '28px' })
+const notificationStyle = css({ display: 'grid', gap: '18px', marginTop: '28px' })
+const notificationActionsStyle = css({ alignItems: 'end', display: 'flex', flexWrap: 'wrap', gap: '12px' })
+const inlineFormStyle = css({ alignItems: 'end', display: 'flex', flex: '1 1 520px', flexWrap: 'wrap', gap: '10px', '& label': { display: 'grid', flex: '1 1 240px', fontWeight: 700, gap: '7px' } })
+const warningStyle = css({ color: '#f7d778', marginBottom: 0 })
 const codeStyle = css({ background: '#080b12', borderRadius: '8px', display: 'block', overflowWrap: 'anywhere', padding: '14px' })
 const twoColumnStyle = css({ display: 'grid', gap: '24px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))', marginTop: '32px' })
 const formStyle = css({ display: 'grid', gap: '14px', marginTop: '18px', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })

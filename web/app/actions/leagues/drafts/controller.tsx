@@ -2,10 +2,11 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 import type { RemixNode } from 'remix/ui'
 
-import { Draft, Identity, Platform } from '../../../middleware/platform.ts'
+import { Draft, Identity, Notifications, Platform } from '../../../middleware/platform.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
 import type { DraftApplication } from '../../../draft/service.ts'
+import { publishBestEffort } from '../../../notifications/publish.ts'
 import { routes } from '../../../routes.ts'
 import { DraftDashboardPage, DraftRoomPage } from '../../../ui/draft-pages.tsx'
 import { MessagePage } from '../../../ui/message-page.tsx'
@@ -73,13 +74,19 @@ export default createController(routes.leagues.drafts, {
       if (!league) return notFound(context)
       return mutateRoom({
         draft: context.get(Draft), draftId: context.params.draftId, identity, league,
-        operation: (draft) => {
-        let data = context.get(FormData)
-        return draft.makePick(identity, league.id, context.params.draftId, {
-          characterId: readString(data, 'characterId'),
-          expectedVersion: readNumber(data, 'expectedVersion'),
-          reason: readString(data, 'reason', false) || undefined,
-        })
+        operation: async (draft) => {
+          let data = context.get(FormData)
+          let pick = await draft.makePick(identity, league.id, context.params.draftId, {
+            characterId: readString(data, 'characterId'),
+            expectedVersion: readNumber(data, 'expectedVersion'),
+            reason: readString(data, 'reason', false) || undefined,
+          })
+          await publishBestEffort(context.get(Notifications), league.id, {
+            dedupeKey: `draft-pick:${pick.id}`,
+            eventType: 'draft.pick_committed',
+            message: `🌟 ${league.name} draft pick #${pick.pickNumber}: ${pick.characterId} joined team ${pick.teamId}.`,
+          }, context.structuredLog)
+          return pick
         },
         render: (node, init) => context.render(node, init),
       })

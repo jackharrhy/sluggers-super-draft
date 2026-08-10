@@ -7,6 +7,7 @@ import type { ContentApplication } from '../content/service.ts'
 import type { DraftApplication } from '../draft/service.ts'
 import type { LeagueOperationsApplication } from '../league-operations/service.ts'
 import type { OperationsApplication } from '../operations/service.ts'
+import type { NotificationApplication } from '../notifications/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
 import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { TelemetryApplication } from '../telemetry/service.ts'
@@ -25,6 +26,7 @@ export const IdentityServiceContext = createContextKey<IdentityService>()
 export const LeagueOperations = createContextKey<LeagueOperationsApplication>()
 export const OAuthCookie = createContextKey<Cookie>()
 export const Operations = createContextKey<OperationsApplication>()
+export const Notifications = createContextKey<NotificationApplication | null>(null)
 export const Platform = createContextKey<PlatformService>()
 export const RunnerControl = createContextKey<RunnerControlApplication>()
 export const RunnerAdmin = createContextKey<RunnerAdminApplication>()
@@ -44,6 +46,7 @@ export function platform(
     { key: typeof LeagueOperations; value: LeagueOperationsApplication },
     { key: typeof OAuthCookie; value: Cookie },
     { key: typeof Operations; value: OperationsApplication },
+    { key: typeof Notifications; value: NotificationApplication | null },
     { key: typeof Platform; value: PlatformService },
     { key: typeof RunnerControl; value: RunnerControlApplication },
     { key: typeof RunnerAdmin; value: RunnerAdminApplication },
@@ -65,6 +68,7 @@ export function platform(
     context.set(LeagueOperations, runtime.leagueOperations)
     context.set(OAuthCookie, runtime.oauthCookie)
     context.set(Operations, runtime.operations)
+    context.set(Notifications, runtime.notifications ?? null)
     context.set(Platform, runtime.platform)
     context.set(RunnerControl, runtime.runnerControl)
     context.set(RunnerAdmin, runtime.runnerAdmin)

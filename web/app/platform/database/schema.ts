@@ -101,6 +101,11 @@ export const telemetryCorrectionEntity = pgEnum('telemetry_correction_entity', [
   'team',
   'character',
 ])
+export const discordNotificationStatus = pgEnum('discord_notification_status', [
+  'pending',
+  'sent',
+  'failed',
+])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -187,6 +192,40 @@ export const publicationSettings = pgTable('publication_settings', {
   draftVisible: boolean('draft_visible').notNull().default(false),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+export const discordNotificationSettings = pgTable('discord_notification_settings', {
+  leagueId: uuid('league_id')
+    .primaryKey()
+    .references(() => leagues.id, { onDelete: 'cascade' }),
+  channelId: text('channel_id').notNull(),
+  configuredByPersonId: uuid('configured_by_person_id')
+    .notNull()
+    .references(() => people.id),
+  ...timestamps,
+}, (table) => [
+  check('discord_notification_settings_channel_id_check', sql`${table.channelId} ~ '^[0-9]{17,20}$'`),
+])
+
+export const discordNotificationOutbox = pgTable('discord_notification_outbox', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  leagueId: uuid('league_id')
+    .notNull()
+    .references(() => leagues.id, { onDelete: 'cascade' }),
+  eventType: text('event_type').notNull(),
+  dedupeKey: text('dedupe_key').notNull(),
+  message: text('message').notNull(),
+  status: discordNotificationStatus('status').notNull().default('pending'),
+  attempts: integer('attempts').notNull().default(0),
+  lastError: text('last_error'),
+  sentAt: timestamp('sent_at', { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex('discord_notification_outbox_dedupe_unique').on(table.leagueId, table.dedupeKey),
+  index('discord_notification_outbox_delivery_index').on(table.leagueId, table.status, table.createdAt),
+  check('discord_notification_outbox_attempts_check', sql`${table.attempts} >= 0`),
+  check('discord_notification_outbox_event_type_check', sql`length(${table.eventType}) between 3 and 100`),
+  check('discord_notification_outbox_message_check', sql`length(${table.message}) between 1 and 1800`),
+])
 
 export const seasons = pgTable(
   'seasons',

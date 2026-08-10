@@ -11,6 +11,8 @@ import { RunnerControlService, type RunnerControlApplication } from '../runner/c
 import { RunnerAdminService, type RunnerAdminApplication } from '../runner/admin-service.ts'
 import { TelemetryService, type TelemetryApplication } from '../telemetry/service.ts'
 import { OperationsService, type OperationsApplication } from '../operations/service.ts'
+import { createDiscordNotificationClient } from '../notifications/discord-client.ts'
+import { NotificationService, type NotificationApplication } from '../notifications/service.ts'
 import { createDatabase } from './database/connection.ts'
 import { PostgresPlatformRepository } from './database/postgres-repository.ts'
 import {
@@ -28,6 +30,7 @@ export interface AppRuntime {
   draft: DraftApplication
   identity: IdentityService
   leagueOperations: LeagueOperationsApplication
+  notifications?: NotificationApplication
   oauthCookie: Cookie
   operations: OperationsApplication
   platform: PlatformService
@@ -66,6 +69,10 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     draft: new DraftService(connection.database),
     identity: new IdentityService(repository, discord),
     leagueOperations: new LeagueOperationsService(connection.database),
+    notifications: new NotificationService(
+      connection.database,
+      createDiscordNotificationClient(process.env),
+    ),
     oauthCookie: createCookie('starworks_oauth', { ...cookieOptions, maxAge: 10 * 60 }),
     operations: new OperationsService(connection.database, assets, {
       metricsToken: process.env.METRICS_BEARER_TOKEN,

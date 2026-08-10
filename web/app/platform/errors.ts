@@ -3,6 +3,7 @@ export class PlatformError extends Error {
     message: string,
     readonly code:
       | 'conflict'
+      | 'external_service'
       | 'forbidden'
       | 'invalid_input'
       | 'not_found'

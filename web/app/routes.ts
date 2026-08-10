@@ -32,6 +32,8 @@ export const routes = route({
     updatePublication: post(':leagueSlug/publication'),
     operations: route(':leagueSlug/operations', {
       dashboard: get('/'),
+      configureDiscord: post('discord-notifications'),
+      retryDiscord: post('discord-notifications/retry'),
       setDeadline: post('deadlines'),
       proposeTrade: post('trades'),
       reviewTrade: post('trades/:proposalId/review'),

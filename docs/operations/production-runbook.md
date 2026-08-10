@@ -143,6 +143,21 @@ attempt, and runner identifiers when those identities are trusted by the
 request path. Ship stdout/stderr to the deployment's log system and alert on
 `http.request.failed` without indexing credentials or request bodies.
 
+## Discord notifications
+
+Email is not required. Set `DISCORD_BOT_TOKEN` only when notification delivery
+is wanted, invite that bot to the Discord server with permission to view and
+send messages in the target channel, then let a league administrator save the
+numeric channel ID from the league operations page. Starworks disables Discord
+mentions in every outbound message.
+
+Draft picks, trade proposals and applications, queued match attempts, and
+confirmed results write to a tenant-scoped outbox before delivery. A Discord
+failure never rolls back the league action. Administrators can inspect sent,
+pending, and failed counts and retry up to 25 queued messages at a time from
+the same page. Removing the channel disables future outbox writes without
+deleting its audit or delivery history.
+
 ## Audit review and credential revocation
 
 League administrators can review the latest 100 append-only audit events in
