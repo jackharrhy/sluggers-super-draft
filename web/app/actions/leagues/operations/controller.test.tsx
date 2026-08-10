@@ -206,6 +206,7 @@ function createRuntime(
   let cookies = { httpOnly: true, path: '/', sameSite: 'Lax' as const, secrets: ['operations-test'] }
   return {
     configuration: {} as ConfigurationApplication,
+    content: {} as AppRuntime['content'],
     draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     leagueOperations,

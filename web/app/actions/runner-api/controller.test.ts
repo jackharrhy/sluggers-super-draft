@@ -277,6 +277,7 @@ function createRuntime(
   }
   return {
     configuration: {} as ConfigurationApplication,
+    content: {} as AppRuntime['content'],
     draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     leagueOperations: {} as AppRuntime['leagueOperations'],
