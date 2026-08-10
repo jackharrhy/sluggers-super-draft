@@ -24,6 +24,10 @@ export const routes = route({
     updatePublication: post(':leagueSlug/publication'),
     operations: route(':leagueSlug/operations', {
       dashboard: get('/'),
+      setDeadline: post('deadlines'),
+      proposeTrade: post('trades'),
+      reviewTrade: post('trades/:proposalId/review'),
+      cancelTrade: post('trades/:proposalId/cancel'),
       scheduleMatch: post('matches'),
       queueAttempt: post('matches/:matchId/attempts'),
       issueCredential: post('runner-credentials'),

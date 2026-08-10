@@ -54,6 +54,7 @@ export function LeaguePage(
           </>
         ) : null}
         {identity ? (
+          <>
           <section mix={[cardStyle, settingsStyle]} aria-labelledby="draft-heading">
             <div>
               <h2 id="draft-heading" mix={subheadingStyle}>Draft room</h2>
@@ -61,6 +62,14 @@ export function LeaguePage(
             </div>
             <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Open draft workspace</a>
           </section>
+          {!mayAdminister ? <section mix={[cardStyle, settingsStyle]} aria-labelledby="team-operations-heading">
+            <div>
+              <h2 id="team-operations-heading" mix={subheadingStyle}>Team operations</h2>
+              <p mix={mutedStyle}>Review published rosters, propose trades, and respond to approval requests.</p>
+            </div>
+            <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Open team operations</a>
+          </section> : null}
+          </>
         ) : null}
       </AppShell>
     )

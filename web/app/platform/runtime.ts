@@ -3,6 +3,7 @@ import { createCookie } from 'remix/cookie'
 
 import { ConfigurationService, type ConfigurationApplication } from '../configuration/service.ts'
 import { DraftService, type DraftApplication } from '../draft/service.ts'
+import { LeagueOperationsService, type LeagueOperationsApplication } from '../league-operations/service.ts'
 import { RunnerControlService, type RunnerControlApplication } from '../runner/control-service.ts'
 import { RunnerAdminService, type RunnerAdminApplication } from '../runner/admin-service.ts'
 import { createDatabase } from './database/connection.ts'
@@ -19,6 +20,7 @@ export interface AppRuntime {
   configuration: ConfigurationApplication
   draft: DraftApplication
   identity: IdentityService
+  leagueOperations: LeagueOperationsApplication
   oauthCookie: Cookie
   platform: PlatformService
   runnerControl: RunnerControlApplication
@@ -51,6 +53,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     configuration: new ConfigurationService(connection.database),
     draft: new DraftService(connection.database),
     identity: new IdentityService(repository, discord),
+    leagueOperations: new LeagueOperationsService(connection.database),
     oauthCookie: createCookie('starworks_oauth', { ...cookieOptions, maxAge: 10 * 60 }),
     platform: new PlatformService(repository),
     runnerControl: new RunnerControlService(connection.database),
