@@ -65,6 +65,10 @@ def test_recording_and_rtmp_workers_have_independent_sanitized_health(
     assert status.state == "degraded"
     assert status.recording.state == "healthy"
     assert status.publishing.state == "failed"
+    assert status.heartbeat_value() == {
+        "recording": "healthy",
+        "publishing": "failed",
+    }
     serialized = json.dumps(status.report_value())
     assert rtmp_secret not in serialized
     assert "super-secret-stream-key" not in serialized

@@ -77,6 +77,7 @@ export interface RunnerOperationsDashboard {
     runtimeState: string
     lastHeartbeatAt: Date | null
     capabilities: unknown
+    componentHealth: Record<string, string>
   }>
 }
 
@@ -140,6 +141,7 @@ export class RunnerAdminService {
       })),
       stations: stationRows.map((station) => ({
         capabilities: station.capabilities,
+        componentHealth: station.componentHealth,
         id: station.id,
         lastHeartbeatAt: station.lastHeartbeatAt,
         name: station.name,

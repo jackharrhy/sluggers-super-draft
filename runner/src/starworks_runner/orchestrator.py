@@ -52,12 +52,14 @@ class RunnerStation:
         station_name: str,
         capabilities: dict[str, Any],
         clock: Callable[[], datetime] | None = None,
+        component_health: Callable[[], dict[str, str]] | None = None,
     ) -> None:
         self.client = client
         self.state = state
         self.station_name = station_name
         self.capabilities = capabilities
         self.clock = clock or (lambda: datetime.now(UTC))
+        self.component_health = component_health
 
     def register(self) -> StationRegistration:
         response = self.client.register(self.station_name, self.capabilities)
@@ -79,6 +81,9 @@ class RunnerStation:
             active_attempt_id=active.envelope["attemptId"] if active else None,
             active_lease_id=active.envelope["lease"]["leaseId"] if active else None,
             last_captured_sequence=active.last_captured_sequence if active else None,
+            component_health=(
+                self.component_health() if self.component_health else None
+            ),
         )
 
     def flush_pending_updates(self) -> None:

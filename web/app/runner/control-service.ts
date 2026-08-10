@@ -173,7 +173,12 @@ export class RunnerControlService {
     let now = this.#clock()
     let updated = await this.database
       .update(runnerStations)
-      .set({ lastHeartbeatAt: now, runtimeState: request.state, updatedAt: now })
+      .set({
+        componentHealth: request.components ?? {},
+        lastHeartbeatAt: now,
+        runtimeState: request.state,
+        updatedAt: now,
+      })
       .where(and(
         eq(runnerStations.leagueId, authenticated.leagueId),
         eq(runnerStations.id, stationId),

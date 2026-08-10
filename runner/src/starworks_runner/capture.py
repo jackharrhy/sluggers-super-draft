@@ -146,6 +146,12 @@ class CaptureHealth:
             "publishing": self.publishing.report_value(),
         }
 
+    def heartbeat_value(self) -> dict[str, str]:
+        return {
+            "recording": self.recording.state,
+            "publishing": self.publishing.state,
+        }
+
 
 class CaptureProcess(Protocol):
     stdin: BinaryIO | None
@@ -439,6 +445,10 @@ class CapturingAttemptExecutor:
 
     def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.executor.prepare(envelope, configuration)
+
+    def component_health(self) -> dict[str, str]:
+        self.last_health = self.capture.health()
+        return self.last_health.heartbeat_value()
 
     def execute(
         self,

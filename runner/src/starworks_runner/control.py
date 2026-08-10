@@ -100,19 +100,23 @@ class RunnerControlClient:
         active_attempt_id: str | None,
         active_lease_id: str | None,
         last_captured_sequence: int | None,
+        component_health: dict[str, str] | None = None,
     ) -> dict[str, Any]:
+        message: dict[str, Any] = {
+            "schemaVersion": 1,
+            "kind": "runner-heartbeat-request",
+            "runnerId": runner_id,
+            "sentAt": sent_at,
+            "state": state,
+            "activeAttemptId": active_attempt_id,
+            "activeLeaseId": active_lease_id,
+            "lastCapturedSequence": last_captured_sequence,
+        }
+        if component_health is not None:
+            message["components"] = component_health
         return self._send(
             "/api/v1/runner/heartbeat",
-            {
-                "schemaVersion": 1,
-                "kind": "runner-heartbeat-request",
-                "runnerId": runner_id,
-                "sentAt": sent_at,
-                "state": state,
-                "activeAttemptId": active_attempt_id,
-                "activeLeaseId": active_lease_id,
-                "lastCapturedSequence": last_captured_sequence,
-            },
+            message,
             expected_kind="runner-heartbeat-response",
         )
 

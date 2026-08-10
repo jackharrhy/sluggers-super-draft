@@ -197,6 +197,56 @@
               "type": "null"
             }
           ]
+        },
+        "components": {
+          "type": "object",
+          "properties": {
+            "dolphin": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "starting",
+                "healthy",
+                "degraded",
+                "failed",
+                "stopped"
+              ]
+            },
+            "bridge": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "starting",
+                "healthy",
+                "degraded",
+                "failed",
+                "stopped"
+              ]
+            },
+            "recording": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "starting",
+                "healthy",
+                "degraded",
+                "failed",
+                "stopped"
+              ]
+            },
+            "publishing": {
+              "type": "string",
+              "enum": [
+                "disabled",
+                "starting",
+                "healthy",
+                "degraded",
+                "failed",
+                "stopped"
+              ]
+            }
+          },
+          "additionalProperties": false
         }
       },
       "required": [
