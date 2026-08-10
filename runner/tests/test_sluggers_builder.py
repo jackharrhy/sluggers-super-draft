@@ -180,13 +180,41 @@ def test_modified_base_fails_closed_without_promoting_a_build(tmp_path: Path) ->
     assert not list((tmp_path / "cache/.staging").iterdir())
 
 
-def test_unprovisioned_production_registry_is_explicit(tmp_path: Path) -> None:
+def test_production_registry_contains_reviewed_rev_zero_base() -> None:
+    registry = SupportedBaseRegistry.load()
+
+    assert len(registry.entries) == 1
+    reviewed = registry.entries[0]
+    assert reviewed.name == "Mario Super Sluggers (USA) (En,Fr,Es) Rev 0"
+    assert reviewed.fingerprint.manifest_value() == {
+        "gameId": "RMBE01",
+        "region": "NTSC-U",
+        "revision": 0,
+        "discHeaderSha256": (
+            "77d0ea06cf31785fe7ceefc68d4b23a5302a75961b94a0cbaa9280f85019a37f"
+        ),
+        "mainDolSha256": (
+            "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"
+        ),
+        "dataArchiveSha256": (
+            "810a0ee7928a8a2f23aee7e74d56d9b7eb8b218dfe9353fe85efcc07b8163705"
+        ),
+        "fstSha256": (
+            "48bf2e7e65a46017386f3d7ddc272824c05bde4a200512333d932e2a7dfa29df"
+        ),
+    }
+    assert registry.require_supported(reviewed.fingerprint) is reviewed
+
+
+def test_unprovisioned_registry_is_explicit(tmp_path: Path) -> None:
     root = tmp_path / "extracted"
     create_extraction(root)
     fingerprint, _ = fingerprint_extraction(
         root, expected_game_id="RMBE01", expected_revision=0
     )
-    registry = SupportedBaseRegistry.load()
+    registry = SupportedBaseRegistry(
+        (), provisioning_note="Maintainer review is still required."
+    )
 
     with pytest.raises(UnsupportedBaseError, match="not provisioned yet"):
         registry.require_supported(fingerprint)

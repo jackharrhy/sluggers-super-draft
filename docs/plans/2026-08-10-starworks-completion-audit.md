@@ -59,18 +59,17 @@ The new Remix application lives in `web/`; the original site is preserved in
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A supported dump becomes a separate managed build that boots in Dolphin. | **Software verified; external acceptance pending** | The runner fingerprints, extracts through pinned `decomp-toolkit`, builds in staging, atomically promotes, verifies the whole tree, and launches pinned Dolphin. The reviewed retail fingerprint registry is intentionally empty until a lawful exact dump is supplied. |
-| Rebuilding the same inputs produces the same manifest and hashes. | **Verified with generated fixtures** | Builder tests cover deterministic manifests, cache hits, interrupted staging, source immutability, and tamper rejection. A real-base repeat is part of the external matrix. |
+| A supported dump becomes a separate managed build that boots in Dolphin. | **Verified on macOS arm64** | A maintainer-owned lossless `RMBE01` Rev 0 ISO produced an exact Redump match, provisioned the reviewed fingerprint registry, and completed a private no-op managed build. The integrity-checking runner launched that extracted build in Dolphin 2606; the emulator identified `RMBE01` and visibly rendered the opening sequence before a clean exit. |
+| Rebuilding the same inputs produces the same manifest and hashes. | **Verified with generated fixtures and real base** | Builder tests cover deterministic manifests, cache hits, interrupted staging, source immutability, and tamper rejection. Repeating the real-base build returned the same `ef58a889…6edc` cache key and `1a865ac4…d28d` build hash with `cacheHit: true`; the report records `sourceMutated: false`. |
 | Python completes a versioned nonce handshake with the game. | **Software verified; external acceptance pending** | Protocol v1, bounded memory access, nonce hashing, synthetic game bridge, and Dolphin Memory Engine transport are implemented. Actual in-game bridge injection is gated below. |
 | A synthetic event survives pause/recovery and cannot cross attempts. | **Verified** | Bridge, execution binding, event-spool, lease-recovery, and synthetic executor tests cover attribution, duplicates, overflow, and interrupted uploads. |
-| Unsupported dumps and modified hooks fail closed. | **Verified in software; real fingerprint pending** | Exact fingerprint registry, expected-byte patch guards, target hash checks, and launch-time whole-tree verification all reject unknown inputs. |
+| Unsupported dumps and modified hooks fail closed. | **Verified** | The provisioned exact fingerprint registry, expected-byte patch guards, target hash checks, and launch-time whole-tree verification reject unknown inputs. The real supported base completed the positive path. |
 | Bridge build approach is selected from evidence. | **Verified** | [`patch-toolchain-spike.md`](../game-adapter/patch-toolchain-spike.md) selects trusted Kamek build plus hash-pinned precompiled runner artifact; end users need no compiler. |
 
-External release gates are explicit in
-`runner/src/starworks_runner/games/sluggers/adapter_manifest.v1.json`: provision
-the reviewed `RMBE01` Rev 0 fingerprint, select a lawful clean-room hook and
-expected bytes, compile/review the bridge artifact, and boot/handshake it in
-Dolphin.
+Remaining external release gates are explicit in
+`runner/src/starworks_runner/games/sluggers/adapter_manifest.v1.json`: select a
+lawful clean-room hook and expected bytes, compile/review the bridge artifact,
+and boot/handshake it in Dolphin.
 
 ### Milestone 2 — Multi-tenant web foundation
 
@@ -176,27 +175,24 @@ Dolphin is the implemented first path.
 These are not missing ordinary repository code and must not be replaced with
 guessed hashes, offsets, binaries, or claims:
 
-1. **Lawful game-base provisioning:** inspect a maintainer-owned, exact
-   `RMBE01` Rev 0 dump; review disc, `main.dol`, `dt_na.dat`, and `fst.bin`
-   fingerprints; add the supported-base entry.
-2. **Reviewed bridge release:** independently identify a clean hook, record its
+1. **Reviewed bridge release:** independently identify a clean hook, record its
    original bytes and collision range, compile the clean-room bridge, review
    symbols/cache barriers, and add hash-pinned artifacts/patch plans.
-3. **Real game vertical slice:** load teams/stats/rules, capture a complete
+2. **Real game vertical slice:** load teams/stats/rules, capture a complete
    representative game, prove ordered telemetry across disconnect/restart, and
    validate cancellation/retry with physical or equivalent input.
-4. **Platform hardware matrix:** repeat boot, bridge, telemetry, capture, RTMP,
+3. **Platform hardware matrix:** repeat boot, bridge, telemetry, capture, RTMP,
    recovery, and revocation gates on every platform advertised as supported.
-5. **Deployment acceptance:** push the branch, observe hosted CI, deploy to the
+4. **Deployment acceptance:** push the branch, observe hosted CI, deploy to the
    target environment, and repeat restore plus credential-revocation drills.
-6. **External licensing outreach:** the project owner must contact the
+5. **External licensing outreach:** the project owner must contact the
    Sluggies/MSS DAT Tools and relevant Mii maintainers before importing their
    code or adopting `.sluggie` as a supported local boundary.
 
-Until gates 1–4 pass, release material must say **software preview** and must
+Until gates 1–3 pass, release material must say **software preview** and must
 not claim that Starworks can run a real Mario Super Sluggers match. The empty
-fingerprint, target, artifact, and patch-plan arrays are intentional safety
-controls, not placeholders to fill from unverified internet values.
+target, artifact, and patch-plan arrays are intentional safety controls, not
+placeholders to fill from unverified internet values.
 
 ## Decision-gated work, not release blockers
 
@@ -209,4 +205,3 @@ controls, not placeholders to fill from unverified internet values.
   and hardware safety.
 - Headless OBS is added only when FFmpeg plus the web overlay cannot express a
   required scene.
-

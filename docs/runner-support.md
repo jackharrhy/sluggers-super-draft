@@ -54,9 +54,10 @@ explicitly. Production sets `RUNNER_MINIMUM_VERSION` and
   sectors.
 - A private runner credential issued from the league operations workspace.
 
-The supported-base registry intentionally remains empty until a maintainer can
-review fingerprints from a lawfully dumped exact match. That is a release gate,
-not an error to bypass.
+The supported-base registry contains the maintainer-reviewed North American
+Rev 0 fingerprints produced from a lawfully dumped exact match. Unknown or
+modified bases remain a hard failure; update the registry only through the same
+review process.
 
 ## Support matrix
 
@@ -66,7 +67,7 @@ match on that target.
 
 | Profile | Package/CLI | Real Dolphin + bridge | Capture/RTMP | Status |
 | --- | --- | --- | --- | --- |
-| macOS 14+ arm64 | verified | hardware pending | synthetic FFmpeg verified; real input pending | preview |
+| macOS 14+ arm64 | verified | Dolphin 2606 boot verified; bridge pending | synthetic FFmpeg verified; real input pending | preview |
 | macOS 14+ x64 | dependency wheel available | hardware pending | hardware pending | preview |
 | Windows 11 x64 | dependency wheel available | hardware pending | `gdigrab`/`dshow` pending | preview |
 | Linux x64 native | test suite verified | hardware pending | `x11grab`/Pulse pending | preview |

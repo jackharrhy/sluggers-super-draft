@@ -65,10 +65,10 @@ independently prove the exact retail base. Converting that WBFS to another
 format does not restore the discarded evidence; make a new lossless dump from
 the owned disc instead.
 
-The checked-in retail fingerprint registry is intentionally empty until a
-maintainer reviews hashes produced from a lawfully dumped, exact Redump match.
-The command fails closed until that one-time provisioning step is complete.
-Starworks never writes to the selected image and never uploads it.
+The checked-in retail fingerprint registry contains the reviewed North American
+Rev 0 hashes. The build command fails closed when any required file differs
+from that exact base. Starworks never writes to the selected image and never
+uploads it.
 
 The review candidate is produced locally without retaining the extraction:
 
