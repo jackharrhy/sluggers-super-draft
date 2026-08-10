@@ -120,6 +120,33 @@
           "type": "integer",
           "minimum": 15,
           "maximum": 900
+        },
+        "versionPolicy": {
+          "type": "object",
+          "properties": {
+            "minimumRunnerVersion": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+            },
+            "recommendedRunnerVersion": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "current",
+                "update-available",
+                "update-required"
+              ]
+            }
+          },
+          "required": [
+            "minimumRunnerVersion",
+            "recommendedRunnerVersion",
+            "status"
+          ],
+          "additionalProperties": false
         }
       },
       "required": [

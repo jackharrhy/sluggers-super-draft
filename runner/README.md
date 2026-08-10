@@ -25,6 +25,10 @@ Tagged releases include a wheel with bundled contract schemas and checksums.
 See the [runner installation, update, support, and recovery policy](../docs/runner-support.md)
 before installing a station outside a source checkout.
 
+Registration compares the installed runner version with the server's minimum
+and recommended versions. The native status card reports whether the station
+is current, has an update available, or must update before it can be supported.
+
 Validate the shared contract fixtures directly:
 
 ```shell
@@ -122,3 +126,19 @@ with `--rtmp-url-environment STARWORKS_RTMP_URL`. The environment value is
 necessarily handed to FFmpeg at process launch, but Starworks never persists or
 prints it. Headless OBS remains a later option for scenes that cannot be
 expressed as a browser-source overlay plus FFmpeg capture.
+
+## Redacted support bundles
+
+Support archives are never uploaded automatically. An operator must choose the
+destination and pass explicit consent; an existing file is never overwritten:
+
+```shell
+uv run --project runner starworks-runner support-bundle \
+  --state "$HOME/Library/Application Support/Starworks/runner.sqlite3" \
+  --output ./starworks-support.zip \
+  --consent
+```
+
+The archive contains platform/prerequisite status and a minimal local-state
+summary. It excludes configured file paths, the game image and build, match
+configuration and attempt nonce, runner credential, and RTMP destination.

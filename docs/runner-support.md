@@ -34,6 +34,12 @@ The release wheel bundles the generated JSON Schemas and validation fixtures.
 The packaging smoke test installs the wheel into a clean `uv tool` home and
 validates them before a release is created.
 
+On registration, the web service returns its configured minimum and recommended
+runner versions. The native status card reports `current`, `update-available`,
+or `update-required`; operators still install a checksum-verified tagged wheel
+explicitly. Production sets `RUNNER_MINIMUM_VERSION` and
+`RUNNER_RECOMMENDED_VERSION` rather than silently updating a station.
+
 ## Native prerequisites
 
 - Python 3.12 and `uv` for installation.
@@ -108,6 +114,20 @@ When recovering:
 5. Revoke the station if its credential or host may be compromised.
 6. Share only redacted logs and diagnostic output. Never include the game dump,
    extracted files, materialized build, runner credential, or RTMP URL.
+
+Create a reviewable local archive only after the operator explicitly consents:
+
+```shell
+starworks-runner support-bundle \
+  --state /path/to/runner.sqlite3 \
+  --output ./starworks-support.zip \
+  --consent
+```
+
+The command refuses to overwrite a file. The generated ZIP has a privacy
+manifest, normalized prerequisite status, and a minimal state summary; it
+contains no configured paths, game/configuration bytes, attempt nonce,
+credential, or RTMP secret. Starworks has no automatic support-bundle upload.
 
 Bridge mismatches, unsupported bases, changed hook bytes, and manifest hash
 mismatches fail closed. Do not “repair” them by weakening checks; update the

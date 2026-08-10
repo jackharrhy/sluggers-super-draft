@@ -21,6 +21,11 @@ class StationRegistration:
     runner_id: str
     heartbeat_seconds: int
     lease_seconds: int
+    version_status: Literal[
+        "current", "update-available", "update-required", "unknown"
+    ] = "unknown"
+    minimum_runner_version: str | None = None
+    recommended_runner_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -72,6 +77,9 @@ class RunnerStateStore:
             "runner_id": registration.runner_id,
             "heartbeat_seconds": str(registration.heartbeat_seconds),
             "lease_seconds": str(registration.lease_seconds),
+            "version_status": registration.version_status,
+            "minimum_runner_version": registration.minimum_runner_version or "",
+            "recommended_runner_version": registration.recommended_runner_version or "",
         }
         with self._lock, self._connection:
             self._connection.executemany(
@@ -94,6 +102,12 @@ class RunnerStateStore:
             runner_id=values["runner_id"],
             heartbeat_seconds=int(values["heartbeat_seconds"]),
             lease_seconds=int(values["lease_seconds"]),
+            version_status=cast(
+                Literal["current", "update-available", "update-required", "unknown"],
+                values.get("version_status", "unknown"),
+            ),
+            minimum_runner_version=values.get("minimum_runner_version") or None,
+            recommended_runner_version=values.get("recommended_runner_version") or None,
         )
 
     def accept_run(self, envelope: dict[str, Any]) -> ActiveRun:

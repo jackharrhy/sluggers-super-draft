@@ -71,7 +71,10 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
       metricsToken: process.env.METRICS_BEARER_TOKEN,
     }),
     platform: new PlatformService(repository),
-    runnerControl: new RunnerControlService(connection.database),
+    runnerControl: new RunnerControlService(connection.database, {
+      minimumRunnerVersion: process.env.RUNNER_MINIMUM_VERSION,
+      recommendedRunnerVersion: process.env.RUNNER_RECOMMENDED_VERSION,
+    }),
     runnerAdmin: new RunnerAdminService(connection.database),
     sessionCookie: createCookie('starworks_session', {
       ...cookieOptions,

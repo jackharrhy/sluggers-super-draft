@@ -63,10 +63,14 @@ class RunnerStation:
 
     def register(self) -> StationRegistration:
         response = self.client.register(self.station_name, self.capabilities)
+        version_policy = response.get("versionPolicy", {})
         registration = StationRegistration(
             runner_id=response["runnerId"],
             heartbeat_seconds=response["heartbeatSeconds"],
             lease_seconds=response["leaseSeconds"],
+            version_status=version_policy.get("status", "unknown"),
+            minimum_runner_version=version_policy.get("minimumRunnerVersion"),
+            recommended_runner_version=version_policy.get("recommendedRunnerVersion"),
         )
         self.state.save_registration(registration)
         return registration
