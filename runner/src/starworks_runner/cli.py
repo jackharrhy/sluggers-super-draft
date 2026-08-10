@@ -20,6 +20,7 @@ from starworks_runner.games.sluggers.bridge.memory import (
 )
 from starworks_runner.games.sluggers.bridge.synthetic import SyntheticGameBridge
 from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
+from starworks_runner.games.sluggers.content import ContentPackInput
 from starworks_runner.games.sluggers.dolphin import DolphinLauncher
 from starworks_runner.games.sluggers.errors import SluggersAdapterError
 from starworks_runner.games.sluggers.fingerprints import (
@@ -77,6 +78,10 @@ def create_parser() -> argparse.ArgumentParser:
         "--content-pack-sha256",
         default="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     )
+    build_parser.add_argument("--content-pack-manifest", type=Path)
+    build_parser.add_argument("--adapter-operations", type=Path)
+    build_parser.add_argument("--content-assets", type=Path)
+    build_parser.add_argument("--static-targets", type=Path)
     build_parser.add_argument("--adapter-version", default="0.1.0")
     build_parser.add_argument("--compiler-version", default="0.1.0")
 
@@ -166,11 +171,24 @@ def run(arguments: argparse.Namespace) -> int:
         cache = arguments.cache.expanduser().resolve()
         tool = DtkDiscTool(_resolve_dtk(arguments.dtk, cache))
         registry = SupportedBaseRegistry.load(arguments.supported_bases)
+        if bool(arguments.content_pack_manifest) != bool(arguments.adapter_operations):
+            raise SluggersAdapterError(
+                "--content-pack-manifest and --adapter-operations must be provided together"
+            )
+        content_pack = None
+        if arguments.content_pack_manifest:
+            content_pack = ContentPackInput.load(
+                arguments.content_pack_manifest,
+                arguments.adapter_operations,
+                assets_root=arguments.content_assets,
+                target_catalog_path=arguments.static_targets,
+            )
         result = GameBuildService(tool, registry).build(
             BuildRequest(
                 image_path=arguments.image,
                 cache_root=cache,
                 content_pack_sha256=arguments.content_pack_sha256,
+                content_pack=content_pack,
                 adapter_version=arguments.adapter_version,
                 compiler_version=arguments.compiler_version,
             )

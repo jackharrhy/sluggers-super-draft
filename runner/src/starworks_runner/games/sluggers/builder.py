@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from starworks_runner.contracts import validate_contract
+from starworks_runner.games.sluggers.content import (
+    ContentCompilationPlan,
+    ContentPackCompiler,
+    ContentPackInput,
+)
 from starworks_runner.games.sluggers.errors import BuildIntegrityError, DiscImageError
 from starworks_runner.games.sluggers.fingerprints import (
     BaseFingerprint,
@@ -38,6 +43,7 @@ class BuildRequest:
     image_path: Path
     cache_root: Path
     content_pack_sha256: str = EMPTY_CONTENT_PACK_SHA256
+    content_pack: ContentPackInput | None = None
     adapter_version: str = "0.1.0"
     compiler_version: str = "0.1.0"
 
@@ -90,10 +96,12 @@ class GameBuildService:
         registry: SupportedBaseRegistry,
         *,
         clock: Clock = _utc_now,
+        content_compiler: ContentPackCompiler | None = None,
     ) -> None:
         self.disc_tool = disc_tool
         self.registry = registry
         self.clock = clock
+        self.content_compiler = content_compiler or ContentPackCompiler()
 
     def build(self, request: BuildRequest) -> BuildResult:
         image = request.image_path.expanduser().resolve()
@@ -106,6 +114,13 @@ class GameBuildService:
         ):
             raise BuildIntegrityError(
                 "content-pack SHA-256 must be 64 lowercase hex digits"
+            )
+        if (
+            request.content_pack is None
+            and request.content_pack_sha256 != EMPTY_CONTENT_PACK_SHA256
+        ):
+            raise BuildIntegrityError(
+                "A non-empty content-pack hash requires its validated local inputs"
             )
 
         cache_root.mkdir(parents=True, exist_ok=True)
@@ -135,11 +150,36 @@ class GameBuildService:
             )
             supported_base = self.registry.require_supported(base_fingerprint)
 
-            cache_key = self._cache_key(request, base_fingerprint)
+            content_plan: ContentCompilationPlan | None = None
+            content_pack_sha256 = EMPTY_CONTENT_PACK_SHA256
+            if request.content_pack is not None:
+                content_plan = self.content_compiler.plan(
+                    request.content_pack,
+                    main_dol_sha256=base_fingerprint.main_dol_sha256,
+                )
+                content_pack_sha256 = content_plan.content_pack_sha256
+                if (
+                    request.adapter_version
+                    != request.content_pack.manifest["adapterVersion"]
+                ):
+                    raise BuildIntegrityError(
+                        "Build and content pack use different adapter versions"
+                    )
+                if request.content_pack_sha256 not in (
+                    EMPTY_CONTENT_PACK_SHA256,
+                    content_pack_sha256,
+                ):
+                    raise BuildIntegrityError(
+                        "Requested content-pack hash does not match its resolved inputs"
+                    )
+
+            cache_key = self._cache_key(request, base_fingerprint, content_pack_sha256)
             final_directory = builds_root / cache_key
             artifact = temporary_directory / "artifact"
             game_directory = artifact / "game"
             shutil.copytree(extracted, game_directory, copy_function=shutil.copy2)
+
+            patch_receipts = content_plan.apply(game_directory) if content_plan else []
 
             outputs = tuple(
                 fingerprint_file(game_directory, path) for path in OUTPUT_PATHS
@@ -149,7 +189,12 @@ class GameBuildService:
             except ValueError as error:
                 raise BuildIntegrityError(str(error)) from error
             manifest = self._manifest(
-                request, base_fingerprint, outputs, game_tree_sha256
+                request,
+                base_fingerprint,
+                outputs,
+                game_tree_sha256,
+                content_pack_sha256,
+                patch_receipts,
             )
             validate_contract("game-build-manifest", manifest)
 
@@ -213,13 +258,17 @@ class GameBuildService:
                 shutil.rmtree(temporary_directory)
 
     @staticmethod
-    def _cache_key(request: BuildRequest, base: BaseFingerprint) -> str:
+    def _cache_key(
+        request: BuildRequest,
+        base: BaseFingerprint,
+        content_pack_sha256: str,
+    ) -> str:
         return sha256_json(
             {
                 "baseGame": base.manifest_value(),
                 "adapterVersion": request.adapter_version,
                 "compilerVersion": request.compiler_version,
-                "contentPackSha256": request.content_pack_sha256,
+                "contentPackSha256": content_pack_sha256,
             }
         )
 
@@ -229,6 +278,8 @@ class GameBuildService:
         base: BaseFingerprint,
         outputs: tuple[FileFingerprint, ...],
         game_tree_sha256: str,
+        content_pack_sha256: str,
+        patch_receipts: list[dict[str, str]],
     ) -> dict[str, Any]:
         deterministic_receipt = {
             "schemaVersion": 1,
@@ -236,22 +287,37 @@ class GameBuildService:
             "baseGame": base.manifest_value(),
             "adapterVersion": request.adapter_version,
             "compilerVersion": request.compiler_version,
-            "contentPackSha256": request.content_pack_sha256,
+            "contentPackSha256": content_pack_sha256,
             "gameTreeSha256": game_tree_sha256,
             "outputs": [output.manifest_value() for output in outputs],
-            "patchReceipts": [],
+            "patchReceipts": patch_receipts,
             "compatible": True,
-            "warnings": [
-                {
-                    "code": "NO_OP_BUILD",
-                    "message": "No static content or bridge patch was applied.",
-                }
-            ],
+            "warnings": GameBuildService._warnings(content_pack_sha256, patch_receipts),
         }
         return {
             **deterministic_receipt,
             "buildSha256": sha256_json(deterministic_receipt),
         }
+
+    @staticmethod
+    def _warnings(
+        content_pack_sha256: str, patch_receipts: list[dict[str, str]]
+    ) -> list[dict[str, str]]:
+        if content_pack_sha256 == EMPTY_CONTENT_PACK_SHA256:
+            return [
+                {
+                    "code": "NO_OP_BUILD",
+                    "message": "No static content or bridge patch was applied.",
+                }
+            ]
+        if not patch_receipts:
+            return [
+                {
+                    "code": "RUNTIME_ONLY_CONTENT_PACK",
+                    "message": "The content pack has no build-time mutations.",
+                }
+            ]
+        return []
 
     @staticmethod
     def _read_existing(
