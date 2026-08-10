@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "adapter-operation-bundle"
+    },
+    "adapterId": {
+      "type": "string",
+      "const": "sluggers-rmbe01"
+    },
+    "adapterVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "leagueId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "statProfileRevisionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "rulesetRevisionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "rosterRevisionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "lineupRevisionId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "matchLineupOverrideId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "operations": {
+      "maxItems": 8192,
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set-character-stat"
+              },
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              },
+              "statKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "gameplayTarget": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "operation",
+              "characterId",
+              "statKey",
+              "gameplayTarget",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set-game-rule"
+              },
+              "ruleKey": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "loadPhase": {
+                "type": "string",
+                "enum": [
+                  "build-time",
+                  "runtime"
+                ]
+              },
+              "gameplayTarget": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "operation",
+              "ruleKey",
+              "loadPhase",
+              "gameplayTarget",
+              "value"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "select-roster-slot"
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 17
+              },
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              }
+            },
+            "required": [
+              "operation",
+              "slot",
+              "characterId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set-captain"
+              },
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              }
+            },
+            "required": [
+              "operation",
+              "characterId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set-batting-slot"
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 9
+              },
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              }
+            },
+            "required": [
+              "operation",
+              "slot",
+              "characterId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
+                "const": "set-fielding-position"
+              },
+              "position": {
+                "type": "string",
+                "enum": [
+                  "P",
+                  "C",
+                  "1B",
+                  "2B",
+                  "3B",
+                  "SS",
+                  "LF",
+                  "CF",
+                  "RF"
+                ]
+              },
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              }
+            },
+            "required": [
+              "operation",
+              "position",
+              "characterId"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "adapterId",
+    "adapterVersion",
+    "leagueId",
+    "statProfileRevisionId",
+    "rulesetRevisionId",
+    "rosterRevisionId",
+    "lineupRevisionId",
+    "matchLineupOverrideId",
+    "operations",
+    "generatedAt"
+  ],
+  "additionalProperties": false,
+  "title": "AdapterOperationBundle v1",
+  "description": "Symbolic, bounded operations translated by a versioned game adapter; never raw memory writes.",
+  "$id": "https://starworks.community/contracts/adapter-operation-bundle/v1.schema.json"
+}
