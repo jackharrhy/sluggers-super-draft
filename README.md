@@ -42,6 +42,9 @@ art keep their own licenses; absence from the codebase does not mean absence
 from the community map.
 
 See the [architecture and product plan](PLAN.md), the [phased delivery plan](docs/plans/2026-08-10-starworks-platform.md), and the [prior-art/community map](PRIOR_ART.md).
+The [completion audit](docs/plans/2026-08-10-starworks-completion-audit.md)
+records every milestone criterion and the remaining game, hardware, deployment,
+and licensing gates without treating them as completed software tests.
 Production operation is covered by the [production runbook](docs/operations/production-runbook.md),
 with separate [runner support](docs/runner-support.md) and [compatibility](docs/compatibility-policy.md)
 policies.
