@@ -2,6 +2,10 @@ import * as assert from 'remix/assert'
 import { createCookie } from 'remix/cookie'
 import { describe, it } from 'remix/test'
 
+import { MatchConfigurationPackageSchema } from '@starworks/contracts'
+
+import configurationFixture from '../../../../contracts/fixtures/valid/match-configuration-package.json' with { type: 'json' }
+
 import type { ConfigurationApplication } from '../../configuration/service.ts'
 import type { DiscordOAuthClient } from '../../platform/discord-oauth.ts'
 import { IdentityService } from '../../platform/identity-service.ts'
@@ -139,6 +143,31 @@ describe('runner API controller', () => {
     assert.equal(response.status, 400)
     assert.equal(called, false)
   })
+
+  it('serves the leased attempt configuration without requiring a JSON body', async () => {
+    let configuration = MatchConfigurationPackageSchema.parse(configurationFixture)
+    let received: unknown
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createRuntime(createRunnerControl({
+        async configuration(credential, attemptId) {
+          received = { attemptId, credential }
+          return configuration
+        },
+      })),
+    })
+    let response = await router.fetch(new Request(
+      'http://localhost' + routes.runnerApi.configuration.href({ attemptId: configuration.attemptId }),
+      { headers: { authorization: 'Bearer runner-secret' } },
+    ))
+
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).kind, 'match-configuration-package')
+    assert.deepEqual(received, {
+      attemptId: configuration.attemptId,
+      credential: 'runner-secret',
+    })
+  })
 })
 
 function createRunnerControl(
@@ -154,6 +183,7 @@ function createRunnerControl(
         serverTime: '2026-08-10T12:00:00Z',
       }
     },
+    async configuration() { throw new Error('Unexpected configuration request') },
     async register() {
       return {
         heartbeatSeconds: 15,

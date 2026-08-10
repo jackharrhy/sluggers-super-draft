@@ -1,0 +1,131 @@
+{
+  "schemaVersion": 1,
+  "kind": "match-configuration-package",
+  "adapterId": "sluggers-rmbe01",
+  "adapterVersion": "0.1.0",
+  "leagueId": "11111111-1111-4111-8111-111111111111",
+  "matchId": "22222222-2222-4222-8222-222222222222",
+  "attemptId": "33333333-3333-4333-8333-333333333333",
+  "attemptNonce": "match_configuration_nonce_0123456789",
+  "statProfile": {
+    "schemaVersion": 1,
+    "kind": "stat-profile-revision",
+    "leagueId": "11111111-1111-4111-8111-111111111111",
+    "profileId": "44444444-4444-4444-8444-444444444444",
+    "revisionId": "55555555-5555-4555-8555-555555555555",
+    "revisionNumber": 1,
+    "status": "published",
+    "name": "League stats",
+    "definitions": [
+      {
+        "definitionId": "66666666-6666-4666-8666-666666666666",
+        "key": "batting.power",
+        "display": { "label": "Power", "group": "Batting", "order": 1 },
+        "gameplayMapping": {
+          "adapterId": "sluggers-rmbe01",
+          "loadPhase": "build-time",
+          "target": { "resource": "dt-na-dat", "field": "character.batting.power", "codec": "u16-be" }
+        },
+        "required": false,
+        "dataType": "integer",
+        "minimum": 0,
+        "maximum": 200,
+        "step": 1
+      }
+    ],
+    "characterValues": [],
+    "basedOnRevisionId": null,
+    "createdAt": "2026-08-10T12:00:00Z",
+    "publishedAt": "2026-08-10T12:05:00Z"
+  },
+  "ruleset": {
+    "schemaVersion": 1,
+    "kind": "ruleset-revision",
+    "leagueId": "11111111-1111-4111-8111-111111111111",
+    "rulesetId": "77777777-7777-4777-8777-777777777777",
+    "revisionId": "88888888-8888-4888-8888-888888888888",
+    "revisionNumber": 1,
+    "status": "published",
+    "name": "League rules",
+    "settings": [
+      { "key": "game.innings", "label": "Innings", "loadPhase": "runtime", "value": 9, "gameplayTarget": "rules.innings" }
+    ],
+    "basedOnRevisionId": null,
+    "createdAt": "2026-08-10T12:00:00Z",
+    "publishedAt": "2026-08-10T12:05:00Z"
+  },
+  "teams": [
+    {
+      "side": "home",
+      "lineup": {
+        "schemaVersion": 1,
+        "kind": "team-lineup-revision",
+        "leagueId": "11111111-1111-4111-8111-111111111111",
+        "teamId": "99999999-9999-4999-8999-999999999999",
+        "rosterRevisionId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "rosterRevisionNumber": 1,
+        "lineupRevisionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        "lineupRevisionNumber": 1,
+        "status": "published",
+        "rosterCharacterIds": ["mario", "luigi", "peach", "daisy", "yoshi", "birdo", "toad", "toadette", "bowser"],
+        "lineup": {
+          "captainCharacterId": "mario",
+          "pitcherCharacterId": "luigi",
+          "battingOrder": ["mario", "luigi", "peach", "daisy", "yoshi", "birdo", "toad", "toadette", "bowser"],
+          "bench": [],
+          "fielding": [
+            { "position": "P", "characterId": "luigi" },
+            { "position": "C", "characterId": "mario" },
+            { "position": "1B", "characterId": "peach" },
+            { "position": "2B", "characterId": "daisy" },
+            { "position": "3B", "characterId": "yoshi" },
+            { "position": "SS", "characterId": "birdo" },
+            { "position": "LF", "characterId": "toad" },
+            { "position": "CF", "characterId": "toadette" },
+            { "position": "RF", "characterId": "bowser" }
+          ]
+        },
+        "basedOnLineupRevisionId": null,
+        "createdAt": "2026-08-10T12:00:00Z",
+        "publishedAt": "2026-08-10T12:05:00Z"
+      }
+    },
+    {
+      "side": "away",
+      "lineup": {
+        "schemaVersion": 1,
+        "kind": "team-lineup-revision",
+        "leagueId": "11111111-1111-4111-8111-111111111111",
+        "teamId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        "rosterRevisionId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        "rosterRevisionNumber": 1,
+        "lineupRevisionId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+        "lineupRevisionNumber": 1,
+        "status": "published",
+        "rosterCharacterIds": ["wario", "waluigi", "bowser-jr", "boo", "king-boo", "dry-bones", "shy-guy", "hammer-bro", "koopa"],
+        "lineup": {
+          "captainCharacterId": "wario",
+          "pitcherCharacterId": "waluigi",
+          "battingOrder": ["wario", "waluigi", "bowser-jr", "boo", "king-boo", "dry-bones", "shy-guy", "hammer-bro", "koopa"],
+          "bench": [],
+          "fielding": [
+            { "position": "P", "characterId": "waluigi" },
+            { "position": "C", "characterId": "wario" },
+            { "position": "1B", "characterId": "bowser-jr" },
+            { "position": "2B", "characterId": "boo" },
+            { "position": "3B", "characterId": "king-boo" },
+            { "position": "SS", "characterId": "dry-bones" },
+            { "position": "LF", "characterId": "shy-guy" },
+            { "position": "CF", "characterId": "hammer-bro" },
+            { "position": "RF", "characterId": "koopa" }
+          ]
+        },
+        "basedOnLineupRevisionId": null,
+        "createdAt": "2026-08-10T12:00:00Z",
+        "publishedAt": "2026-08-10T12:05:00Z"
+      }
+    }
+  ],
+  "dynamicRuleOverrides": { "game.innings": 7 },
+  "generatedAt": "2026-08-10T12:10:00Z"
+}

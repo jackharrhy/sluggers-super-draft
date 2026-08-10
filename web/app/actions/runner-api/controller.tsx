@@ -45,6 +45,19 @@ export default createController(routes.runnerApi, {
         return json(response)
       })
     },
+    async configuration(context) {
+      return handle(async () => {
+        let response = await context.get(RunnerControl).configuration(
+          readBearerCredential(context.request),
+          context.params.attemptId,
+        )
+        context.get(RequestLog)?.bind({
+          leagueId: response.leagueId,
+          matchAttemptId: response.attemptId,
+        })
+        return json(response)
+      })
+    },
     async updateLease(context) {
       return handle(async () => {
         let body = await readJson(context.request)

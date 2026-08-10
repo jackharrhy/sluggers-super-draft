@@ -2,10 +2,17 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 
-import { TeamLineupRevisionSchema, type RunnerRegistrationRequest } from '@starworks/contracts'
+import {
+  RulesetRevisionSchema,
+  StatProfileRevisionSchema,
+  TeamLineupRevisionSchema,
+  type RunnerRegistrationRequest,
+} from '@starworks/contracts'
 import { eq } from 'drizzle-orm'
 
 import lineupFixture from '../../../contracts/fixtures/valid/team-lineup-revision.json' with { type: 'json' }
+import rulesetFixture from '../../../contracts/fixtures/valid/ruleset-revision.json' with { type: 'json' }
+import statProfileFixture from '../../../contracts/fixtures/valid/stat-profile-revision.json' with { type: 'json' }
 import { createDatabase, type StarworksDatabase } from '../platform/database/connection.ts'
 import {
   attemptLifecycleEvents,
@@ -15,8 +22,12 @@ import {
   matchAttempts,
   people,
   rosterRevisions,
+  rulesetRevisions,
+  rulesets,
   runnerCredentials,
   seasons,
+  statProfileRevisions,
+  statProfiles,
 } from '../platform/database/schema.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { hashSecret } from '../platform/security.ts'
@@ -50,9 +61,11 @@ test(
           })
           let firstAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
             awayLineupRevisionId: fixture.away.lineupRevisionId,
-            dynamicRuleOverrides: { innings: 9, stars: true },
+            dynamicRuleOverrides: { 'game.innings': 7 },
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'a'.repeat(64),
+            rulesetRevisionId: fixture.rulesetRevisionId,
+            statProfileRevisionId: fixture.statProfileRevisionId,
           })
 
           let firstRegistration = await control.register(fixture.credentials.first.raw, registration('Desk one'))
@@ -65,7 +78,20 @@ test(
           assert.ok(firstClaim.run)
           assert.equal(firstClaim.run.attemptId, firstAttempt.attemptId)
           assert.equal(firstClaim.run.teams[0].teamId, fixture.home.teamId)
-          assert.equal(firstClaim.run.dynamicRuleOverrides.innings, 9)
+          assert.equal(firstClaim.run.dynamicRuleOverrides['game.innings'], 7)
+          assert.equal(firstClaim.run.statProfileRevisionId, fixture.statProfileRevisionId)
+          assert.equal(firstClaim.run.rulesetRevisionId, fixture.rulesetRevisionId)
+          let configuration = await control.configuration(
+            fixture.credentials.first.raw,
+            firstAttempt.attemptId,
+          )
+          assert.equal(configuration.attemptNonce, firstClaim.run.attemptNonce)
+          assert.equal(configuration.statProfile.revisionId, fixture.statProfileRevisionId)
+          assert.equal(configuration.ruleset.revisionId, fixture.rulesetRevisionId)
+          assert.deepEqual(
+            configuration.teams.map((team) => [team.side, team.lineup.teamId]),
+            [['home', fixture.home.teamId], ['away', fixture.away.teamId]],
+          )
           let recoveryClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.deepEqual(recoveryClaim.run, firstClaim.run)
           let unavailableClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
@@ -111,6 +137,8 @@ test(
             dynamicRuleOverrides: {},
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'b'.repeat(64),
+            rulesetRevisionId: fixture.rulesetRevisionId,
+            statProfileRevisionId: fixture.statProfileRevisionId,
           })
           assert.equal(cancelledAttempt.attemptNumber, 2)
           let cancellationClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
@@ -127,6 +155,8 @@ test(
             dynamicRuleOverrides: {},
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'c'.repeat(64),
+            rulesetRevisionId: fixture.rulesetRevisionId,
+            statProfileRevisionId: fixture.statProfileRevisionId,
           })
           let expiringClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.ok(expiringClaim.run)
@@ -144,6 +174,8 @@ test(
             dynamicRuleOverrides: {},
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'd'.repeat(64),
+            rulesetRevisionId: fixture.rulesetRevisionId,
+            statProfileRevisionId: fixture.statProfileRevisionId,
           })
           let replacementClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
           assert.equal(replacementClaim.run?.attemptId, replacementAttempt.attemptId)
@@ -168,6 +200,8 @@ test(
 
 async function createRunnerFixture(database: StarworksDatabase) {
   let source = TeamLineupRevisionSchema.parse(lineupFixture)
+  let profileSource = StatProfileRevisionSchema.parse(statProfileFixture)
+  let rulesetSource = RulesetRevisionSchema.parse(rulesetFixture)
   let personId = randomUUID()
   let leagueId = randomUUID()
   let seasonId = randomUUID()
@@ -179,6 +213,36 @@ async function createRunnerFixture(database: StarworksDatabase) {
     slug: `runner-${leagueId}`,
   })
   await database.insert(seasons).values({ id: seasonId, leagueId, name: 'Season', slug: 'season' })
+  let profileId = randomUUID()
+  let statProfileRevisionId = randomUUID()
+  let rulesetId = randomUUID()
+  let rulesetRevisionId = randomUUID()
+  let publishedAt = new Date('2026-08-10T11:00:00Z')
+  await database.insert(statProfiles).values({ id: profileId, leagueId, name: 'Stats', slug: 'stats' })
+  await database.insert(statProfileRevisions).values({
+    characterValues: profileSource.characterValues,
+    createdByPersonId: personId,
+    definitions: profileSource.definitions,
+    id: statProfileRevisionId,
+    leagueId,
+    name: profileSource.name,
+    profileId,
+    publishedAt,
+    revisionNumber: 1,
+    status: 'published',
+  })
+  await database.insert(rulesets).values({ id: rulesetId, leagueId, name: 'Rules', slug: 'rules' })
+  await database.insert(rulesetRevisions).values({
+    createdByPersonId: personId,
+    id: rulesetRevisionId,
+    leagueId,
+    name: rulesetSource.name,
+    publishedAt,
+    revisionNumber: 1,
+    rulesetId,
+    settings: rulesetSource.settings,
+    status: 'published',
+  })
   let home = await createTeamConfiguration(database, { leagueId, personId, seasonId }, 'home', source)
   let away = await createTeamConfiguration(database, { leagueId, personId, seasonId }, 'away', source)
   let firstSecret = 'first_runner_secret_abcdefghijklmnopqrstuvwxyz'
@@ -191,7 +255,7 @@ async function createRunnerFixture(database: StarworksDatabase) {
       id: firstCredentialId,
       leagueId,
       name: 'First runner',
-      scopes: ['heartbeat:write', 'runs:claim'],
+      scopes: ['heartbeat:write', 'runs:claim', 'runs:read'],
       secretHash: hashSecret(firstSecret),
     },
     {
@@ -199,7 +263,7 @@ async function createRunnerFixture(database: StarworksDatabase) {
       id: secondCredentialId,
       leagueId,
       name: 'Second runner',
-      scopes: ['heartbeat:write', 'runs:claim'],
+      scopes: ['heartbeat:write', 'runs:claim', 'runs:read'],
       secretHash: hashSecret(secondSecret),
     },
   ])
@@ -219,7 +283,9 @@ async function createRunnerFixture(database: StarworksDatabase) {
       personId,
     } satisfies SessionIdentity,
     leagueId,
+    rulesetRevisionId,
     seasonId,
+    statProfileRevisionId,
   }
 }
 

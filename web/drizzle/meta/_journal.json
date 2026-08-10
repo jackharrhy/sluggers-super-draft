@@ -57,6 +57,13 @@
       "when": 1786340973318,
       "tag": "0007_peaceful_thunderball",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786342612585,
+      "tag": "0008_adorable_wasp",
+      "breakpoints": true
     }
   ]
 }

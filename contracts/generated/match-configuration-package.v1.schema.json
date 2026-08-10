@@ -1,0 +1,1724 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "match-configuration-package"
+    },
+    "adapterId": {
+      "type": "string",
+      "const": "sluggers-rmbe01"
+    },
+    "adapterVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "leagueId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "matchId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "attemptId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+    },
+    "attemptNonce": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{32,128}$"
+    },
+    "statProfile": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "stat-profile-revision"
+        },
+        "leagueId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "revisionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "revisionNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "published"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "definitions": {
+          "minItems": 1,
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "definitionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                  },
+                  "display": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "group": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "group",
+                      "order"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "gameplayMapping": {
+                    "type": "object",
+                    "properties": {
+                      "adapterId": {
+                        "type": "string",
+                        "const": "sluggers-rmbe01"
+                      },
+                      "loadPhase": {
+                        "type": "string",
+                        "enum": [
+                          "build-time",
+                          "runtime"
+                        ]
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "enum": [
+                              "dt-na-dat",
+                              "main-dol",
+                              "runtime-bridge"
+                            ]
+                          },
+                          "field": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+                          },
+                          "codec": {
+                            "type": "string",
+                            "enum": [
+                              "bool",
+                              "enum",
+                              "f32-be",
+                              "s16-be",
+                              "u16-be",
+                              "u32-be",
+                              "u8"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "field",
+                          "codec"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "adapterId",
+                      "loadPhase",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "dataType": {
+                    "type": "string",
+                    "const": "integer"
+                  },
+                  "minimum": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "maximum": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  "step": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "definitionId",
+                  "key",
+                  "display",
+                  "required",
+                  "dataType",
+                  "minimum",
+                  "maximum",
+                  "step"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "definitionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                  },
+                  "display": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "group": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "group",
+                      "order"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "gameplayMapping": {
+                    "type": "object",
+                    "properties": {
+                      "adapterId": {
+                        "type": "string",
+                        "const": "sluggers-rmbe01"
+                      },
+                      "loadPhase": {
+                        "type": "string",
+                        "enum": [
+                          "build-time",
+                          "runtime"
+                        ]
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "enum": [
+                              "dt-na-dat",
+                              "main-dol",
+                              "runtime-bridge"
+                            ]
+                          },
+                          "field": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+                          },
+                          "codec": {
+                            "type": "string",
+                            "enum": [
+                              "bool",
+                              "enum",
+                              "f32-be",
+                              "s16-be",
+                              "u16-be",
+                              "u32-be",
+                              "u8"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "field",
+                          "codec"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "adapterId",
+                      "loadPhase",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "dataType": {
+                    "type": "string",
+                    "const": "number"
+                  },
+                  "minimum": {
+                    "type": "number"
+                  },
+                  "maximum": {
+                    "type": "number"
+                  },
+                  "step": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  }
+                },
+                "required": [
+                  "definitionId",
+                  "key",
+                  "display",
+                  "required",
+                  "dataType",
+                  "minimum",
+                  "maximum",
+                  "step"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "definitionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                  },
+                  "display": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "group": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "group",
+                      "order"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "gameplayMapping": {
+                    "type": "object",
+                    "properties": {
+                      "adapterId": {
+                        "type": "string",
+                        "const": "sluggers-rmbe01"
+                      },
+                      "loadPhase": {
+                        "type": "string",
+                        "enum": [
+                          "build-time",
+                          "runtime"
+                        ]
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "enum": [
+                              "dt-na-dat",
+                              "main-dol",
+                              "runtime-bridge"
+                            ]
+                          },
+                          "field": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+                          },
+                          "codec": {
+                            "type": "string",
+                            "enum": [
+                              "bool",
+                              "enum",
+                              "f32-be",
+                              "s16-be",
+                              "u16-be",
+                              "u32-be",
+                              "u8"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "field",
+                          "codec"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "adapterId",
+                      "loadPhase",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "dataType": {
+                    "type": "string",
+                    "const": "boolean"
+                  }
+                },
+                "required": [
+                  "definitionId",
+                  "key",
+                  "display",
+                  "required",
+                  "dataType"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "definitionId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "key": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                  },
+                  "display": {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 500
+                      },
+                      "group": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 100
+                      },
+                      "order": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "group",
+                      "order"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "gameplayMapping": {
+                    "type": "object",
+                    "properties": {
+                      "adapterId": {
+                        "type": "string",
+                        "const": "sluggers-rmbe01"
+                      },
+                      "loadPhase": {
+                        "type": "string",
+                        "enum": [
+                          "build-time",
+                          "runtime"
+                        ]
+                      },
+                      "target": {
+                        "type": "object",
+                        "properties": {
+                          "resource": {
+                            "type": "string",
+                            "enum": [
+                              "dt-na-dat",
+                              "main-dol",
+                              "runtime-bridge"
+                            ]
+                          },
+                          "field": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+                          },
+                          "codec": {
+                            "type": "string",
+                            "enum": [
+                              "bool",
+                              "enum",
+                              "f32-be",
+                              "s16-be",
+                              "u16-be",
+                              "u32-be",
+                              "u8"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "resource",
+                          "field",
+                          "codec"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "adapterId",
+                      "loadPhase",
+                      "target"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "required": {
+                    "type": "boolean"
+                  },
+                  "dataType": {
+                    "type": "string",
+                    "const": "enum"
+                  },
+                  "choices": {
+                    "minItems": 1,
+                    "maxItems": 64,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        },
+                        "value": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "value"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "definitionId",
+                  "key",
+                  "display",
+                  "required",
+                  "dataType",
+                  "choices"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "characterValues": {
+          "maxItems": 512,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "characterId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 127
+              },
+              "values": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "maxLength": 80,
+                  "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                },
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "boolean"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              }
+            },
+            "required": [
+              "characterId",
+              "values"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "basedOnRevisionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "publishedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "leagueId",
+        "profileId",
+        "revisionId",
+        "revisionNumber",
+        "status",
+        "name",
+        "definitions",
+        "characterValues",
+        "basedOnRevisionId",
+        "createdAt",
+        "publishedAt"
+      ],
+      "additionalProperties": false,
+      "title": "StatProfileRevision v1",
+      "description": "A versioned stat vocabulary and its independently modeled character values."
+    },
+    "ruleset": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "ruleset-revision"
+        },
+        "leagueId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "rulesetId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "revisionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "revisionNumber": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "published"
+          ]
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "settings": {
+          "maxItems": 256,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "maxLength": 80,
+                "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 500
+              },
+              "loadPhase": {
+                "type": "string",
+                "enum": [
+                  "web-only",
+                  "build-time",
+                  "runtime"
+                ]
+              },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "gameplayTarget": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
+              }
+            },
+            "required": [
+              "key",
+              "label",
+              "loadPhase",
+              "value"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "basedOnRevisionId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "publishedAt": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time",
+              "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "schemaVersion",
+        "kind",
+        "leagueId",
+        "rulesetId",
+        "revisionId",
+        "revisionNumber",
+        "status",
+        "name",
+        "settings",
+        "basedOnRevisionId",
+        "createdAt",
+        "publishedAt"
+      ],
+      "additionalProperties": false,
+      "title": "RulesetRevision v1",
+      "description": "An immutable-on-publication ruleset with explicit loading phases."
+    },
+    "teams": {
+      "anyOf": [
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "const": "home"
+                },
+                "lineup": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "team-lineup-revision"
+                    },
+                    "leagueId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lineupRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "lineupRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "published"
+                      ]
+                    },
+                    "rosterCharacterIds": {
+                      "minItems": 1,
+                      "maxItems": 18,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 127
+                      }
+                    },
+                    "lineup": {
+                      "type": "object",
+                      "properties": {
+                        "captainCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "pitcherCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "battingOrder": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "bench": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "fielding": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "characterId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 127
+                              },
+                              "position": {
+                                "type": "string",
+                                "enum": [
+                                  "P",
+                                  "C",
+                                  "1B",
+                                  "2B",
+                                  "3B",
+                                  "SS",
+                                  "LF",
+                                  "CF",
+                                  "RF"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "characterId",
+                              "position"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "captainCharacterId",
+                        "pitcherCharacterId",
+                        "battingOrder",
+                        "bench",
+                        "fielding"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "basedOnLineupRevisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "publishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "kind",
+                    "leagueId",
+                    "teamId",
+                    "rosterRevisionId",
+                    "rosterRevisionNumber",
+                    "lineupRevisionId",
+                    "lineupRevisionNumber",
+                    "status",
+                    "rosterCharacterIds",
+                    "lineup",
+                    "basedOnLineupRevisionId",
+                    "createdAt",
+                    "publishedAt"
+                  ],
+                  "additionalProperties": false,
+                  "title": "TeamLineupRevision v1",
+                  "description": "A roster revision and independently versioned legal lineup."
+                }
+              },
+              "required": [
+                "side",
+                "lineup"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "const": "away"
+                },
+                "lineup": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "team-lineup-revision"
+                    },
+                    "leagueId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lineupRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "lineupRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "published"
+                      ]
+                    },
+                    "rosterCharacterIds": {
+                      "minItems": 1,
+                      "maxItems": 18,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 127
+                      }
+                    },
+                    "lineup": {
+                      "type": "object",
+                      "properties": {
+                        "captainCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "pitcherCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "battingOrder": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "bench": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "fielding": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "characterId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 127
+                              },
+                              "position": {
+                                "type": "string",
+                                "enum": [
+                                  "P",
+                                  "C",
+                                  "1B",
+                                  "2B",
+                                  "3B",
+                                  "SS",
+                                  "LF",
+                                  "CF",
+                                  "RF"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "characterId",
+                              "position"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "captainCharacterId",
+                        "pitcherCharacterId",
+                        "battingOrder",
+                        "bench",
+                        "fielding"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "basedOnLineupRevisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "publishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "kind",
+                    "leagueId",
+                    "teamId",
+                    "rosterRevisionId",
+                    "rosterRevisionNumber",
+                    "lineupRevisionId",
+                    "lineupRevisionNumber",
+                    "status",
+                    "rosterCharacterIds",
+                    "lineup",
+                    "basedOnLineupRevisionId",
+                    "createdAt",
+                    "publishedAt"
+                  ],
+                  "additionalProperties": false,
+                  "title": "TeamLineupRevision v1",
+                  "description": "A roster revision and independently versioned legal lineup."
+                }
+              },
+              "required": [
+                "side",
+                "lineup"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        {
+          "type": "array",
+          "prefixItems": [
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "const": "away"
+                },
+                "lineup": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "team-lineup-revision"
+                    },
+                    "leagueId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lineupRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "lineupRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "published"
+                      ]
+                    },
+                    "rosterCharacterIds": {
+                      "minItems": 1,
+                      "maxItems": 18,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 127
+                      }
+                    },
+                    "lineup": {
+                      "type": "object",
+                      "properties": {
+                        "captainCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "pitcherCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "battingOrder": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "bench": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "fielding": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "characterId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 127
+                              },
+                              "position": {
+                                "type": "string",
+                                "enum": [
+                                  "P",
+                                  "C",
+                                  "1B",
+                                  "2B",
+                                  "3B",
+                                  "SS",
+                                  "LF",
+                                  "CF",
+                                  "RF"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "characterId",
+                              "position"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "captainCharacterId",
+                        "pitcherCharacterId",
+                        "battingOrder",
+                        "bench",
+                        "fielding"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "basedOnLineupRevisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "publishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "kind",
+                    "leagueId",
+                    "teamId",
+                    "rosterRevisionId",
+                    "rosterRevisionNumber",
+                    "lineupRevisionId",
+                    "lineupRevisionNumber",
+                    "status",
+                    "rosterCharacterIds",
+                    "lineup",
+                    "basedOnLineupRevisionId",
+                    "createdAt",
+                    "publishedAt"
+                  ],
+                  "additionalProperties": false,
+                  "title": "TeamLineupRevision v1",
+                  "description": "A roster revision and independently versioned legal lineup."
+                }
+              },
+              "required": [
+                "side",
+                "lineup"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "side": {
+                  "type": "string",
+                  "const": "home"
+                },
+                "lineup": {
+                  "type": "object",
+                  "properties": {
+                    "schemaVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "team-lineup-revision"
+                    },
+                    "leagueId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "teamId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "rosterRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "lineupRevisionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "lineupRevisionNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "draft",
+                        "published"
+                      ]
+                    },
+                    "rosterCharacterIds": {
+                      "minItems": 1,
+                      "maxItems": 18,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 127
+                      }
+                    },
+                    "lineup": {
+                      "type": "object",
+                      "properties": {
+                        "captainCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "pitcherCharacterId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 127
+                        },
+                        "battingOrder": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "bench": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 127
+                          }
+                        },
+                        "fielding": {
+                          "maxItems": 18,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "characterId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 127
+                              },
+                              "position": {
+                                "type": "string",
+                                "enum": [
+                                  "P",
+                                  "C",
+                                  "1B",
+                                  "2B",
+                                  "3B",
+                                  "SS",
+                                  "LF",
+                                  "CF",
+                                  "RF"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "characterId",
+                              "position"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "captainCharacterId",
+                        "pitcherCharacterId",
+                        "battingOrder",
+                        "bench",
+                        "fielding"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "basedOnLineupRevisionId": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                    },
+                    "publishedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "schemaVersion",
+                    "kind",
+                    "leagueId",
+                    "teamId",
+                    "rosterRevisionId",
+                    "rosterRevisionNumber",
+                    "lineupRevisionId",
+                    "lineupRevisionNumber",
+                    "status",
+                    "rosterCharacterIds",
+                    "lineup",
+                    "basedOnLineupRevisionId",
+                    "createdAt",
+                    "publishedAt"
+                  ],
+                  "additionalProperties": false,
+                  "title": "TeamLineupRevision v1",
+                  "description": "A roster revision and independently versioned legal lineup."
+                }
+              },
+              "required": [
+                "side",
+                "lineup"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
+      ]
+    },
+    "dynamicRuleOverrides": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "generatedAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "adapterId",
+    "adapterVersion",
+    "leagueId",
+    "matchId",
+    "attemptId",
+    "attemptNonce",
+    "statProfile",
+    "ruleset",
+    "teams",
+    "dynamicRuleOverrides",
+    "generatedAt"
+  ],
+  "additionalProperties": false,
+  "title": "MatchConfigurationPackage v1",
+  "description": "Published declarative inputs for one leased attempt; contains no game buffers, addresses, or executable patches.",
+  "$id": "https://starworks.community/contracts/match-configuration-package/v1.schema.json"
+}
