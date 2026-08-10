@@ -1,0 +1,139 @@
+@font-face {
+  font-family: "Aurea";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/AureaUltra-Roman.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "NewCezanne";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/FOT-NewCezanne-Pro-M.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "NewRodin";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/FOT-NewRodin-Pro-EB.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "PopHappiness";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/FOT-PopHappinessStd-EB.otf") format("opentype");
+}
+
+@font-face {
+  font-family: "ITC Bolt";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/ITC-Bolt-Bold-Regular.otf") format("opentype");
+}
+
+:root {
+  --font-sans: "NewCezanne", ui-sans-serif, system-ui, sans-serif;
+  --font-aurea: "Aurea", serif;
+  --font-display: "NewRodin", var(--font-sans);
+  --font-happiness: "PopHappiness", var(--font-sans);
+  --font-bolt: "ITC Bolt", var(--font-sans);
+
+  --blue-50: oklch(67.241% 0.13311 255);
+  --blue-200: oklch(62.757% 0.15333 257.02);
+  --blue-400: oklch(56.46% 0.1832 259.74);
+  --blue-600: oklch(48.197% 0.17551 261.35);
+  --blue-700: oklch(43.002% 0.15879 262.02);
+  --blue-800: oklch(37.566% 0.1402 262.84);
+  --blue-900: oklch(32.249% 0.12106 263.76);
+  --blue-950: oklch(29.533% 0.109 264.06);
+  --cell-gray: oklch(0.57 0.07 262.2);
+
+  --text-primary: #fff;
+  --text-soft: rgb(229 231 235 / 0.92);
+  --text-muted: rgb(209 213 219 / 0.76);
+  --link: rgb(219 234 254);
+  --surface: color-mix(in oklch, var(--cell-gray) 40%, transparent);
+  --surface-soft: color-mix(in oklch, var(--cell-gray) 25%, transparent);
+  --surface-strong: color-mix(in oklch, var(--cell-gray) 60%, transparent);
+  --surface-deep: color-mix(in oklch, var(--blue-950) 72%, transparent);
+  --border: color-mix(in oklch, var(--cell-gray) 50%, transparent);
+  --border-strong: color-mix(in oklch, var(--blue-50) 52%, transparent);
+  --accent-yellow: rgb(253 224 71);
+  --warning-surface: rgb(161 98 7 / 0.34);
+  --warning-border: rgb(250 204 21 / 0.48);
+  --warning-text: rgb(254 240 138);
+  --danger-surface: rgb(127 29 29 / 0.48);
+  --danger-button: rgb(153 27 27 / 0.9);
+  --danger-border: rgb(248 113 113 / 0.55);
+  --danger-text: rgb(254 202 202);
+  --success-surface: rgb(20 83 45 / 0.5);
+  --success-border: rgb(74 222 128 / 0.44);
+  --success-text: rgb(134 239 172);
+  --bg-dot-size: 7rem;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background-color: var(--blue-600);
+  background-image:
+    radial-gradient(circle, rgb(255 255 255 / 0.025) 40%, transparent 21%),
+    radial-gradient(circle, rgb(255 255 255 / 0.025) 40%, transparent 21%);
+  background-size: var(--bg-dot-size) var(--bg-dot-size);
+  background-position:
+    0 0,
+    calc(var(--bg-dot-size) / 2) calc(var(--bg-dot-size) / 2);
+  background-repeat: repeat;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-weight: 500;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  font-weight: 800;
+}
+
+::selection {
+  background: var(--blue-200);
+  color: white;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a,
+  button,
+  input,
+  select,
+  textarea {
+    transition:
+      background-color 140ms ease,
+      border-color 140ms ease,
+      color 140ms ease,
+      transform 140ms ease;
+  }
+}

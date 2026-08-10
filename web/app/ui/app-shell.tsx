@@ -41,59 +41,68 @@ export function AppShell(
 }
 
 export const cardStyle = css({
-  background: '#151c2d',
-  border: '1px solid #2d3955',
-  borderRadius: '18px',
-  padding: '24px',
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: '12px',
+  boxShadow: '0 8px 24px rgb(15 23 42 / 0.12)',
+  padding: '20px',
 })
 
 export const buttonStyle = css({
-  background: '#f7c948',
-  border: 0,
-  borderRadius: '10px',
-  color: '#182035',
+  background: 'var(--blue-950)',
+  border: '1px solid var(--blue-800)',
+  borderRadius: '7px',
+  color: 'var(--text-primary)',
   cursor: 'pointer',
-  font: 'inherit',
-  fontWeight: 800,
-  padding: '11px 16px',
+  fontFamily: 'var(--font-bolt)',
+  fontWeight: 700,
+  padding: '10px 15px',
+  '&:hover': { background: 'var(--blue-900)', borderColor: 'var(--blue-50)' },
+  '&:focus-visible': { outline: '3px solid var(--blue-50)', outlineOffset: '2px' },
 })
 
 export const inputStyle = css({
-  background: '#0c1220',
-  border: '1px solid #445171',
-  borderRadius: '9px',
-  color: '#f7f2e8',
+  background: 'var(--surface-soft)',
+  border: '1px solid var(--border)',
+  borderRadius: '7px',
+  color: 'var(--text-primary)',
   font: 'inherit',
-  padding: '10px 12px',
+  padding: '9px 11px',
   width: '100%',
+  '&:focus': { borderColor: 'var(--blue-50)', outline: '2px solid var(--blue-200)' },
+  '&::placeholder': { color: 'var(--text-muted)' },
 })
 
 const pageStyle = css({
-  background: 'radial-gradient(circle at top, #243255 0, #0b1020 48%, #070a12 100%)',
-  color: '#f7f2e8',
-  fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+  background: 'linear-gradient(to bottom, var(--blue-600), transparent 72vh)',
+  color: 'var(--text-primary)',
+  fontFamily: 'var(--font-sans)',
   minHeight: '100vh',
-  '& a': { color: '#78d5ff' },
+  '& a': { color: 'var(--link)' },
 })
 
 const headerStyle = css({
   alignItems: 'center',
-  borderBottom: '1px solid #26324b',
+  borderBottom: '1px solid rgb(229 231 235 / 0.72)',
   display: 'flex',
   gap: '24px',
   justifyContent: 'space-between',
   margin: '0 auto',
-  maxWidth: '1120px',
-  padding: '20px 24px',
+  maxWidth: '1280px',
+  padding: '16px 24px',
+  '@media (max-width: 680px)': {
+    alignItems: 'flex-start',
+    flexDirection: 'column',
+  },
 })
 
 const brandStyle = css({
-  color: '#f7c948 !important',
-  fontSize: '24px',
-  fontWeight: 900,
-  letterSpacing: '-0.04em',
+  color: 'var(--text-primary) !important',
+  fontFamily: 'var(--font-happiness)',
+  fontSize: '22px',
+  fontWeight: 800,
   textDecoration: 'none',
-  textTransform: 'uppercase',
+  textShadow: '0 2px 0 rgb(28 38 75 / 0.28)',
 })
 
 const navStyle = css({
@@ -107,7 +116,7 @@ const navStyle = css({
 const linkButtonStyle = css({
   background: 'transparent',
   border: 0,
-  color: '#78d5ff',
+  color: 'var(--link)',
   cursor: 'pointer',
   font: 'inherit',
   padding: 0,
@@ -116,6 +125,6 @@ const linkButtonStyle = css({
 
 const mainStyle = css({
   margin: '0 auto',
-  maxWidth: '1120px',
-  padding: '64px 24px 96px',
+  maxWidth: '1280px',
+  padding: '36px 24px 80px',
 })

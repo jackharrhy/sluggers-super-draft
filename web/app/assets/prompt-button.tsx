@@ -30,8 +30,8 @@ export const PromptButton = clientEntry(
           type="button"
           className={state}
           style={{
-            background: active ? 'var(--surface-4)' : undefined,
-            color: active ? 'var(--brand-blue)' : undefined,
+            background: active ? 'var(--surface-strong)' : undefined,
+            color: active ? 'var(--link)' : undefined,
           }}
           mix={[
             buttonStyle,
@@ -142,8 +142,8 @@ const buttonStyle = css({
   background: 'transparent',
   transition: 'background-color 150ms ease, color 150ms ease',
   '&:hover, &:focus-visible': {
-    background: 'var(--surface-4)',
-    color: 'var(--brand-blue)',
+    background: 'var(--surface-strong)',
+    color: 'var(--link)',
     outline: 'none',
   },
 })

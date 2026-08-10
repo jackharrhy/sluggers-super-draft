@@ -54,20 +54,20 @@ export function HomePage(
   }
 }
 
-const heroStyle = css({ maxWidth: '840px' })
+const heroStyle = css({ maxWidth: '880px', padding: '28px 0 12px' })
 const eyebrowStyle = css({
-  color: '#f7c948',
-  fontSize: '13px',
-  fontWeight: 800,
-  letterSpacing: '0.12em',
+  color: 'var(--text-soft)',
+  fontFamily: 'var(--font-aurea)',
+  fontSize: '15px',
+  letterSpacing: '0.08em',
   margin: '0 0 12px',
   textTransform: 'uppercase',
 })
-const headingStyle = css({ fontSize: 'clamp(42px, 8vw, 82px)', letterSpacing: '-0.06em', lineHeight: 0.95, margin: 0 })
-const subheadingStyle = css({ fontSize: '32px', letterSpacing: '-0.04em', margin: 0 })
-const ledeStyle = css({ color: '#c9d4e9', fontSize: '20px', lineHeight: 1.65, margin: '28px 0 0', maxWidth: '760px' })
-const sectionStyle = css({ display: 'grid', gap: '24px', marginTop: '80px' })
+const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(36px, 6vw, 58px)', lineHeight: 1.05, margin: 0, textShadow: '0 3px 0 rgb(30 41 86 / 0.22)' })
+const subheadingStyle = css({ fontFamily: 'var(--font-display)', fontSize: '28px', margin: 0 })
+const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.6, margin: '22px 0 0', maxWidth: '760px' })
+const sectionStyle = css({ display: 'grid', gap: '20px', marginTop: '52px' })
 const gridStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' })
 const leagueHeadingStyle = css({ fontSize: '22px', margin: '0 0 10px' })
 const bodyStyle = css({ fontSize: '18px', margin: '0 0 8px' })
-const mutedStyle = css({ color: '#9faec8', lineHeight: 1.6, margin: 0 })
+const mutedStyle = css({ color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 })

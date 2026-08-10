@@ -68,10 +68,10 @@ export function InvitationCreatedPage(
 }
 
 const contentStyle = css({ display: 'grid', gap: '36px', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 480px)', '@media (max-width: 800px)': { gridTemplateColumns: '1fr' } })
-const eyebrowStyle = css({ color: '#f7c948', fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', margin: '0 0 12px', textTransform: 'uppercase' })
-const headingStyle = css({ fontSize: '56px', letterSpacing: '-0.05em', lineHeight: 1, margin: 0 })
-const ledeStyle = css({ color: '#c9d4e9', fontSize: '18px', lineHeight: 1.65, maxWidth: '620px' })
+const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
+const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
+const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.65, maxWidth: '620px' })
 const formStyle = css({ alignSelf: 'start', display: 'grid', gap: '20px' })
 const fieldStyle = css({ display: 'grid', fontWeight: 700, gap: '8px' })
-const errorStyle = css({ background: '#541f2d', borderRadius: '8px', color: '#ffd7df', margin: 0, padding: '12px' })
-const smallStyle = css({ color: '#9faec8', fontSize: '14px', margin: 0 })
+const errorStyle = css({ background: 'var(--danger-surface)', borderRadius: '8px', color: 'var(--danger-text)', margin: 0, padding: '12px' })
+const smallStyle = css({ color: 'var(--text-muted)', fontSize: '14px', margin: 0 })
