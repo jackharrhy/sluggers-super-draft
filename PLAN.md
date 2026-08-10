@@ -69,7 +69,8 @@ The matching decompilation project remains an upstream research project. Starwor
 
 ### Web
 
-- Remix, initialized from the current `remix@next` line.
+- Remix 3, initialized in `web/` with `npx remix@next new web` rather than
+  repurposing the original single-tenant React Router application.
 - TypeScript and React.
 - PostgreSQL with Drizzle ORM.
 - Zod as the source of truth for API and manifest validation.
@@ -99,6 +100,9 @@ The repository root owns `compose.yml` with:
 - Optional Mailpit profile.
 
 The native runner normally runs outside Compose. A containerized Linux runner is a later deployment profile, not a local-development prerequisite.
+
+The original Sluggers Super Draft implementation is retained under
+`legacy/sluggers-super-draft/` as migration input and behavioral prior art.
 
 ### Production
 

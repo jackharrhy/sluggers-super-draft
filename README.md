@@ -8,34 +8,32 @@ from the community map.
 
 See the [architecture and product plan](PLAN.md), the [phased delivery plan](docs/plans/2026-08-10-starworks-platform.md), and the [prior-art/community map](PRIOR_ART.md).
 
-## setting up
+## Workspace
 
-start the database:
+- `web/` — clean Remix 3 application generated with `remix@next`.
+- `runner/` — Python runner and Sluggers adapter.
+- `contracts/` — Zod contracts and generated JSON Schema.
+- `legacy/` — preserved prior applications for migration and reference.
+- `compose.yml` — local shared infrastructure.
 
-```shell
-docker compose up db
-```
+## Setting up
 
-install packages:
-
-```shell
-npm install
-```
-
-copy `.env.example` to `.env` and provide a `DATABASE_URL` with your connection string.
-
-run db migrations:
+Install the Remix application:
 
 ```shell
-npm run db:migrate
+npm install --prefix web
 ```
 
-> TODO: ingest seed data
+Start local infrastructure:
 
-start the web server:
+```shell
+docker compose up -d
+```
+
+Copy `.env.example` to `.env`, then start Remix:
 
 ```shell
 npm run dev
 ```
 
-visit `http://localhost:3000`
+Visit `http://localhost:3000`.

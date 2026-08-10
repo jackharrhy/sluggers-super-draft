@@ -1,23 +1,32 @@
 services:
-  website:
+  web:
     build:
       context: .
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      DATABASE_URL: "postgres://postgres:postgres@127.0.0.1:5932/sluggers_super_draft"
+      DATABASE_URL: "postgres://starworks:starworks@db:5432/starworks"
       NODE_ENV: "production"
+      PORT: "3000"
+    depends_on:
+      db:
+        condition: service_healthy
 
   db:
     image: postgres:17
     ports:
-      - "127.0.0.1:5932:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - db:/var/lib/postgresql/data
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: sluggers_super_draft
+      POSTGRES_USER: starworks
+      POSTGRES_PASSWORD: starworks
+      POSTGRES_DB: starworks
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starworks -d starworks"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
 volumes:
   db:

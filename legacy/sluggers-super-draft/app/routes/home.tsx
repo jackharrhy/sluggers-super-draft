@@ -49,7 +49,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <main className="flex-1 flex flex-col gap-6 items-center">
-        <h1 className="text-6xl font-bold font-happiness">Starworks</h1>
+        <h1 className="text-6xl font-bold font-happiness">Lil Slug Crew</h1>
 
         {/* Top 5 Standings */}
         {loaderData.standings.standings.length > 0 && (
