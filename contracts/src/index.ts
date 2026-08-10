@@ -1,5 +1,6 @@
 export * from "./adapter-operation-bundle.ts";
 export * from "./common.ts";
+export * from "./compile-adapter-operations.ts";
 export * from "./content-pack-manifest.ts";
 export * from "./game-build-manifest.ts";
 export * from "./run-envelope.ts";

@@ -12,6 +12,9 @@ const SetCharacterStatOperationSchema = z.strictObject({
   characterId: z.string().min(1).max(127),
   statKey: z.string().min(1).max(80),
   gameplayTarget: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,126}$/),
+  loadPhase: z.enum(["build-time", "runtime"]),
+  resource: z.enum(["dt-na-dat", "main-dol", "runtime-bridge"]),
+  codec: z.enum(["bool", "enum", "f32-be", "s16-be", "u16-be", "u32-be", "u8"]),
   value: JsonScalarSchema,
 });
 
