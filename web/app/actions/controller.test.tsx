@@ -116,7 +116,7 @@ function createTestRuntime(
     token?: string
   } = {},
 ): AppRuntime {
-  let repository: PlatformRepository = {
+  let repository: PlatformRepository = Object.assign({
     async bootstrapSiteAdmin() {
       return siteAdminIdentity()
     },
@@ -128,6 +128,9 @@ function createTestRuntime(
       return null
     },
     async createOAuthAttempt() {},
+    async createRunnerCredential() {
+      return '22222222-2222-4222-8222-222222222222'
+    },
     async findAccessibleLeague() {
       return null
     },
@@ -144,9 +147,11 @@ function createTestRuntime(
       throw new Error('Unexpected league provisioning')
     },
     async revokeSession() {},
+    async revokeRunnerCredential() {
+      return true
+    },
     async setPublicationPolicy() {},
-    ...options.repository,
-  }
+  }, options.repository)
   let discord: DiscordOAuthClient = {
     createAuthorizationUrl() {
       return new URL('https://discord.test/oauth2/authorize')
