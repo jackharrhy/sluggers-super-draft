@@ -37,6 +37,14 @@ export const routes = route({
       correctTelemetry: post('attempts/:attemptId/telemetry/corrections'),
       confirmTelemetry: post('attempts/:attemptId/telemetry/confirm'),
     }),
+    content: route(':leagueSlug/content', {
+      dashboard: get('/'),
+      create: post('/'),
+      uploadAsset: post('assets'),
+      assignAsset: post('revisions/:revisionId/assets'),
+      publish: post('revisions/:revisionId/publish'),
+      clone: post('revisions/:revisionId/clone'),
+    }),
     drafts: route(':leagueSlug/drafts', {
       dashboard: get('/'),
       create: post('/'),

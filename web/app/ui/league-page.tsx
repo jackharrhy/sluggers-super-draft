@@ -38,6 +38,13 @@ export function LeaguePage(
             </div>
             <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Open operations workspace</a>
           </section>
+          <section mix={[cardStyle, settingsStyle]} aria-labelledby="content-heading">
+            <div>
+              <h2 id="content-heading" mix={subheadingStyle}>Content packs</h2>
+              <p mix={mutedStyle}>Publish versioned local-build manifests and allowed user-created source art.</p>
+            </div>
+            <a href={routes.leagues.content.dashboard.href({ leagueSlug: league.slug })}>Open content workspace</a>
+          </section>
           <section mix={[cardStyle, settingsStyle]} aria-labelledby="publication-heading">
             <div>
               <h2 id="publication-heading" mix={subheadingStyle}>Publication policy</h2>
