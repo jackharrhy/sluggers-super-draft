@@ -6,10 +6,11 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --import remix/node-tsx scripts/migrate.ts",
     "db:bootstrap-admin": "node --import remix/node-tsx scripts/bootstrap-site-admin.ts",
+    "import:legacy": "node --import remix/node-tsx scripts/import-legacy-super-draft.ts",
     "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
     "test": "remix test",
-    "test:db": "node --import remix/node-tsx --test app/platform/database/schema.integration.ts app/platform/platform.integration.ts",
+    "test:db": "node --import remix/node-tsx --test app/platform/database/schema.integration.ts app/platform/platform.integration.ts app/import/legacy-super-draft-importer.integration.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {

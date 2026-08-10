@@ -143,6 +143,7 @@ export const conferences = pgTable(
     seasonId: uuid('season_id').notNull(),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
+    color: text('color'),
     ...timestamps,
   },
   (table) => [
@@ -187,7 +188,7 @@ export const divisions = pgTable(
       columns: [table.leagueId, table.conferenceId],
       foreignColumns: [conferences.leagueId, conferences.id],
       name: 'divisions_league_conference_fk',
-    }).onDelete('set null'),
+    }),
   ],
 )
 
@@ -215,8 +216,12 @@ export const leagueTeams = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     leagueId: uuid('league_id').notNull(),
     seasonId: uuid('season_id').notNull(),
+    conferenceId: uuid('conference_id'),
+    managerPersonId: uuid('manager_person_id'),
     slug: text('slug').notNull(),
     name: text('name').notNull(),
+    abbreviation: text('abbreviation'),
+    color: text('color'),
     ...timestamps,
   },
   (table) => [
@@ -231,6 +236,16 @@ export const leagueTeams = pgTable(
       foreignColumns: [seasons.leagueId, seasons.id],
       name: 'league_teams_league_season_fk',
     }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.conferenceId],
+      foreignColumns: [conferences.leagueId, conferences.id],
+      name: 'league_teams_league_conference_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.managerPersonId],
+      foreignColumns: [leagueMemberships.leagueId, leagueMemberships.personId],
+      name: 'league_teams_league_manager_fk',
+    }),
   ],
 )
 
