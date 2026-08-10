@@ -1,0 +1,76 @@
+import * as assert from 'remix/assert'
+import { describe, it } from 'remix/test'
+
+import { validateStatProfileRevision } from '@starworks/contracts'
+
+import { PlatformError } from '../platform/errors.ts'
+import { importStatEditorV4 } from './stat-editor-v4.ts'
+
+describe('Stat Editor v4 importer', () => {
+  it('translates character data into a typed Starworks stat profile draft', () => {
+    let result = importStatEditorV4({
+      profileName: 'Imported league stats',
+      rawText: buildStatEditorV4Snapshot(),
+      sourceVersion: 'v4',
+    })
+
+    assert.equal(result.definitions.length, 49)
+    assert.equal(result.characterValues.length, 101)
+    assert.equal(result.characterValues[0]?.characterId, 'rmbe01-character-000')
+    assert.equal(result.characterValues[0]?.values['legacy.stat-editor.stat-12'], 112)
+    assert.equal(result.characterValues[0]?.values['legacy.stat-editor.pitching-03'], 0.75)
+    assert.equal(result.warnings.length, 3)
+    assert.deepEqual(validateStatProfileRevision({
+      basedOnRevisionId: null,
+      characterValues: result.characterValues,
+      createdAt: '2026-08-10T00:00:00Z',
+      definitions: result.definitions,
+      kind: 'stat-profile-revision',
+      leagueId: '11111111-1111-4111-8111-111111111111',
+      name: result.name,
+      profileId: '22222222-2222-4222-8222-222222222222',
+      publishedAt: null,
+      revisionId: '33333333-3333-4333-8333-333333333333',
+      revisionNumber: 1,
+      schemaVersion: 1,
+      status: 'draft',
+    }), [])
+  })
+
+  it('refuses a mislabeled v3 snapshot instead of guessing', () => {
+    let v3 = Array.from({ length: 228 }, () => '0').join('\n')
+    assert.throws(
+      () => importStatEditorV4({ profileName: 'Wrong version', rawText: v3, sourceVersion: 'v4' }),
+      (error: unknown) => error instanceof PlatformError && /v3/.test(error.message),
+    )
+  })
+})
+
+function buildStatEditorV4Snapshot(): string {
+  let lines: string[] = []
+  appendRows(lines, 101, 101, () => 1)
+  appendRows(lines, 101, 30, (row, column) => row === 0 ? 100 + column : 50 + column)
+  appendRows(lines, 24, 25, () => 1)
+  lines.push('Medium,High,Low,Group 3,Group 4,Group 5')
+  lines.push('1,1,1,0,0,0')
+  appendRows(lines, 101, 14, (_row, column) => 1 + column / 10)
+  appendRows(lines, 101, 5, (_row, column) => column === 3 ? 0.75 : 10 + column)
+  appendRows(lines, 43, 2, () => 1)
+  appendRows(lines, 12, 41, () => 0)
+  appendRows(lines, 16, 4, () => 1)
+  appendRows(lines, 4, 2, () => 1)
+  appendRows(lines, 2, 3, () => 1)
+  assert.equal(lines.length, 507)
+  return lines.join('\n')
+}
+
+function appendRows(
+  lines: string[],
+  rows: number,
+  columns: number,
+  value: (row: number, column: number) => number,
+): void {
+  for (let row = 0; row < rows; row += 1) {
+    lines.push(Array.from({ length: columns }, (_, column) => value(row, column)).join(','))
+  }
+}
