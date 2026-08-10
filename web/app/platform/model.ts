@@ -68,3 +68,21 @@ export interface CompletedLogin {
   sessionToken: string
   sessionExpiresAt: Date
 }
+
+export const runnerCredentialScopes = [
+  'artifacts:read',
+  'heartbeat:write',
+  'runs:claim',
+  'runs:read',
+  'telemetry:write',
+] as const
+
+export type RunnerCredentialScope = (typeof runnerCredentialScopes)[number]
+
+export interface IssuedRunnerCredential {
+  credential: string
+  credentialId: string
+  leagueId: string
+  name: string
+  scopes: RunnerCredentialScope[]
+}
