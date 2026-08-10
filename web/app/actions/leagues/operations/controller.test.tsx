@@ -126,6 +126,7 @@ function createRuntime(runnerAdmin: RunnerAdminApplication): AppRuntime {
   let cookies = { httpOnly: true, path: '/', sameSite: 'Lax' as const, secrets: ['operations-test'] }
   return {
     configuration: {} as ConfigurationApplication,
+    draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     oauthCookie: createCookie('test_oauth', cookies),
     platform: new PlatformService(repository),

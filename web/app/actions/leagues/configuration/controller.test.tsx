@@ -154,6 +154,7 @@ function createRuntime(configuration: ConfigurationApplication): AppRuntime {
   }
   return {
     configuration,
+    draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository),
