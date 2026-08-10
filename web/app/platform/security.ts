@@ -7,3 +7,7 @@ export function createOpaqueToken(byteLength = 32): string {
 export function hashSecret(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex')
 }
+
+export function createPkceChallenge(verifier: string): string {
+  return createHash('sha256').update(verifier, 'utf8').digest('base64url')
+}
