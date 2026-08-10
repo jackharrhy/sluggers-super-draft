@@ -49,6 +49,7 @@ from starworks_runner.games.sluggers.tools import (
     install_dtk,
     load_dtk_release,
 )
+from starworks_runner.support import create_support_bundle
 
 
 def validate_contract_fixtures(contracts_directory: Path) -> None:
@@ -176,6 +177,21 @@ def create_parser() -> argparse.ArgumentParser:
     desktop_parser.add_argument("--image", type=Path)
     desktop_parser.add_argument("--dolphin", type=Path)
     desktop_parser.add_argument("--dtk", type=Path)
+
+    support_parser = subparsers.add_parser(
+        "support-bundle",
+        help="create a redacted diagnostic archive after explicit operator consent",
+    )
+    support_parser.add_argument("--output", type=Path, required=True)
+    support_parser.add_argument("--state", type=Path, default=default_state_path())
+    support_parser.add_argument("--image", type=Path)
+    support_parser.add_argument("--dolphin", type=Path)
+    support_parser.add_argument("--dtk", type=Path)
+    support_parser.add_argument(
+        "--consent",
+        action="store_true",
+        help="confirm that the operator intends to create and review the archive",
+    )
     return parser
 
 
@@ -460,6 +476,20 @@ def run(arguments: argparse.Namespace) -> int:
                 dtk_executable=arguments.dtk,
             )
         )
+    if arguments.command == "support-bundle":
+        if not arguments.consent:
+            raise SluggersAdapterError(
+                "support-bundle requires --consent; review the archive before sharing it"
+            )
+        created = create_support_bundle(
+            arguments.output,
+            state_path=arguments.state,
+            game_image=arguments.image,
+            dolphin_executable=arguments.dolphin,
+            dtk_executable=arguments.dtk,
+        )
+        print(json.dumps({"supportBundle": str(created)}, sort_keys=True))
+        return 0
     raise AssertionError(f"Unhandled command {arguments.command}")
 
 

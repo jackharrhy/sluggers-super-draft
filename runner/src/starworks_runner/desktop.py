@@ -299,7 +299,8 @@ def launch_desktop(
                 operation,
                 lambda registration: self.status.setText(
                     f"Registered as {registration.runner_id} · heartbeat every "
-                    f"{registration.heartbeat_seconds}s"
+                    f"{registration.heartbeat_seconds}s · "
+                    f"runner update {registration.version_status}"
                 ),
             )
 
@@ -346,7 +347,15 @@ def launch_desktop(
                 registration = state.load_registration()
                 active = state.load_active_run()
             if registration:
-                self.status.setText(f"Registered locally as {registration.runner_id}")
+                update_detail = registration.version_status
+                if registration.recommended_runner_version:
+                    update_detail += (
+                        f" (recommended {registration.recommended_runner_version})"
+                    )
+                self.status.setText(
+                    f"Registered locally as {registration.runner_id} · "
+                    f"runner update {update_detail}"
+                )
             if active:
                 self.active_run.setText(
                     f"Attempt {active.envelope['attemptId']} · stage {active.stage}"

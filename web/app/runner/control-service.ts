@@ -68,6 +68,8 @@ export interface RunnerControlServiceOptions {
   heartbeatSeconds?: number
   leaseSeconds?: number
   adapterVersion?: string
+  minimumRunnerVersion?: string
+  recommendedRunnerVersion?: string
 }
 
 export class RunnerControlService {
@@ -76,6 +78,8 @@ export class RunnerControlService {
   readonly #heartbeatSeconds: number
   readonly #leaseSeconds: number
   readonly #adapterVersion: string
+  readonly #minimumRunnerVersion: string
+  readonly #recommendedRunnerVersion: string
 
   constructor(
     readonly database: StarworksDatabase,
@@ -86,6 +90,8 @@ export class RunnerControlService {
     this.#heartbeatSeconds = options.heartbeatSeconds ?? 15
     this.#leaseSeconds = options.leaseSeconds ?? 60
     this.#adapterVersion = options.adapterVersion ?? '0.1.0'
+    this.#minimumRunnerVersion = options.minimumRunnerVersion ?? '0.1.0'
+    this.#recommendedRunnerVersion = options.recommendedRunnerVersion ?? '0.1.0'
   }
 
   async register(
@@ -143,6 +149,15 @@ export class RunnerControlService {
       leaseSeconds: this.#leaseSeconds,
       runnerId: stationId,
       schemaVersion: 1,
+      versionPolicy: {
+        minimumRunnerVersion: this.#minimumRunnerVersion,
+        recommendedRunnerVersion: this.#recommendedRunnerVersion,
+        status: runnerVersionStatus(
+          request.capabilities.runnerVersion,
+          this.#minimumRunnerVersion,
+          this.#recommendedRunnerVersion,
+        ),
+      },
     })
   }
 
@@ -722,4 +737,24 @@ export class RunnerControlService {
     }
     return authenticated.stationId
   }
+}
+
+export function runnerVersionStatus(
+  installed: string,
+  minimum: string,
+  recommended: string,
+): 'current' | 'update-available' | 'update-required' {
+  if (compareVersions(installed, minimum) < 0) return 'update-required'
+  if (compareVersions(installed, recommended) < 0) return 'update-available'
+  return 'current'
+}
+
+function compareVersions(left: string, right: string): number {
+  let leftParts = left.split('.').map(Number)
+  let rightParts = right.split('.').map(Number)
+  for (let index = 0; index < 3; index += 1) {
+    let difference = leftParts[index]! - rightParts[index]!
+    if (difference !== 0) return Math.sign(difference)
+  }
+  return 0
 }

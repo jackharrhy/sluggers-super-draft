@@ -12,6 +12,8 @@ services:
       NODE_ENV: "production"
       PORT: "3000"
       METRICS_BEARER_TOKEN: "${METRICS_BEARER_TOKEN:-starworks-local-metrics-token-change-me}"
+      RUNNER_MINIMUM_VERSION: "${RUNNER_MINIMUM_VERSION:-0.1.0}"
+      RUNNER_RECOMMENDED_VERSION: "${RUNNER_RECOMMENDED_VERSION:-0.1.0}"
       SESSION_COOKIE_SECRETS: "${SESSION_COOKIE_SECRETS:-starworks-local-compose-cookie-secret-change-me}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-GK00000000000000000000000000000000}"
       S3_BUCKET: "${S3_BUCKET:-starworks}"

@@ -49,6 +49,11 @@ export const RunnerRegistrationResponseSchema = z.strictObject({
   runnerId: UuidSchema,
   heartbeatSeconds: z.number().int().min(5).max(300),
   leaseSeconds: z.number().int().min(15).max(900),
+  versionPolicy: z.strictObject({
+    minimumRunnerVersion: VersionSchema,
+    recommendedRunnerVersion: VersionSchema,
+    status: z.enum(["current", "update-available", "update-required"]),
+  }).optional(),
 });
 
 export const RunnerHeartbeatRequestSchema = z.strictObject({
