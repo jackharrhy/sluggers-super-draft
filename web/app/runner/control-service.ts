@@ -46,6 +46,7 @@ import {
   statProfileRevisions,
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
+import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
 import type { RunnerCredentialScope } from '../platform/model.ts'
 import { hashSecret } from '../platform/security.ts'
 
@@ -103,7 +104,7 @@ export class RunnerControlService {
     this.#createId = options.createId ?? randomUUID
     this.#heartbeatSeconds = options.heartbeatSeconds ?? 15
     this.#leaseSeconds = options.leaseSeconds ?? 60
-    this.#adapterVersion = options.adapterVersion ?? '0.1.0'
+    this.#adapterVersion = options.adapterVersion ?? SLUGGERS_ADAPTER_VERSION
     this.#minimumRunnerVersion = options.minimumRunnerVersion ?? '0.1.0'
     this.#recommendedRunnerVersion = options.recommendedRunnerVersion ?? '0.1.0'
   }

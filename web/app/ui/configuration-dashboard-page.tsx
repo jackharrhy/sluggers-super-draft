@@ -6,6 +6,7 @@ import type { AdapterOperationBundle } from '@starworks/contracts'
 import type { ConfigurationDashboard, RevisionSummary } from '../configuration/service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { routes } from '../routes.ts'
+import { SLUGGERS_ADAPTER_VERSION } from '../runner/adapter-version.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
 
 export function ConfigurationDashboardPage(
@@ -170,7 +171,7 @@ export function ConfigurationDashboardPage(
               <SelectField label="Stat profile" name="statProfileRevisionId" options={publishedProfiles.map(({ label, revision }) => ({ label, value: revision.id }))} />
               <SelectField label="Ruleset" name="rulesetRevisionId" options={publishedRulesets.map(({ label, revision }) => ({ label, value: revision.id }))} />
               <SelectField label="Team lineup" name="lineupSelection" options={publishedLineups.map(({ label, revision, teamId }) => ({ label, value: `${teamId}:${revision.id}` }))} />
-              <Field label="Adapter version" name="adapterVersion" defaultValue="0.1.0" />
+              <Field label="Adapter version" name="adapterVersion" defaultValue={SLUGGERS_ADAPTER_VERSION} />
               <button type="submit" mix={buttonStyle}>Compile operations</button>
             </form>
           ) : (

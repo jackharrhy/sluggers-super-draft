@@ -28,6 +28,7 @@ import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { runnerOperationRoles } from '../platform/repository.ts'
 import { createOpaqueToken } from '../platform/security.ts'
+import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
 
 const ScheduleMatchSchema = z.strictObject({
   awayTeamId: z.uuid(),
@@ -113,7 +114,7 @@ export class RunnerAdminService {
     options: RunnerAdminServiceOptions = {},
   ) {
     this.#clock = options.clock ?? (() => new Date())
-    this.#adapterVersion = options.adapterVersion ?? '0.1.0'
+    this.#adapterVersion = options.adapterVersion ?? SLUGGERS_ADAPTER_VERSION
     this.#createId = options.createId ?? randomUUID
     this.#createNonce = options.createNonce ?? createOpaqueToken
   }
