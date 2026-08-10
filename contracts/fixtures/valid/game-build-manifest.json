@@ -5,6 +5,7 @@
     "gameId": "RMBE01",
     "region": "NTSC-U",
     "revision": 0,
+    "discHeaderSha256": "9999999999999999999999999999999999999999999999999999999999999999",
     "mainDolSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     "dataArchiveSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "fstSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -13,6 +14,7 @@
   "compilerVersion": "0.1.0",
   "contentPackSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "buildSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "gameTreeSha256": "8888888888888888888888888888888888888888888888888888888888888888",
   "outputs": [
     {
       "path": "sys/main.dol",

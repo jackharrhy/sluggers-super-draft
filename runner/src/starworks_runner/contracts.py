@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-from functools import lru_cache
+from functools import cache
 from pathlib import Path
 from typing import Any, Literal, cast
 
@@ -30,7 +30,7 @@ def default_contracts_directory() -> Path:
     return Path(__file__).resolve().parents[3] / "contracts"
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_schema(
     name: ContractName, contracts_directory: Path | None = None
 ) -> dict[str, Any]:
