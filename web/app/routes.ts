@@ -29,6 +29,18 @@ export const routes = route({
       issueCredential: post('runner-credentials'),
       revokeStation: post('runner-stations/:stationId/revoke'),
     }),
+    drafts: route(':leagueSlug/drafts', {
+      dashboard: get('/'),
+      create: post('/'),
+      room: get(':draftId'),
+      start: post(':draftId/start'),
+      pick: post(':draftId/picks'),
+      pause: post(':draftId/pause'),
+      resume: post(':draftId/resume'),
+      automaticPick: post(':draftId/automatic-pick'),
+      reversePick: post(':draftId/reverse-pick'),
+      updateQueue: post(':draftId/teams/:teamId/queue'),
+    }),
     configuration: route(':leagueSlug/configuration', {
       dashboard: get('/'),
       preview: post('preview'),

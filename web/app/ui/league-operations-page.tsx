@@ -28,6 +28,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
           </div>
           <nav mix={linkRowStyle} aria-label="League workspaces">
             <a href={routes.leagues.show.href({ leagueSlug: league.slug })}>League home</a>
+            <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Draft room</a>
             <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>Configuration</a>
           </nav>
         </header>

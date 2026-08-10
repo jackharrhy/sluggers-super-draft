@@ -53,6 +53,15 @@ export function LeaguePage(
           </section>
           </>
         ) : null}
+        {identity ? (
+          <section mix={[cardStyle, settingsStyle]} aria-labelledby="draft-heading">
+            <div>
+              <h2 id="draft-heading" mix={subheadingStyle}>Draft room</h2>
+              <p mix={mutedStyle}>Follow the live order, manage a private queue, and make server-authoritative picks.</p>
+            </div>
+            <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Open draft workspace</a>
+          </section>
+        ) : null}
       </AppShell>
     )
   }

@@ -2,6 +2,7 @@ import type { Cookie } from 'remix/cookie'
 import { createContextKey, type Middleware } from 'remix/router'
 
 import type { ConfigurationApplication } from '../configuration/service.ts'
+import type { DraftApplication } from '../draft/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
 import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { IdentityService } from '../platform/identity-service.ts'
@@ -12,6 +13,7 @@ import { RequestLog } from './request-logging.ts'
 
 export const Identity = createContextKey<SessionIdentity | null>(null)
 export const Configuration = createContextKey<ConfigurationApplication>()
+export const Draft = createContextKey<DraftApplication>()
 export const IdentityServiceContext = createContextKey<IdentityService>()
 export const OAuthCookie = createContextKey<Cookie>()
 export const Platform = createContextKey<PlatformService>()
@@ -24,6 +26,7 @@ export function platform(
 ): Middleware<
   [
     { key: typeof Configuration; value: ConfigurationApplication },
+    { key: typeof Draft; value: DraftApplication },
     { key: typeof Identity; value: SessionIdentity | null; property: 'identity' },
     { key: typeof IdentityServiceContext; value: IdentityService },
     { key: typeof OAuthCookie; value: Cookie },
@@ -39,6 +42,7 @@ export function platform(
     let identity = await runtime.platform.resolveSession(rawSessionToken)
 
     context.set(Configuration, runtime.configuration)
+    context.set(Draft, runtime.draft)
     context.set(Identity, identity, { property: 'identity' })
     context.set(IdentityServiceContext, runtime.identity)
     context.set(OAuthCookie, runtime.oauthCookie)

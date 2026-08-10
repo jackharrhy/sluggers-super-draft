@@ -169,6 +169,7 @@ function createTestRuntime(
   }
   return {
     configuration: {} as ConfigurationApplication,
+    draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository, { createToken: () => options.token ?? 'test-token' }),
