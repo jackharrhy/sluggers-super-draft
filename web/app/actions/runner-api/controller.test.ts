@@ -237,6 +237,7 @@ function createRuntime(runnerControl: RunnerControlApplication): AppRuntime {
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository),
     runnerControl,
+    runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
   }
 }

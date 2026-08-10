@@ -18,6 +18,7 @@ import {
   runnerCredentials,
   runnerLeases,
   runnerStations,
+  seasons,
   statProfileRevisions,
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
@@ -47,6 +48,45 @@ export interface RunnerAdminServiceOptions {
   createNonce?: () => string
 }
 
+export interface RunnerOperationsDashboard {
+  seasons: Array<{
+    id: string
+    name: string
+    teams: Array<{
+      id: string
+      name: string
+      lineups: Array<{ id: string; revisionNumber: number }>
+    }>
+  }>
+  statProfiles: Array<{ id: string; name: string; revisionNumber: number }>
+  rulesets: Array<{ id: string; name: string; revisionNumber: number }>
+  matches: Array<{
+    id: string
+    status: string
+    scheduledAt: Date | null
+    homeTeamName: string
+    awayTeamName: string
+    homeTeamId: string
+    awayTeamId: string
+    attempts: Array<{ id: string; attemptNumber: number; status: string; failureKind: string | null }>
+  }>
+  stations: Array<{
+    id: string
+    name: string
+    status: string
+    runtimeState: string
+    lastHeartbeatAt: Date | null
+    capabilities: unknown
+  }>
+}
+
+export interface RunnerAdminApplication {
+  dashboard(identity: SessionIdentity | null, leagueId: string): Promise<RunnerOperationsDashboard>
+  scheduleMatch: RunnerAdminService['scheduleMatch']
+  queueAttempt: RunnerAdminService['queueAttempt']
+  revokeStation: RunnerAdminService['revokeStation']
+}
+
 export class RunnerAdminService {
   readonly #clock: () => Date
   readonly #createId: () => string
@@ -59,6 +99,54 @@ export class RunnerAdminService {
     this.#clock = options.clock ?? (() => new Date())
     this.#createId = options.createId ?? randomUUID
     this.#createNonce = options.createNonce ?? createOpaqueToken
+  }
+
+  async dashboard(
+    identity: SessionIdentity | null,
+    leagueId: string,
+  ): Promise<RunnerOperationsDashboard> {
+    this.#requireAdmin(identity, leagueId)
+    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, matchRows, attemptRows, stationRows] = await Promise.all([
+      this.database.select({ id: seasons.id, name: seasons.name }).from(seasons).where(eq(seasons.leagueId, leagueId)),
+      this.database.select({ id: leagueTeams.id, name: leagueTeams.name, seasonId: leagueTeams.seasonId }).from(leagueTeams).where(eq(leagueTeams.leagueId, leagueId)),
+      this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))),
+      this.database.select({ id: statProfileRevisions.id, name: statProfileRevisions.name, revisionNumber: statProfileRevisions.revisionNumber }).from(statProfileRevisions).where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.status, 'published'))),
+      this.database.select({ id: rulesetRevisions.id, name: rulesetRevisions.name, revisionNumber: rulesetRevisions.revisionNumber }).from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.status, 'published'))),
+      this.database.select().from(matches).where(eq(matches.leagueId, leagueId)),
+      this.database.select({ attemptNumber: matchAttempts.attemptNumber, failureKind: matchAttempts.failureKind, id: matchAttempts.id, matchId: matchAttempts.matchId, status: matchAttempts.status }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
+      this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
+    ])
+    let teamNames = new Map(teamRows.map((team) => [team.id, team.name]))
+    return {
+      seasons: seasonRows.map((season) => ({
+        ...season,
+        teams: teamRows.filter((team) => team.seasonId === season.id).map((team) => ({
+          id: team.id,
+          lineups: lineupRows.filter((lineup) => lineup.teamId === team.id).map((lineup) => ({ id: lineup.id, revisionNumber: lineup.revisionNumber })),
+          name: team.name,
+        })),
+      })),
+      statProfiles: profileRows,
+      rulesets: rulesetRows,
+      matches: matchRows.map((match) => ({
+        attempts: attemptRows.filter((attempt) => attempt.matchId === match.id).map(({ matchId: _, ...attempt }) => attempt),
+        awayTeamName: teamNames.get(match.awayTeamId) ?? 'Unknown team',
+        awayTeamId: match.awayTeamId,
+        homeTeamName: teamNames.get(match.homeTeamId) ?? 'Unknown team',
+        homeTeamId: match.homeTeamId,
+        id: match.id,
+        scheduledAt: match.scheduledAt,
+        status: match.status,
+      })),
+      stations: stationRows.map((station) => ({
+        capabilities: station.capabilities,
+        id: station.id,
+        lastHeartbeatAt: station.lastHeartbeatAt,
+        name: station.name,
+        runtimeState: station.runtimeState,
+        status: station.status,
+      })),
+    }
   }
 
   async scheduleMatch(

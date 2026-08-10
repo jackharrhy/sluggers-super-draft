@@ -173,6 +173,7 @@ function createTestRuntime(
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository, { createToken: () => options.token ?? 'test-token' }),
     runnerControl: {} as AppRuntime['runnerControl'],
+    runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
   }
 }
