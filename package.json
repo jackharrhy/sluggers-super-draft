@@ -1,5 +1,7 @@
 {
-  "name": "lil-slug-crew",
+  "name": "starworks",
+  "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "react-router build",
