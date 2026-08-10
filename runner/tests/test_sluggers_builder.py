@@ -1,0 +1,293 @@
+from __future__ import annotations
+
+import io
+from datetime import UTC, datetime
+from pathlib import Path
+
+import pytest
+from starworks_runner.contracts import validate_contract
+from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
+from starworks_runner.games.sluggers.dolphin import DolphinLauncher
+from starworks_runner.games.sluggers.errors import (
+    BuildIntegrityError,
+    DolphinLaunchError,
+    ToolVerificationError,
+    UnsupportedBaseError,
+)
+from starworks_runner.games.sluggers.fingerprints import (
+    SupportedBase,
+    SupportedBaseRegistry,
+    fingerprint_extraction,
+)
+from starworks_runner.games.sluggers.hashing import sha256_file
+from starworks_runner.games.sluggers.tools import (
+    DtkDiscTool,
+    DtkRelease,
+    ToolAsset,
+    install_dtk,
+)
+
+
+def create_extraction(root: Path, *, dat_payload: bytes = b"clean dat") -> None:
+    (root / "disc").mkdir(parents=True)
+    (root / "sys").mkdir()
+    (root / "files").mkdir()
+    (root / "disc/header.bin").write_bytes(b"RMBE01\x00\x00" + bytes(248))
+    (root / "sys/main.dol").write_bytes(b"synthetic clean main dol")
+    (root / "files/dt_na.dat").write_bytes(dat_payload)
+    (root / "sys/fst.bin").write_bytes(b"synthetic fst")
+    (root / "sys/boot.bin").write_bytes(b"synthetic boot")
+
+
+def create_fake_dtk(
+    path: Path,
+    *,
+    dat_payload: str = "clean dat",
+    version: str = "1.8.3",
+    redump_line: str = "Mario Super Sluggers (USA)",
+) -> str:
+    script = f"""#!/usr/bin/env python3
+import pathlib
+import sys
+
+args = sys.argv[1:]
+if args == ["--version"]:
+    print("decomp-toolkit {version}")
+elif args[:2] == ["disc", "info"]:
+    print("Format: RVZ")
+    print("Game ID: RMBE01")
+    print("Disc 1, Revision 0")
+elif args[:2] == ["disc", "verify"]:
+    print("Game ID: RMBE01")
+    print("Redump: {redump_line}")
+elif args[:2] == ["disc", "extract"]:
+    root = pathlib.Path(args[3])
+    (root / "disc").mkdir(parents=True)
+    (root / "sys").mkdir()
+    (root / "files").mkdir()
+    (root / "disc" / "header.bin").write_bytes(b"RMBE01\\x00\\x00" + bytes(248))
+    (root / "sys" / "main.dol").write_bytes(b"synthetic clean main dol")
+    (root / "files" / "dt_na.dat").write_bytes({dat_payload!r}.encode())
+    (root / "sys" / "fst.bin").write_bytes(b"synthetic fst")
+    (root / "sys" / "boot.bin").write_bytes(b"synthetic boot")
+else:
+    print("unexpected arguments: " + repr(args), file=sys.stderr)
+    raise SystemExit(9)
+"""
+    path.write_text(script, encoding="utf-8")
+    path.chmod(0o755)
+    return sha256_file(path)
+
+
+def fake_release() -> DtkRelease:
+    return DtkRelease(
+        version="1.8.3",
+        release_tag="v1.8.3",
+        source_commit="e4219e7644fb7b96d920d5bc3d1d950f5569dcaf",
+        assets={},
+    )
+
+
+def registry_for(root: Path) -> SupportedBaseRegistry:
+    fingerprint, _ = fingerprint_extraction(
+        root, expected_game_id="RMBE01", expected_revision=0
+    )
+    return SupportedBaseRegistry(
+        (SupportedBase(name="Synthetic RMBE01 Rev 0", fingerprint=fingerprint),)
+    )
+
+
+def test_no_op_build_is_deterministic_atomic_cached_and_source_preserving(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    original_image = b"synthetic user-owned image; not game data"
+    image.write_bytes(original_image)
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    reference = tmp_path / "reference"
+    create_extraction(reference)
+    registry = registry_for(reference)
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry,
+        clock=lambda: datetime(2026, 8, 10, 12, 0, tzinfo=UTC),
+    )
+    request = BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+
+    first = service.build(request)
+    first_manifest_bytes = (
+        first.build_directory / "game-build-manifest.json"
+    ).read_bytes()
+    second = service.build(request)
+
+    assert first.cache_hit is False
+    assert second.cache_hit is True
+    assert first.build_directory == second.build_directory
+    assert first.manifest == second.manifest
+    assert (
+        second.build_directory / "game-build-manifest.json"
+    ).read_bytes() == first_manifest_bytes
+    assert image.read_bytes() == original_image
+    assert first.report["sourceMutated"] is False
+    assert not list((tmp_path / "cache/.staging").iterdir())
+    validate_contract("game-build-manifest", first.manifest)
+    assert first.manifest["patchReceipts"] == []
+    assert first.manifest["warnings"][0]["code"] == "NO_OP_BUILD"
+    assert first.manifest["buildSha256"] == second.manifest["buildSha256"]
+    for output in first.manifest["outputs"]:
+        assert sha256_file(first.game_directory / output["path"]) == output["sha256"]
+
+
+def test_modified_base_fails_closed_without_promoting_a_build(tmp_path: Path) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk, dat_payload="modified dat")
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+    )
+
+    with pytest.raises(UnsupportedBaseError, match="modified or unknown files"):
+        service.build(BuildRequest(image_path=image, cache_root=tmp_path / "cache"))
+
+    assert not list((tmp_path / "cache/builds").iterdir())
+    assert not list((tmp_path / "cache/.staging").iterdir())
+
+
+def test_unprovisioned_production_registry_is_explicit(tmp_path: Path) -> None:
+    root = tmp_path / "extracted"
+    create_extraction(root)
+    fingerprint, _ = fingerprint_extraction(
+        root, expected_game_id="RMBE01", expected_revision=0
+    )
+    registry = SupportedBaseRegistry.load()
+
+    with pytest.raises(UnsupportedBaseError, match="not provisioned yet"):
+        registry.require_supported(fingerprint)
+
+
+def test_dtk_binary_and_redump_verification_fail_closed(tmp_path: Path) -> None:
+    wrong_version = tmp_path / "wrong-version"
+    wrong_version_hash = create_fake_dtk(wrong_version, version="1.8.2")
+    tool = DtkDiscTool(
+        wrong_version,
+        release=fake_release(),
+        expected_sha256=wrong_version_hash,
+    )
+    with pytest.raises(ToolVerificationError, match="Expected decomp-toolkit"):
+        tool.verify_pinned_binary()
+
+    non_redump = tmp_path / "non-redump"
+    non_redump_hash = create_fake_dtk(non_redump, redump_line="Not found")
+    tool = DtkDiscTool(
+        non_redump,
+        release=fake_release(),
+        expected_sha256=non_redump_hash,
+    )
+    with pytest.raises(Exception, match="exact Redump match"):
+        tool.verify_image(tmp_path / "image.rvz")
+
+
+def test_tool_install_rejects_an_unpublished_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    release = DtkRelease(
+        version="1.8.3",
+        release_tag="v1.8.3",
+        source_commit="source",
+        assets={
+            "test-platform": ToolAsset(
+                file_name="dtk-test",
+                sha256="0" * 64,
+                url="https://example.invalid/dtk",
+            )
+        },
+    )
+    monkeypatch.setattr(
+        "starworks_runner.games.sluggers.tools.current_platform_key",
+        lambda: "test-platform",
+    )
+
+    with pytest.raises(ToolVerificationError, match="published SHA-256"):
+        install_dtk(
+            tmp_path,
+            release=release,
+            opener=lambda _: io.BytesIO(b"not the published binary"),
+        )
+
+
+def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    result = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+    ).build(BuildRequest(image_path=image, cache_root=tmp_path / "cache"))
+    dolphin = tmp_path / "Dolphin"
+    dolphin.write_text(
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo \'Dolphin 2603\'; fi\n',
+        encoding="utf-8",
+    )
+    dolphin.chmod(0o755)
+    launcher = DolphinLauncher(dolphin)
+
+    assert "2603" in launcher.verify()
+    command = launcher.command_for(result.build_directory, tmp_path / "profile")
+    assert command[-2:] == (
+        "--exec",
+        str(result.game_directory / "sys/main.dol"),
+    )
+    assert command[command.index("--user") + 1] == str(tmp_path / "profile")
+
+    (result.game_directory / "sys/main.dol").write_bytes(b"tampered")
+    with pytest.raises(DolphinLaunchError, match="modified managed output"):
+        launcher.command_for(result.build_directory, tmp_path / "profile")
+
+
+def test_corrupt_cache_is_not_silently_reused(tmp_path: Path) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+    )
+    request = BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+    result = service.build(request)
+    (result.game_directory / "files/dt_na.dat").write_bytes(b"tampered")
+
+    with pytest.raises(BuildIntegrityError, match="Cached output failed verification"):
+        service.build(request)

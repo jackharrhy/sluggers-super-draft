@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "gameId": "RMBE01",
+  "region": "NTSC-U",
+  "revisions": [],
+  "provisioningNote": "No retail game fingerprint is guessed or copied into Starworks. A project maintainer must inspect a lawfully dumped, Redump-matched RMBE01 Rev 0 image and review the generated hashes before adding the first production entry."
+}

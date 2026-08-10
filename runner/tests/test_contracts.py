@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pytest
 from jsonschema import ValidationError
-
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
 
 CONTRACTS_DIRECTORY = Path(__file__).resolve().parents[2] / "contracts"
