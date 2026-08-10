@@ -7,12 +7,12 @@
   "matchId": "55555555-5555-4555-8555-555555555555",
   "attemptId": "66666666-6666-4666-8666-666666666666",
   "attemptNonce": "test_attempt_nonce_0123456789abcdef",
-  "sequence": 0,
+  "sequence": 1,
   "frame": 120,
   "eventType": "synthetic",
+  "observationSource": "synthetic",
   "payload": {
-    "message": "bridge-ready",
-    "acknowledged": true
+    "value": 1
   },
   "adapterVersion": "0.1.0",
   "gameBuildSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

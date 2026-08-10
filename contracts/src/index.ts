@@ -21,6 +21,7 @@ import { RulesetRevisionSchema } from "./ruleset-revision.ts";
 import { StatProfileRevisionSchema } from "./stat-profile-revision.ts";
 import { TeamLineupRevisionSchema } from "./team-lineup-revision.ts";
 import { TelemetryEnvelopeSchema } from "./telemetry-envelope.ts";
+import { TelemetryUploadMessageSchema } from "./telemetry-envelope.ts";
 
 export const contractSchemas = {
   "adapter-operation-bundle": AdapterOperationBundleSchema,
@@ -33,6 +34,7 @@ export const contractSchemas = {
   "stat-profile-revision": StatProfileRevisionSchema,
   "team-lineup-revision": TeamLineupRevisionSchema,
   "telemetry-envelope": TelemetryEnvelopeSchema,
+  "telemetry-upload": TelemetryUploadMessageSchema,
 } as const;
 
 export type ContractName = keyof typeof contractSchemas;

@@ -40,7 +40,7 @@
     },
     "sequence": {
       "type": "integer",
-      "minimum": 0,
+      "exclusiveMinimum": 0,
       "maximum": 9007199254740991
     },
     "frame": {
@@ -54,10 +54,20 @@
         "synthetic",
         "game-started",
         "inning-started",
+        "batter-changed",
+        "pitcher-changed",
         "plate-appearance-ended",
         "substitution",
         "game-ended",
         "bridge-warning"
+      ]
+    },
+    "observationSource": {
+      "type": "string",
+      "enum": [
+        "bridge-hook",
+        "memory-observation",
+        "synthetic"
       ]
     },
     "payload": {
@@ -66,22 +76,7 @@
         "type": "string",
         "minLength": 1
       },
-      "additionalProperties": {
-        "anyOf": [
-          {
-            "type": "string"
-          },
-          {
-            "type": "number"
-          },
-          {
-            "type": "boolean"
-          },
-          {
-            "type": "null"
-          }
-        ]
-      }
+      "additionalProperties": {}
     },
     "adapterVersion": {
       "type": "string",
@@ -108,6 +103,7 @@
     "sequence",
     "frame",
     "eventType",
+    "observationSource",
     "payload",
     "adapterVersion",
     "gameBuildSha256"
