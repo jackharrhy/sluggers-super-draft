@@ -239,7 +239,7 @@ export default function AdminDebug({
     "pre-season",
     "drafting",
     "playing",
-    "post-season",
+    "finished",
   ];
 
   return (
