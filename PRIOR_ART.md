@@ -17,7 +17,7 @@ License labels below describe repository metadata and visible license files at t
 
 | Project | Relevance to Starworks | License/status observed |
 | --- | --- | --- |
-| [Sluggers Super Draft](https://github.com/jackharrhy/sluggers-super-draft) | Current league website, draft, teams, lineups, trades, matches, standings, Discord integration, and the starting repository for Starworks. | No repository license currently declared; Starworks plans to become MIT. |
+| [Sluggers Super Draft](https://github.com/jackharrhy/sluggers-super-draft) | Original league website, draft, teams, lineups, trades, matches, standings, Discord integration, and the starting repository for Starworks. | The prior implementation had no declared license when reviewed. New Starworks code is MIT; preserved legacy provenance is not silently relicensed. |
 | [Sluggers Stat Tracker](https://github.com/isThatC2/Sluggers-Stat-Tracker) | Python/Dolphin stat observation, game-state knowledge, event detection, and operator workflow. A local fork also exists at [jackharrhy/Sluggers-Stat-Tracker](https://github.com/jackharrhy/Sluggers-Stat-Tracker). | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |
 | [Sluggers Stat Editor](https://github.com/Philenarion/Sluggers-Stat-Editor) | Character stat layout, validation ranges, chemistry, Gecko generation, and established Python UI behavior. | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |
 | [MSS AutoTeam](https://github.com/STGtheOG/MSS-AutoTeam) | Dolphin process control, team/lineup loading, Mii handling, and match setup automation. | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |

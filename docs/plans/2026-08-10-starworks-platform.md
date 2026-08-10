@@ -8,17 +8,14 @@
 
 ## Implementation status
 
-As of 2026-08-10, the repository-owned portions of Milestones 0–7 are
-implemented and verified with generated fixtures, unit tests, PostgreSQL
-integrations, and synthetic process/bridge tests. Their acceptance criteria
-that require a lawfully dumped reviewed game image, an actual Dolphin process,
-the in-game bridge, or physical input remain part of the external acceptance
-matrix. Milestone 8's overlay, independent FFmpeg recording/publishing, health
-reporting, and experimental Linux image are implemented; hardware bridge,
-input, and real RTMP runs remain external gates. Milestone 9's production
-topology, observability, release packaging, and isolated backup/restore tooling
-are implemented; each real deployment must still perform its own restore and
-credential-revocation drills.
+As of 2026-08-10, the public-checkout software is implemented through the
+production/release slice and verified with contract, Remix/Chromium,
+PostgreSQL, runner, Compose, image, wheel, capture, and recovery tests. The
+criterion-by-criterion record is
+[`2026-08-10-starworks-completion-audit.md`](2026-08-10-starworks-completion-audit.md).
+It is authoritative about which criteria are fully verified and which still
+require a lawfully dumped reviewed game image, compiled in-game bridge, actual
+Dolphin/hardware run, external RTMP/deployment, or maintainer action.
 
 No pending hardware or game-data gate should be interpreted as a reason to
 weaken a fingerprint, expected-byte, nonce, tenancy, or credential check.
