@@ -1,10 +1,12 @@
 import { and, asc, eq, gt, isNull, or } from 'drizzle-orm'
 
 import type {
+  DiscordProfile,
   LeagueDetail,
   LeagueRole,
   LeagueSummary,
   MembershipIdentity,
+  OAuthAttemptRecord,
   PublicationPolicy,
   SessionIdentity,
 } from '../model.ts'
@@ -17,6 +19,7 @@ import {
   leagueMembershipRoles,
   leagueMemberships,
   leagues,
+  oauthAttempts,
   people,
   publicationSettings,
   sessions,
@@ -72,6 +75,178 @@ export class PostgresPlatformRepository implements PlatformRepository {
     let identity = await this.#loadIdentity(personId)
     if (!identity) throw new Error('Failed to load bootstrapped site administrator')
     return identity
+  }
+
+  async completeDiscordLogin(input: {
+    invitationId: string | null
+    now: Date
+    profile: DiscordProfile
+    sessionExpiresAt: Date
+    sessionTokenHash: string
+  }): Promise<SessionIdentity> {
+    let personId = await this.database.transaction(async (transaction) => {
+      let [discordIdentity] = await transaction
+        .select({ personId: discordIdentities.personId })
+        .from(discordIdentities)
+        .where(eq(discordIdentities.discordUserId, input.profile.discordUserId))
+        .limit(1)
+
+      let invitation = null
+      if (input.invitationId) {
+        let [pendingInvitation] = await transaction
+          .select({
+            id: invitations.id,
+            leagueId: invitations.leagueId,
+            role: invitations.role,
+          })
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.id, input.invitationId),
+              eq(invitations.status, 'pending'),
+              gt(invitations.expiresAt, input.now),
+              isNull(invitations.revokedAt),
+            ),
+          )
+          .limit(1)
+          .for('update')
+        invitation = pendingInvitation ?? null
+        if (!invitation) throw new Error('Invitation is no longer available')
+      }
+
+      if (!discordIdentity && !invitation) {
+        throw new Error('Open registration is disabled')
+      }
+
+      let resolvedPersonId = discordIdentity?.personId
+      if (!resolvedPersonId) {
+        let [person] = await transaction
+          .insert(people)
+          .values({ displayName: input.profile.displayName })
+          .returning({ id: people.id })
+        if (!person) throw new Error('Failed to create provisioned person')
+        resolvedPersonId = person.id
+        await transaction.insert(discordIdentities).values({
+          avatarHash: input.profile.avatarHash,
+          discordUserId: input.profile.discordUserId,
+          personId: resolvedPersonId,
+          username: input.profile.username,
+        })
+      } else {
+        await transaction
+          .update(discordIdentities)
+          .set({
+            avatarHash: input.profile.avatarHash,
+            lastLoginAt: input.now,
+            username: input.profile.username,
+          })
+          .where(eq(discordIdentities.discordUserId, input.profile.discordUserId))
+        await transaction
+          .update(people)
+          .set({ displayName: input.profile.displayName, updatedAt: input.now })
+          .where(eq(people.id, resolvedPersonId))
+      }
+
+      if (invitation) {
+        await transaction
+          .insert(leagueMemberships)
+          .values({ leagueId: invitation.leagueId, personId: resolvedPersonId })
+          .onConflictDoNothing()
+        await transaction
+          .insert(leagueMembershipRoles)
+          .values({
+            leagueId: invitation.leagueId,
+            personId: resolvedPersonId,
+            role: invitation.role,
+          })
+          .onConflictDoNothing()
+        let redeemed = await transaction
+          .update(invitations)
+          .set({
+            redeemedAt: input.now,
+            redeemedByPersonId: resolvedPersonId,
+            status: 'redeemed',
+          })
+          .where(and(eq(invitations.id, invitation.id), eq(invitations.status, 'pending')))
+          .returning({ id: invitations.id })
+        if (redeemed.length !== 1) throw new Error('Invitation was redeemed concurrently')
+        await transaction.insert(auditRecords).values({
+          action: 'invitation.redeemed',
+          actorPersonId: resolvedPersonId,
+          leagueId: invitation.leagueId,
+          targetId: invitation.id,
+          targetType: 'invitation',
+        })
+      }
+
+      await transaction.insert(sessions).values({
+        expiresAt: input.sessionExpiresAt,
+        personId: resolvedPersonId,
+        tokenHash: input.sessionTokenHash,
+      })
+      await transaction.insert(auditRecords).values({
+        action: 'session.created',
+        actorPersonId: resolvedPersonId,
+        targetId: resolvedPersonId,
+        targetType: 'person',
+      })
+      return resolvedPersonId
+    })
+
+    let identity = await this.#loadIdentity(personId)
+    if (!identity) throw new Error('Failed to load authenticated identity')
+    return identity
+  }
+
+  async consumeOAuthAttempt(input: {
+    now: Date
+    stateHash: string
+    transactionHash: string
+  }): Promise<OAuthAttemptRecord | null> {
+    let [attempt] = await this.database
+      .update(oauthAttempts)
+      .set({ consumedAt: input.now })
+      .where(
+        and(
+          eq(oauthAttempts.transactionHash, input.transactionHash),
+          eq(oauthAttempts.stateHash, input.stateHash),
+          isNull(oauthAttempts.consumedAt),
+          gt(oauthAttempts.expiresAt, input.now),
+        ),
+      )
+      .returning({
+        codeVerifier: oauthAttempts.codeVerifier,
+        invitationId: oauthAttempts.invitationId,
+        returnTo: oauthAttempts.returnTo,
+      })
+    return attempt ?? null
+  }
+
+  async createOAuthAttempt(input: {
+    codeVerifier: string
+    expiresAt: Date
+    invitationId: string | null
+    returnTo: string
+    stateHash: string
+    transactionHash: string
+  }): Promise<void> {
+    await this.database.insert(oauthAttempts).values(input)
+  }
+
+  async findPendingInvitationId(tokenHash: string, now: Date): Promise<string | null> {
+    let [invitation] = await this.database
+      .select({ id: invitations.id })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.tokenHash, tokenHash),
+          eq(invitations.status, 'pending'),
+          gt(invitations.expiresAt, now),
+          isNull(invitations.revokedAt),
+        ),
+      )
+      .limit(1)
+    return invitation?.id ?? null
   }
 
   async findIdentityBySessionHash(tokenHash: string, now: Date): Promise<SessionIdentity | null> {

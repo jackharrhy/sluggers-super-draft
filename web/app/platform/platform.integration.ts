@@ -10,6 +10,9 @@ import { PostgresPlatformRepository } from './database/postgres-repository.ts'
 import { auditRecords, discordIdentities, leagues, people, sessions } from './database/schema.ts'
 import { hashSecret } from './security.ts'
 import { PlatformService } from './service.ts'
+import { IdentityService } from './identity-service.ts'
+import type { DiscordOAuthClient } from './discord-oauth.ts'
+import type { DiscordProfile } from './model.ts'
 
 let databaseUrl = process.env.STARWORKS_TEST_DATABASE_URL
 
@@ -112,7 +115,139 @@ test(
   },
 )
 
+test(
+  'one Discord identity can redeem invitations into two leagues while open registration stays closed',
+  { skip: databaseUrl ? false : 'STARWORKS_TEST_DATABASE_URL is not set' },
+  async () => {
+    let connection = createDatabase(databaseUrl!, { max: 1 })
+    let repository = new PostgresPlatformRepository(connection.database)
+    let discriminator = randomUUID()
+    let admin = await repository.bootstrapSiteAdmin({
+      discordUserId: uniqueDiscordId(),
+      discordUsername: `multi-admin-${discriminator}`,
+      displayName: 'Multi League Admin',
+    })
+    let leagueIds: string[] = []
+    let memberPersonId: string | null = null
+
+    try {
+      let firstInvite = `first-invite-${discriminator}`
+      let secondInvite = `second-invite-${discriminator}`
+      let firstProvisioner = new PlatformService(repository, { createToken: () => firstInvite })
+      let secondProvisioner = new PlatformService(repository, { createToken: () => secondInvite })
+      let first = await firstProvisioner.provisionLeague(admin, {
+        name: 'First Invitation League',
+        slug: `first-invite-${discriminator}`,
+      })
+      let second = await secondProvisioner.provisionLeague(admin, {
+        name: 'Second Invitation League',
+        slug: `second-invite-${discriminator}`,
+      })
+      leagueIds.push(first.league.id, second.league.id)
+
+      let profile = {
+        avatarHash: null,
+        discordUserId: uniqueDiscordId(),
+        displayName: 'Shared Discord Member',
+        username: `shared-${discriminator}`,
+      }
+      let firstLogin = identityServiceWithTokens(repository, profile, [
+        `state-one-${discriminator}`,
+        `transaction-one-${discriminator}`,
+        `verifier-one-${discriminator}`,
+        `session-one-${discriminator}`,
+      ])
+      let firstStart = await firstLogin.beginDiscordLogin({ invitationToken: firstInvite })
+      let firstCompleted = await firstLogin.completeDiscordLogin({
+        code: 'first-code',
+        state: firstStart.authorizationUrl.searchParams.get('state'),
+        transactionToken: firstStart.transactionToken,
+      })
+      memberPersonId = firstCompleted.identity.personId
+      assert.equal(firstCompleted.identity.memberships.length, 1)
+
+      let secondLogin = identityServiceWithTokens(repository, profile, [
+        `state-two-${discriminator}`,
+        `transaction-two-${discriminator}`,
+        `verifier-two-${discriminator}`,
+        `session-two-${discriminator}`,
+      ])
+      let secondStart = await secondLogin.beginDiscordLogin({ invitationToken: secondInvite })
+      let secondCompleted = await secondLogin.completeDiscordLogin({
+        code: 'second-code',
+        state: secondStart.authorizationUrl.searchParams.get('state'),
+        transactionToken: secondStart.transactionToken,
+      })
+      assert.equal(secondCompleted.identity.personId, memberPersonId)
+      assert.deepEqual(
+        new Set(secondCompleted.identity.memberships.map((membership) => membership.leagueId)),
+        new Set(leagueIds),
+      )
+
+      let unknownProfile = { ...profile, discordUserId: uniqueDiscordId() }
+      let openLogin = identityServiceWithTokens(repository, unknownProfile, [
+        `state-open-${discriminator}`,
+        `transaction-open-${discriminator}`,
+        `verifier-open-${discriminator}`,
+        `session-open-${discriminator}`,
+      ])
+      let openStart = await openLogin.beginDiscordLogin({})
+      await assert.rejects(
+        openLogin.completeDiscordLogin({
+          code: 'open-code',
+          state: openStart.authorizationUrl.searchParams.get('state'),
+          transactionToken: openStart.transactionToken,
+        }),
+        (error: unknown) =>
+          error instanceof PlatformError && error.code === 'registration_closed',
+      )
+    } finally {
+      for (let leagueId of leagueIds) {
+        await connection.database.delete(leagues).where(eq(leagues.id, leagueId))
+        await connection.database.delete(auditRecords).where(eq(auditRecords.targetId, leagueId))
+      }
+      if (memberPersonId) {
+        await connection.database.delete(people).where(eq(people.id, memberPersonId))
+        await connection.database
+          .delete(auditRecords)
+          .where(eq(auditRecords.targetId, memberPersonId))
+      }
+      await connection.database.delete(people).where(eq(people.id, admin.personId))
+      await connection.database
+        .delete(auditRecords)
+        .where(eq(auditRecords.targetId, admin.personId))
+      await connection.close()
+    }
+  },
+)
+
 function uniqueDiscordId(): string {
   let digits = randomUUID().replaceAll(/\D/g, '')
   return (digits + Date.now().toString()).slice(0, 18).padEnd(18, '7')
+}
+
+function identityServiceWithTokens(
+  repository: PostgresPlatformRepository,
+  profile: DiscordProfile,
+  tokens: string[],
+): IdentityService {
+  let remaining = [...tokens]
+  let discord: DiscordOAuthClient = {
+    createAuthorizationUrl(input) {
+      let url = new URL('https://discord.test/oauth2/authorize')
+      url.searchParams.set('state', input.state)
+      url.searchParams.set('code_challenge', input.codeChallenge)
+      return url
+    },
+    async exchangeCode() {
+      return profile
+    },
+  }
+  return new IdentityService(repository, discord, {
+    createToken() {
+      let token = remaining.shift()
+      if (!token) throw new Error('Identity service requested an unexpected token')
+      return token
+    },
+  })
 }

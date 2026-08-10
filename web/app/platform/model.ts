@@ -48,3 +48,23 @@ export interface ProvisionedLeague {
   invitationToken: string
   invitationExpiresAt: Date
 }
+
+export interface DiscordProfile {
+  avatarHash: string | null
+  discordUserId: string
+  displayName: string
+  username: string
+}
+
+export interface OAuthAttemptRecord {
+  codeVerifier: string
+  invitationId: string | null
+  returnTo: string
+}
+
+export interface CompletedLogin {
+  identity: SessionIdentity
+  returnTo: string
+  sessionToken: string
+  sessionExpiresAt: Date
+}

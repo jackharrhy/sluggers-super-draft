@@ -1,7 +1,9 @@
 import type {
+  DiscordProfile,
   LeagueDetail,
   LeagueRole,
   LeagueSummary,
+  OAuthAttemptRecord,
   PublicationPolicy,
   SessionIdentity,
 } from './model.ts'
@@ -20,6 +22,27 @@ export interface PlatformRepository {
     displayName: string
     discordUsername: string
   }): Promise<SessionIdentity>
+  completeDiscordLogin(input: {
+    invitationId: string | null
+    now: Date
+    profile: DiscordProfile
+    sessionExpiresAt: Date
+    sessionTokenHash: string
+  }): Promise<SessionIdentity>
+  consumeOAuthAttempt(input: {
+    now: Date
+    stateHash: string
+    transactionHash: string
+  }): Promise<OAuthAttemptRecord | null>
+  createOAuthAttempt(input: {
+    codeVerifier: string
+    expiresAt: Date
+    invitationId: string | null
+    returnTo: string
+    stateHash: string
+    transactionHash: string
+  }): Promise<void>
+  findPendingInvitationId(tokenHash: string, now: Date): Promise<string | null>
   findIdentityBySessionHash(tokenHash: string, now: Date): Promise<SessionIdentity | null>
   listVisibleLeagues(personId: string | null): Promise<LeagueSummary[]>
   findAccessibleLeague(slug: string, personId: string | null): Promise<LeagueDetail | null>
