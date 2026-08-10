@@ -44,17 +44,20 @@ The workstreams meet at explicit integration milestones. Reverse engineering can
 - Confirm the final repository layout around the existing application:
 
   ```text
-  app/                       Remix application
-  database/                  Drizzle schema and migrations
+  web/                       new Remix 3 application
   runner/                    Python/PySide6 runner
     starworks/games/sluggers Sluggers adapter and bridge
   contracts/                 Zod schemas and generated JSON Schema
   docs/
   deploy/prod/               Traefik and production deployment
   compose.yml                local web dependencies
+  legacy/                    prior implementations and migration sources
   ```
 
-- Rename product-facing labels from Lil Slug Crew/Sluggers Super Draft to Starworks while preserving league-specific branding as tenant data.
+- Scaffold `web/` with `npx remix@next new web`; do not evolve the original
+  single-tenant application in place.
+- Move Sluggers Super Draft under `legacy/` with its original branding intact,
+  and treat it as a migration source rather than a Starworks package.
 - Adopt Zod schemas with explicit `schemaVersion` discriminators.
 - Generate JSON Schema artifacts and prove validation of the same fixture in TypeScript and Python.
 - Add correlation IDs, actor IDs, league IDs, match-attempt IDs, and runner IDs to structured logs.

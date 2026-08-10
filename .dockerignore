@@ -1,10 +1,7 @@
 .DS_Store
 *.swp
-
-.react-router
-build
-
-data
-
-public/images
+.git
 .env
+legacy
+node_modules
+runner/.venv

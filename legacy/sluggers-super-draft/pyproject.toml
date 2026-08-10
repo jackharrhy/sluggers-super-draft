@@ -1,7 +1,7 @@
 [project]
-name = "starworks-research"
+name = "sluggers-super-draft"
 version = "0.1.0"
-description = "Research and migration utilities for the Starworks platform"
+description = "Mario Sluggers league suite"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
