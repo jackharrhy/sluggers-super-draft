@@ -1,6 +1,7 @@
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
 export interface ContentAssetStore {
+  ready(): Promise<void>
   put(objectKey: string, bytes: Uint8Array, mediaType: string, sha256: string): Promise<void>
 }
 
@@ -9,6 +10,10 @@ export class S3ContentAssetStore implements ContentAssetStore {
     readonly client: S3Client,
     readonly bucket: string,
   ) {}
+
+  async ready(): Promise<void> {
+    await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }))
+  }
 
   async put(objectKey: string, bytes: Uint8Array, mediaType: string, sha256: string): Promise<void> {
     await this.client.send(new PutObjectCommand({

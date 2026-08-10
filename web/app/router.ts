@@ -11,6 +11,7 @@ import leagueContentController from './actions/leagues/content/controller.tsx'
 import runnerController from './actions/runner-api/controller.tsx'
 import leagueOperationsController from './actions/leagues/operations/controller.tsx'
 import leagueDraftsController from './actions/leagues/drafts/controller.tsx'
+import systemController from './actions/system/controller.ts'
 import { platform, sameOrigin } from './middleware/platform.ts'
 import { render } from './middleware/render.tsx'
 import {
@@ -62,6 +63,7 @@ export function createAppRouter(options: AppRouterOptions = {}) {
   router.map(routes.leagues.operations, leagueOperationsController)
   router.map(routes.leagues.drafts, leagueDraftsController)
   router.map(routes.runnerApi, runnerController)
+  router.map(routes.system, systemController)
   return router
 }
 

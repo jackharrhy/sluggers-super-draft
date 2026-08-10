@@ -5,6 +5,11 @@ export const routes = route({
   broadcastData: get('/api/v1/public/leagues/:leagueSlug/matches/:matchId/overlay'),
   broadcastOverlay: get('/overlays/:leagueSlug/matches/:matchId'),
   home: '/',
+  system: {
+    health: get('/healthz'),
+    metrics: get('/internal/metrics'),
+    ready: get('/readyz'),
+  },
   auth: route('auth', {
     discord: get('discord'),
     discordCallback: get('discord/callback'),

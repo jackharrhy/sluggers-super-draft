@@ -283,6 +283,7 @@ function createRuntime(
     identity: new IdentityService(repository, discord),
     leagueOperations: {} as AppRuntime['leagueOperations'],
     oauthCookie: createCookie('test_oauth', cookieOptions),
+    operations: {} as AppRuntime['operations'],
     platform: new PlatformService(repository),
     runnerControl,
     runnerAdmin: {} as AppRuntime['runnerAdmin'],

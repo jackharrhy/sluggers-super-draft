@@ -8,6 +8,7 @@ import broadcastOverlayFixture from '../../../contracts/fixtures/valid/broadcast
 import type { BroadcastApplication } from '../broadcast/service.ts'
 import type { DiscordOAuthClient } from '../platform/discord-oauth.ts'
 import type { ConfigurationApplication } from '../configuration/service.ts'
+import type { OperationsApplication } from '../operations/service.ts'
 import { IdentityService } from '../platform/identity-service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import type { PlatformRepository } from '../platform/repository.ts'
@@ -96,6 +97,64 @@ describe('root controller', () => {
     assert.match(html, /broadcast-overlay\.ts/)
   })
 
+  it('exposes shallow health, dependency readiness, and token-protected aggregate metrics', async () => {
+    let operations: OperationsApplication = {
+      authorizeMetrics(authorization) {
+        return authorization === 'Bearer metrics-secret'
+      },
+      async metrics() {
+        return '# TYPE starworks_runner_stations_stale gauge\nstarworks_runner_stations_stale 0\n'
+      },
+      async readiness() {
+        return { checks: { garage: 'ready', postgres: 'ready' }, status: 'ready' }
+      },
+    }
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createTestRuntime({ operations }),
+    })
+
+    let health = await router.fetch(new Request('http://localhost' + routes.system.health.href()))
+    assert.equal(health.status, 200)
+    assert.deepEqual(await health.json(), { status: 'ok' })
+
+    let ready = await router.fetch(new Request('http://localhost' + routes.system.ready.href()))
+    assert.equal(ready.status, 200)
+    assert.equal(ready.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(await ready.json(), {
+      checks: { garage: 'ready', postgres: 'ready' },
+      status: 'ready',
+    })
+
+    let hidden = await router.fetch(new Request('http://localhost' + routes.system.metrics.href()))
+    assert.equal(hidden.status, 404)
+
+    let metrics = await router.fetch(new Request('http://localhost' + routes.system.metrics.href(), {
+      headers: { authorization: 'Bearer metrics-secret' },
+    }))
+    assert.equal(metrics.status, 200)
+    assert.match(metrics.headers.get('content-type') ?? '', /text\/plain/)
+    assert.match(await metrics.text(), /starworks_runner_stations_stale 0/)
+  })
+
+  it('reports unavailable dependencies as not ready', async () => {
+    let operations: OperationsApplication = {
+      authorizeMetrics() { return false },
+      async metrics() { return '' },
+      async readiness() {
+        return { checks: { garage: 'unavailable', postgres: 'ready' }, status: 'unavailable' }
+      },
+    }
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createTestRuntime({ operations }),
+    })
+    let response = await router.fetch(new Request('http://localhost' + routes.system.ready.href()))
+
+    assert.equal(response.status, 503)
+    assert.equal((await response.json()).status, 'unavailable')
+  })
+
   it('lets a site administrator create a private league and reveals its one-time invitation', async () => {
     let admin = siteAdminIdentity()
     let provisioned: LeagueDetail = {
@@ -146,6 +205,7 @@ function createTestRuntime(
   options: {
     broadcast?: BroadcastApplication
     identity?: SessionIdentity | null
+    operations?: OperationsApplication
     repository?: Partial<PlatformRepository>
     token?: string
   } = {},
@@ -208,11 +268,20 @@ function createTestRuntime(
     identity: new IdentityService(repository, discord),
     leagueOperations: {} as AppRuntime['leagueOperations'],
     oauthCookie: createCookie('test_oauth', cookieOptions),
+    operations: options.operations ?? unexpectedOperations(),
     platform: new PlatformService(repository, { createToken: () => options.token ?? 'test-token' }),
     runnerControl: {} as AppRuntime['runnerControl'],
     runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
     telemetry: {} as AppRuntime['telemetry'],
+  }
+}
+
+function unexpectedOperations(): OperationsApplication {
+  return {
+    authorizeMetrics() { return false },
+    async metrics() { throw new Error('Unexpected metrics request') },
+    async readiness() { throw new Error('Unexpected readiness request') },
   }
 }
 
