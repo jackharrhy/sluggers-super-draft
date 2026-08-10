@@ -156,6 +156,7 @@ function createRuntime(content: ContentApplication): AppRuntime {
   }
   let cookies = { httpOnly: true, path: '/', sameSite: 'Lax' as const, secrets: ['content-test'] }
   return {
+    broadcast: {} as AppRuntime['broadcast'],
     configuration: {} as ConfigurationApplication,
     content,
     draft: {} as AppRuntime['draft'],

@@ -2,6 +2,7 @@ import type { Cookie } from 'remix/cookie'
 import { createContextKey, type Middleware } from 'remix/router'
 
 import type { ConfigurationApplication } from '../configuration/service.ts'
+import type { BroadcastApplication } from '../broadcast/service.ts'
 import type { ContentApplication } from '../content/service.ts'
 import type { DraftApplication } from '../draft/service.ts'
 import type { LeagueOperationsApplication } from '../league-operations/service.ts'
@@ -15,6 +16,7 @@ import type { PlatformService } from '../platform/service.ts'
 import { RequestLog } from './request-logging.ts'
 
 export const Identity = createContextKey<SessionIdentity | null>(null)
+export const Broadcast = createContextKey<BroadcastApplication>()
 export const Configuration = createContextKey<ConfigurationApplication>()
 export const Content = createContextKey<ContentApplication>()
 export const Draft = createContextKey<DraftApplication>()
@@ -31,6 +33,7 @@ export function platform(
   resolveRuntime: () => AppRuntime,
 ): Middleware<
   [
+    { key: typeof Broadcast; value: BroadcastApplication },
     { key: typeof Configuration; value: ConfigurationApplication },
     { key: typeof Content; value: ContentApplication },
     { key: typeof Draft; value: DraftApplication },
@@ -50,6 +53,7 @@ export function platform(
     let rawSessionToken = await runtime.sessionCookie.parse(context.request.headers.get('cookie'))
     let identity = await runtime.platform.resolveSession(rawSessionToken)
 
+    context.set(Broadcast, runtime.broadcast)
     context.set(Configuration, runtime.configuration)
     context.set(Content, runtime.content)
     context.set(Draft, runtime.draft)

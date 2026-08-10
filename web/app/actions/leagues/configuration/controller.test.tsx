@@ -153,6 +153,7 @@ function createRuntime(configuration: ConfigurationApplication): AppRuntime {
     secrets: ['configuration-controller-test'],
   }
   return {
+    broadcast: {} as AppRuntime['broadcast'],
     configuration,
     content: {} as AppRuntime['content'],
     draft: {} as AppRuntime['draft'],

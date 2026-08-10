@@ -2,6 +2,7 @@ import type { Cookie } from 'remix/cookie'
 import { createCookie } from 'remix/cookie'
 
 import { ConfigurationService, type ConfigurationApplication } from '../configuration/service.ts'
+import { BroadcastService, type BroadcastApplication } from '../broadcast/service.ts'
 import { createContentAssetStore } from '../content/object-store.ts'
 import { ContentService, type ContentApplication } from '../content/service.ts'
 import { DraftService, type DraftApplication } from '../draft/service.ts'
@@ -20,6 +21,7 @@ import { IdentityService } from './identity-service.ts'
 import { PlatformService } from './service.ts'
 
 export interface AppRuntime {
+  broadcast: BroadcastApplication
   configuration: ConfigurationApplication
   content: ContentApplication
   draft: DraftApplication
@@ -55,6 +57,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
       await connection.close()
       runtime = undefined
     },
+    broadcast: new BroadcastService(connection.database),
     configuration: new ConfigurationService(connection.database),
     content: new ContentService(connection.database, createContentAssetStore(process.env)),
     draft: new DraftService(connection.database),

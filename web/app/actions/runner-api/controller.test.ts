@@ -276,6 +276,7 @@ function createRuntime(
     secrets: ['runner-controller-test'],
   }
   return {
+    broadcast: {} as AppRuntime['broadcast'],
     configuration: {} as ConfigurationApplication,
     content: {} as AppRuntime['content'],
     draft: {} as AppRuntime['draft'],

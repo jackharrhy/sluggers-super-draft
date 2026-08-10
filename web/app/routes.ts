@@ -2,6 +2,8 @@ import { get, post, route } from 'remix/routes'
 
 export const routes = route({
   assets: get('/assets/*path'),
+  broadcastData: get('/api/v1/public/leagues/:leagueSlug/matches/:matchId/overlay'),
+  broadcastOverlay: get('/overlays/:leagueSlug/matches/:matchId'),
   home: '/',
   auth: route('auth', {
     discord: get('discord'),
