@@ -2,6 +2,7 @@ import type { Cookie } from 'remix/cookie'
 import { createCookie } from 'remix/cookie'
 
 import { ConfigurationService, type ConfigurationApplication } from '../configuration/service.ts'
+import { RunnerControlService, type RunnerControlApplication } from '../runner/control-service.ts'
 import { createDatabase } from './database/connection.ts'
 import { PostgresPlatformRepository } from './database/postgres-repository.ts'
 import {
@@ -17,6 +18,7 @@ export interface AppRuntime {
   identity: IdentityService
   oauthCookie: Cookie
   platform: PlatformService
+  runnerControl: RunnerControlApplication
   sessionCookie: Cookie
 }
 
@@ -46,6 +48,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     identity: new IdentityService(repository, discord),
     oauthCookie: createCookie('starworks_oauth', { ...cookieOptions, maxAge: 10 * 60 }),
     platform: new PlatformService(repository),
+    runnerControl: new RunnerControlService(connection.database),
     sessionCookie: createCookie('starworks_session', {
       ...cookieOptions,
       maxAge: 30 * 24 * 60 * 60,

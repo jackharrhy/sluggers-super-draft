@@ -16,6 +16,7 @@ import {
   type RunnerClaimRequest,
   type RunnerClaimResponse,
   type RunnerHeartbeatRequest,
+  type RunnerHeartbeatResponse,
   type RunnerLeaseUpdateRequest,
   type RunnerLeaseUpdateResponse,
   type RunnerRegistrationRequest,
@@ -44,6 +45,13 @@ interface AuthenticatedRunnerCredential {
   stationId: string | null
 }
 
+export interface RunnerControlApplication {
+  register(bearerCredential: string, input: unknown): Promise<RunnerRegistrationResponse>
+  heartbeat(bearerCredential: string, input: unknown): Promise<RunnerHeartbeatResponse>
+  claim(bearerCredential: string, input: unknown): Promise<RunnerClaimResponse>
+  updateLease(bearerCredential: string, input: unknown): Promise<RunnerLeaseUpdateResponse>
+}
+
 export interface RunnerControlServiceOptions {
   clock?: () => Date
   createId?: () => string
@@ -69,7 +77,7 @@ export class RunnerControlService {
 
   async register(
     bearerCredential: string,
-    input: RunnerRegistrationRequest,
+    input: unknown,
   ): Promise<RunnerRegistrationResponse> {
     let request = this.#parse(RunnerRegistrationRequestSchema, input)
     let authenticated = await this.#authenticate(bearerCredential, 'heartbeat:write')
@@ -127,8 +135,8 @@ export class RunnerControlService {
 
   async heartbeat(
     bearerCredential: string,
-    input: RunnerHeartbeatRequest,
-  ) {
+    input: unknown,
+  ): Promise<RunnerHeartbeatResponse> {
     let request = this.#parse(RunnerHeartbeatRequestSchema, input)
     let authenticated = await this.#authenticate(bearerCredential, 'heartbeat:write')
     let stationId = this.#requireBoundStation(authenticated, request.runnerId)
@@ -170,7 +178,7 @@ export class RunnerControlService {
 
   async claim(
     bearerCredential: string,
-    input: RunnerClaimRequest,
+    input: unknown,
   ): Promise<RunnerClaimResponse> {
     let request = this.#parse(RunnerClaimRequestSchema, input)
     let authenticated = await this.#authenticate(bearerCredential, 'runs:claim')
@@ -291,7 +299,7 @@ export class RunnerControlService {
 
   async updateLease(
     bearerCredential: string,
-    input: RunnerLeaseUpdateRequest,
+    input: unknown,
   ): Promise<RunnerLeaseUpdateResponse> {
     let request = this.#parse(RunnerLeaseUpdateRequestSchema, input)
     let authenticated = await this.#authenticate(bearerCredential, 'runs:claim')
