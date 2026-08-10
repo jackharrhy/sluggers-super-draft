@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from starworks_runner.control import RunnerControlClient
+from starworks_runner.diagnostics import inspect_local_prerequisites
 from starworks_runner.orchestrator import RunnerStation
 from starworks_runner.state import RunnerStateStore
 
@@ -18,6 +19,9 @@ class DesktopDefaults:
     credential: str
     station_name: str
     state_path: Path
+    game_image: Path | None = None
+    dolphin_executable: Path | None = None
+    dtk_executable: Path | None = None
 
 
 def default_state_path() -> Path:
@@ -81,6 +85,7 @@ def launch_desktop(
         from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
         from PySide6.QtWidgets import (
             QApplication,
+            QFileDialog,
             QFormLayout,
             QFrame,
             QHBoxLayout,
@@ -120,7 +125,7 @@ def launch_desktop(
             super().__init__()
             self.pool = QThreadPool.globalInstance()
             self.setWindowTitle("Starworks Runner")
-            self.setMinimumSize(620, 440)
+            self.setMinimumSize(680, 720)
 
             heading = QLabel("Starworks Runner")
             heading.setObjectName("heading")
@@ -135,11 +140,44 @@ def launch_desktop(
             self.credential.setEchoMode(QLineEdit.EchoMode.Password)
             self.credential.setPlaceholderText("One-time runner credential")
             self.station_name = QLineEdit(defaults.station_name)
+            self.game_image = QLineEdit(
+                str(defaults.game_image) if defaults.game_image else ""
+            )
+            self.dolphin_executable = QLineEdit(
+                str(defaults.dolphin_executable) if defaults.dolphin_executable else ""
+            )
+            self.dtk_executable = QLineEdit(
+                str(defaults.dtk_executable) if defaults.dtk_executable else ""
+            )
 
             form = QFormLayout()
             form.addRow("Starworks URL", self.url)
             form.addRow("Runner credential", self.credential)
             form.addRow("Station name", self.station_name)
+            form.addRow(
+                "Game dump",
+                self.path_selector(
+                    self.game_image,
+                    "Select a user-owned Mario Super Sluggers dump",
+                    "Wii images (*.rvz *.iso *.wbfs);;All files (*)",
+                ),
+            )
+            form.addRow(
+                "Dolphin",
+                self.path_selector(
+                    self.dolphin_executable,
+                    "Select the pinned Dolphin executable",
+                    "All files (*)",
+                ),
+            )
+            form.addRow(
+                "decomp-toolkit",
+                self.path_selector(
+                    self.dtk_executable,
+                    "Select the pinned decomp-toolkit executable",
+                    "All files (*)",
+                ),
+            )
 
             self.register_button = QPushButton("Register station")
             self.register_button.clicked.connect(self.register_station)
@@ -159,9 +197,12 @@ def launch_desktop(
             self.status.setWordWrap(True)
             self.active_run = QLabel("No locally journaled match attempt")
             self.active_run.setWordWrap(True)
+            self.prerequisites = QLabel()
+            self.prerequisites.setWordWrap(True)
             status_layout.addWidget(status_label)
             status_layout.addWidget(self.status)
             status_layout.addWidget(self.active_run)
+            status_layout.addWidget(self.prerequisites)
 
             privacy = QLabel(
                 "The credential is held only in this window. It is never saved to the local runner database."
@@ -186,9 +227,11 @@ def launch_desktop(
                 QWidget { background: #11141a; color: #f4f1e8; font-size: 14px; }
                 #heading { font-size: 28px; font-weight: 700; color: #ffd45c; }
                 QLineEdit { background: #202631; border: 1px solid #465064;
+                            min-height: 22px;
                             border-radius: 7px; padding: 9px; }
                 QPushButton { background: #f4b942; color: #17130a; border: 0;
-                              border-radius: 7px; font-weight: 700; padding: 10px 15px; }
+                              border-radius: 7px; font-weight: 700; min-height: 22px;
+                              padding: 10px 15px; }
                 QPushButton:disabled { background: #69645a; }
                 #statusCard { background: #1b202a; border: 1px solid #343e50;
                               border-radius: 10px; padding: 8px; }
@@ -198,6 +241,30 @@ def launch_desktop(
                 """
             )
             self.refresh_local_status()
+
+        def path_selector(
+            self, field: QLineEdit, caption: str, file_filter: str
+        ) -> QWidget:
+            container = QWidget()
+            container.setMinimumHeight(44)
+            layout = QHBoxLayout(container)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(8)
+            browse = QPushButton("Browse…")
+            browse.clicked.connect(
+                lambda: self.select_file(field, caption, file_filter)
+            )
+            layout.addWidget(field)
+            layout.addWidget(browse)
+            return container
+
+        def select_file(self, field: QLineEdit, caption: str, file_filter: str) -> None:
+            selected, _ = QFileDialog.getOpenFileName(
+                self, caption, field.text(), file_filter
+            )
+            if selected:
+                field.setText(selected)
+                self.refresh_local_status()
 
         def runner_station(self) -> tuple[RunnerStation, RunnerStateStore]:
             credential = self.credential.text().strip()
@@ -284,6 +351,22 @@ def launch_desktop(
                 )
             else:
                 self.active_run.setText("No locally journaled match attempt")
+            checks = inspect_local_prerequisites(
+                game_image=self.optional_path(self.game_image.text()),
+                dolphin_executable=self.optional_path(self.dolphin_executable.text()),
+                dtk_executable=self.optional_path(self.dtk_executable.text()),
+            )
+            symbols = {"ready": "✓", "missing": "!", "not-configured": "○"}
+            self.prerequisites.setText(
+                "\n".join(
+                    f"{symbols[check.status]} {check.label}: {check.detail}"
+                    for check in checks
+                )
+            )
+
+        @staticmethod
+        def optional_path(value: str) -> Path | None:
+            return Path(value.strip()) if value.strip() else None
 
     application = QApplication.instance() or QApplication([])
     application.setApplicationName("Starworks Runner")

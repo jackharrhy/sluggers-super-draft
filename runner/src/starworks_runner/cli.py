@@ -134,6 +134,9 @@ def create_parser() -> argparse.ArgumentParser:
         type=Path,
         default=default_state_path(),
     )
+    desktop_parser.add_argument("--image", type=Path)
+    desktop_parser.add_argument("--dolphin", type=Path)
+    desktop_parser.add_argument("--dtk", type=Path)
     return parser
 
 
@@ -353,6 +356,9 @@ def run(arguments: argparse.Namespace) -> int:
                 credential=os.environ.get("STARWORKS_RUNNER_CREDENTIAL", ""),
                 station_name=arguments.station_name,
                 state_path=arguments.state,
+                game_image=arguments.image,
+                dolphin_executable=arguments.dolphin,
+                dtk_executable=arguments.dtk,
             )
         )
     raise AssertionError(f"Unhandled command {arguments.command}")
