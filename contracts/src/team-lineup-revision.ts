@@ -62,6 +62,8 @@ export const MatchLineupOverrideSchema = z.strictObject({
   createdAt: TimestampSchema,
 });
 
+export type MatchLineupOverride = z.infer<typeof MatchLineupOverrideSchema>;
+
 export type TeamLineupRevision = z.infer<typeof TeamLineupRevisionSchema>;
 
 export const lineupIssueCodes = [
