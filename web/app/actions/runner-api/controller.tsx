@@ -94,6 +94,7 @@ async function handle(action: () => Promise<Response>): Promise<Response> {
     if (!(error instanceof PlatformError)) throw error
     let status = {
       conflict: 409,
+      external_service: 502,
       forbidden: 403,
       invalid_input: 400,
       not_found: 404,

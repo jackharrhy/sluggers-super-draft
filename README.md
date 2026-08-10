@@ -17,6 +17,10 @@ docker compose up --build web
 The site is available at <http://127.0.0.1:3000>. Mailpit remains optional through the `email`
 profile. Local Discord sign-in requires `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, and
 `DISCORD_REDIRECT_URI`; the rest of the application remains usable without email.
+`DISCORD_BOT_TOKEN` is optional: when present, each league administrator can configure a Discord
+channel from the operations page for draft, trade, runner-queue, and confirmed-result notices.
+When the token is absent or Discord is temporarily unavailable, core league actions still succeed
+and configured notices remain in the tenant-scoped outbox for an administrator to retry.
 
 Bootstrap the first site administrator after migrations have run:
 

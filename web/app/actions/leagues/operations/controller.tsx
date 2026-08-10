@@ -2,8 +2,10 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 import type { RemixNode } from 'remix/ui'
 
-import { Identity, LeagueOperations, Platform, RunnerAdmin, Telemetry } from '../../../middleware/platform.ts'
+import { Identity, LeagueOperations, Notifications, Platform, RunnerAdmin, Telemetry } from '../../../middleware/platform.ts'
 import type { LeagueOperationsApplication } from '../../../league-operations/service.ts'
+import type { NotificationApplication } from '../../../notifications/service.ts'
+import { publishBestEffort } from '../../../notifications/publish.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
 import { runnerOperationRoles } from '../../../platform/repository.ts'
@@ -26,6 +28,7 @@ export default createController(routes.leagues.operations, {
           league,
           context.get(RunnerAdmin),
           context.get(LeagueOperations),
+          context.get(Notifications),
           context.get(Telemetry),
         )
         return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} />)
@@ -54,19 +57,55 @@ export default createController(routes.leagues.operations, {
         return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
+    async configureDiscord(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let notifications = context.get(Notifications)
+        if (!notifications) {
+          throw new PlatformError('Discord notifications are unavailable', 'external_service')
+        }
+        let channelId = readString(context.get(FormData), 'channelId', false)
+        await notifications.configure(identity, league.id, { channelId: channelId || null })
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async retryDiscord(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let notifications = context.get(Notifications)
+        if (!notifications) {
+          throw new PlatformError('Discord notifications are unavailable', 'external_service')
+        }
+        await notifications.retry(identity, league.id)
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
     async proposeTrade(context) {
       let identity = context.get(Identity)
       let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
       if (!league) return notFound(context)
       try {
         let data = context.get(FormData)
-        await context.get(LeagueOperations).proposeTrade(identity, league.id, {
+        let proposal = await context.get(LeagueOperations).proposeTrade(identity, league.id, {
           counterpartyCharacterIds: readCharacterList(data, 'counterpartyCharacterIds'),
           counterpartyTeamId: readString(data, 'counterpartyTeamId'),
           message: readString(data, 'message', false) || null,
           proposerCharacterIds: readCharacterList(data, 'proposerCharacterIds'),
           proposerTeamId: readString(data, 'proposerTeamId'),
           seasonId: readString(data, 'seasonId'),
+        })
+        await publishNotification(context, league.id, {
+          dedupeKey: `trade-proposed:${proposal.id}`,
+          eventType: 'trade.proposed',
+          message: `🔄 ${league.name} received a trade proposal between teams ${readString(data, 'proposerTeamId')} and ${readString(data, 'counterpartyTeamId')}.`,
         })
         return operationsRedirect(league)
       } catch (error) {
@@ -85,6 +124,13 @@ export default createController(routes.leagues.operations, {
           decision,
           reason: readString(data, 'reason', false) || null,
         })
+        if (decision === 'approved') {
+          await publishNotification(context, league.id, {
+            dedupeKey: `trade-applied:${context.params.proposalId}`,
+            eventType: 'trade.applied',
+            message: `✅ ${league.name} applied trade ${context.params.proposalId}. New roster revisions are now published.`,
+          })
+        }
         return operationsRedirect(league)
       } catch (error) {
         return renderDashboardError(renderContext(context), identity, league, error)
@@ -127,13 +173,18 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       try {
         let data = context.get(FormData)
-        await context.get(RunnerAdmin).queueAttempt(identity, league.id, context.params.matchId, {
+        let queued = await context.get(RunnerAdmin).queueAttempt(identity, league.id, context.params.matchId, {
           awayLineupRevisionId: readString(data, 'awayLineupRevisionId'),
           dynamicRuleOverrides: readJsonObject(data, 'dynamicRuleOverrides'),
           homeLineupRevisionId: readString(data, 'homeLineupRevisionId'),
           requiredGameBuildSha256: readString(data, 'requiredGameBuildSha256'),
           rulesetRevisionId: readString(data, 'rulesetRevisionId'),
           statProfileRevisionId: readString(data, 'statProfileRevisionId'),
+        })
+        await publishNotification(context, league.id, {
+          dedupeKey: `match-attempt:${queued.attemptId}`,
+          eventType: 'match.attempt_queued',
+          message: `⚾ ${league.name} queued match attempt #${queued.attemptNumber} for ${context.params.matchId}.`,
         })
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
@@ -154,6 +205,7 @@ export default createController(routes.leagues.operations, {
           league,
           context.get(RunnerAdmin),
           context.get(LeagueOperations),
+          context.get(Notifications),
           context.get(Telemetry),
         )
         return context.render(
@@ -220,6 +272,11 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       try {
         await context.get(Telemetry).confirm(identity, league.id, context.params.attemptId)
+        await publishNotification(context, league.id, {
+          dedupeKey: `match-result:${context.params.attemptId}`,
+          eventType: 'match.result_confirmed',
+          message: `✅ ${league.name} confirmed the official result for attempt ${context.params.attemptId}.`,
+        })
         return operationsRedirect(league)
       } catch (error) {
         return renderDashboardError(renderContext(context), identity, league, error)
@@ -239,6 +296,7 @@ async function renderDashboardError(
     league,
     context.runnerAdmin,
     context.leagueOperations,
+    context.notifications,
     context.telemetry,
   )
   let message = error instanceof PlatformError ? error.message : 'The league operation could not be completed.'
@@ -278,11 +336,15 @@ async function loadDashboards(
   league: LeagueDetail,
   runnerAdmin: RunnerAdminApplication,
   leagueOperations: LeagueOperationsApplication,
+  notifications: NotificationApplication | null,
   telemetry: TelemetryApplication,
 ) {
   let mayOperateRunner = Boolean(identity?.isSiteAdmin || league.roles.some((role) => runnerOperationRoles.has(role)))
-  let [leagueOperationsDashboard, runnerDashboard, telemetryDashboard] = await Promise.all([
+  let [leagueOperationsDashboard, notificationDashboard, runnerDashboard, telemetryDashboard] = await Promise.all([
     leagueOperations.dashboard(identity, league.id),
+    notifications
+      ? notifications.dashboard(identity, league.id)
+      : Promise.resolve({ botConfigured: false, channelId: null, failed: 0, pending: 0, sent: 0 }),
     mayOperateRunner ? runnerAdmin.dashboard(identity, league.id) : Promise.resolve(emptyRunnerDashboard()),
     telemetry.dashboard(identity, league.id),
   ])
@@ -291,7 +353,7 @@ async function loadDashboards(
     seasonId: season.id,
     statistics: await telemetry.rebuildSeason(identity, league.id, season.id),
   })))
-  return { dashboard: runnerDashboard, leagueOperations: leagueOperationsDashboard, seasonStatistics, telemetry: telemetryDashboard }
+  return { dashboard: runnerDashboard, leagueOperations: leagueOperationsDashboard, notificationDashboard, seasonStatistics, telemetry: telemetryDashboard }
 }
 
 function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
@@ -310,6 +372,7 @@ function notFound(context: { render(node: RemixNode, init?: ResponseInit): Respo
 
 interface OperationsRenderContext {
   leagueOperations: LeagueOperationsApplication
+  notifications: NotificationApplication | null
   runnerAdmin: RunnerAdminApplication
   telemetry: TelemetryApplication
   render(node: RemixNode, init?: ResponseInit): Response
@@ -318,12 +381,28 @@ interface OperationsRenderContext {
 function renderContext(context: unknown): OperationsRenderContext {
   let runnerContext = context as { get(key: typeof RunnerAdmin): RunnerAdminApplication }
   let operationsContext = context as { get(key: typeof LeagueOperations): LeagueOperationsApplication }
+  let notificationContext = context as { get(key: typeof Notifications): NotificationApplication | null }
   let telemetryContext = context as { get(key: typeof Telemetry): TelemetryApplication }
   let renderer = context as { render(node: RemixNode, init?: ResponseInit): Response }
   return {
     leagueOperations: operationsContext.get(LeagueOperations),
+    notifications: notificationContext.get(Notifications),
     render: (node, init) => renderer.render(node, init),
     runnerAdmin: runnerContext.get(RunnerAdmin),
     telemetry: telemetryContext.get(Telemetry),
   }
+}
+
+async function publishNotification(
+  context: {
+    get(key: typeof Notifications): NotificationApplication | null
+    structuredLog: {
+      error(event: string, error: unknown, fields?: Record<string, unknown>): void
+      info(event: string, fields?: Record<string, unknown>): void
+    }
+  },
+  leagueId: string,
+  event: { dedupeKey: string; eventType: string; message: string },
+) {
+  await publishBestEffort(context.get(Notifications), leagueId, event, context.structuredLog)
 }

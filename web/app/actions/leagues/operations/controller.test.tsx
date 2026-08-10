@@ -4,6 +4,7 @@ import { describe, it } from 'remix/test'
 
 import type { ConfigurationApplication } from '../../../configuration/service.ts'
 import type { LeagueOperationsApplication, LeagueOperationsDashboard } from '../../../league-operations/service.ts'
+import type { NotificationApplication } from '../../../notifications/service.ts'
 import type { DiscordOAuthClient } from '../../../platform/discord-oauth.ts'
 import { IdentityService } from '../../../platform/identity-service.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
@@ -151,6 +152,42 @@ describe('league operations controller', () => {
     })
   })
 
+  it('commits a trade even when best-effort Discord delivery rejects', async () => {
+    let published: unknown
+    let notifications = createNotifications({
+      async publish(leagueId, input) {
+        published = { input, leagueId }
+        throw new Error('Discord is unavailable')
+      },
+    })
+    let runtime = createRuntime(createRunnerAdmin(), createLeagueOperations(), createTelemetry(), notifications)
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+      new Request('http://localhost' + routes.leagues.operations.proposeTrade.href({ leagueSlug: league.slug }), {
+        body: new URLSearchParams({
+          counterpartyCharacterIds: 'peach',
+          counterpartyTeamId: '44444444-4444-4444-8444-444444444444',
+          message: '',
+          proposerCharacterIds: 'mario',
+          proposerTeamId: '55555555-5555-4555-8555-555555555555',
+          seasonId: '66666666-6666-4666-8666-666666666666',
+        }),
+        headers: { cookie: session, origin: 'http://localhost' },
+        method: 'POST',
+      }),
+    )
+
+    assert.equal(response.status, 303)
+    assert.deepEqual(published, {
+      input: {
+        dedupeKey: 'trade-proposed:trade',
+        eventType: 'trade.proposed',
+        message: '🔄 Shell League received a trade proposal between teams 55555555-5555-4555-8555-555555555555 and 44444444-4444-4444-8444-444444444444.',
+      },
+      leagueId: league.id,
+    })
+  })
+
   it('parses an audited telemetry correction form', async () => {
     let received: unknown
     let telemetry = createTelemetry({
@@ -194,6 +231,7 @@ function createRuntime(
   runnerAdmin: RunnerAdminApplication,
   leagueOperations = createLeagueOperations(),
   telemetry = createTelemetry(),
+  notifications?: NotificationApplication,
 ): AppRuntime {
   let repository: PlatformRepository = {
     async bootstrapSiteAdmin() { return identity },
@@ -222,6 +260,7 @@ function createRuntime(
     draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
     leagueOperations,
+    notifications,
     oauthCookie: createCookie('test_oauth', cookies),
     operations: {} as AppRuntime['operations'],
     platform: new PlatformService(repository),
@@ -229,6 +268,18 @@ function createRuntime(
     runnerControl: {} as AppRuntime['runnerControl'],
     sessionCookie: createCookie('test_session', cookies),
     telemetry,
+  }
+}
+
+function createNotifications(
+  overrides: Partial<NotificationApplication> = {},
+): NotificationApplication {
+  return {
+    async configure() {},
+    async dashboard() { return { botConfigured: true, channelId: null, failed: 0, pending: 0, sent: 0 } },
+    async publish() { return { status: 'disabled' } },
+    async retry() { return 0 },
+    ...overrides,
   }
 }
 

@@ -8,6 +8,7 @@ services:
       DATABASE_URL: "postgres://starworks:starworks@db:5432/starworks"
       DISCORD_CLIENT_ID: "${DISCORD_CLIENT_ID:-}"
       DISCORD_CLIENT_SECRET: "${DISCORD_CLIENT_SECRET:-}"
+      DISCORD_BOT_TOKEN: "${DISCORD_BOT_TOKEN:-}"
       DISCORD_REDIRECT_URI: "${DISCORD_REDIRECT_URI:-http://127.0.0.1:3000/auth/discord/callback}"
       NODE_ENV: "production"
       PORT: "3000"
