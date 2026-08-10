@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
-    "test": "NODE_ENV=test node --import remix/node-tsx --test",
+    "test": "remix test",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
@@ -16,6 +16,7 @@
   },
   "devDependencies": {
     "@types/node": "latest",
+    "playwright": "^1.62.1",
     "typescript": "latest"
   }
 }
