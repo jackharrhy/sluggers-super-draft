@@ -8,7 +8,7 @@ export function MessagePage(handle: Handle<{ heading: string; message: string }>
     <AppShell title={handle.props.heading}>
       <section mix={[cardStyle, css({ margin: '40px auto', maxWidth: '620px' })]}>
         <h1 mix={css({ fontSize: '36px', margin: '0 0 16px' })}>{handle.props.heading}</h1>
-        <p mix={css({ color: '#c9d4e9', fontSize: '18px', lineHeight: 1.65, margin: 0 })}>
+        <p mix={css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.65, margin: 0 })}>
           {handle.props.message}
         </p>
       </section>

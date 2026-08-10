@@ -92,11 +92,11 @@ function Checkbox(handle: Handle<{ checked: boolean; label: string; name: string
   )
 }
 
-const eyebrowStyle = css({ color: '#f7c948', fontSize: '13px', fontWeight: 800, letterSpacing: '0.12em', margin: '0 0 12px', textTransform: 'uppercase' })
-const headingStyle = css({ fontSize: '64px', letterSpacing: '-0.055em', lineHeight: 1, margin: 0 })
-const subheadingStyle = css({ fontSize: '30px', letterSpacing: '-0.04em', margin: '0 0 6px' })
-const ledeStyle = css({ color: '#c9d4e9', fontSize: '18px', lineHeight: 1.65, maxWidth: '700px' })
-const mutedStyle = css({ color: '#9faec8', margin: 0 })
+const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
+const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
+const subheadingStyle = css({ fontFamily: 'var(--font-display)', fontSize: '28px', margin: '0 0 6px' })
+const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.65, maxWidth: '700px' })
+const mutedStyle = css({ color: 'var(--text-muted)', margin: 0 })
 const settingsStyle = css({ display: 'grid', gap: '28px', marginTop: '56px', maxWidth: '760px' })
 const formStyle = css({ display: 'grid', gap: '14px', justifyItems: 'start' })
 const checkboxStyle = css({ alignItems: 'center', display: 'flex', gap: '10px' })
