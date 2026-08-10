@@ -1,4 +1,5 @@
 export * from "./adapter-operation-bundle.ts";
+export * from "./broadcast-overlay.ts";
 export * from "./common.ts";
 export * from "./compile-adapter-operations.ts";
 export * from "./content-pack-manifest.ts";
@@ -12,6 +13,7 @@ export * from "./team-lineup-revision.ts";
 export * from "./telemetry-envelope.ts";
 
 import { AdapterOperationBundleSchema } from "./adapter-operation-bundle.ts";
+import { BroadcastOverlaySchema } from "./broadcast-overlay.ts";
 import { ContentPackManifestSchema } from "./content-pack-manifest.ts";
 import { GameBuildManifestSchema } from "./game-build-manifest.ts";
 import { MatchConfigurationPackageSchema } from "./match-configuration-package.ts";
@@ -25,6 +27,7 @@ import { TelemetryUploadMessageSchema } from "./telemetry-envelope.ts";
 
 export const contractSchemas = {
   "adapter-operation-bundle": AdapterOperationBundleSchema,
+  "broadcast-overlay": BroadcastOverlaySchema,
   "content-pack-manifest": ContentPackManifestSchema,
   "game-build-manifest": GameBuildManifestSchema,
   "match-configuration-package": MatchConfigurationPackageSchema,

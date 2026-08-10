@@ -10,6 +10,7 @@ from jsonschema import Draft202012Validator, FormatChecker
 
 ContractName = Literal[
     "adapter-operation-bundle",
+    "broadcast-overlay",
     "content-pack-manifest",
     "game-build-manifest",
     "match-configuration-package",
@@ -24,6 +25,7 @@ ContractName = Literal[
 
 CONTRACT_NAMES: tuple[ContractName, ...] = (
     "adapter-operation-bundle",
+    "broadcast-overlay",
     "content-pack-manifest",
     "game-build-manifest",
     "match-configuration-package",
