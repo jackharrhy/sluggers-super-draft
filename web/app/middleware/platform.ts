@@ -6,6 +6,7 @@ import type { DraftApplication } from '../draft/service.ts'
 import type { LeagueOperationsApplication } from '../league-operations/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
 import type { RunnerAdminApplication } from '../runner/admin-service.ts'
+import type { TelemetryApplication } from '../telemetry/service.ts'
 import type { IdentityService } from '../platform/identity-service.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import type { AppRuntime } from '../platform/runtime.ts'
@@ -22,6 +23,7 @@ export const Platform = createContextKey<PlatformService>()
 export const RunnerControl = createContextKey<RunnerControlApplication>()
 export const RunnerAdmin = createContextKey<RunnerAdminApplication>()
 export const SessionCookie = createContextKey<Cookie>()
+export const Telemetry = createContextKey<TelemetryApplication>()
 
 export function platform(
   resolveRuntime: () => AppRuntime,
@@ -37,6 +39,7 @@ export function platform(
     { key: typeof RunnerControl; value: RunnerControlApplication },
     { key: typeof RunnerAdmin; value: RunnerAdminApplication },
     { key: typeof SessionCookie; value: Cookie },
+    { key: typeof Telemetry; value: TelemetryApplication },
   ]
 > {
   return async (context, next) => {
@@ -54,6 +57,7 @@ export function platform(
     context.set(RunnerControl, runtime.runnerControl)
     context.set(RunnerAdmin, runtime.runnerAdmin)
     context.set(SessionCookie, runtime.sessionCookie)
+    context.set(Telemetry, runtime.telemetry)
     if (identity) context.get(RequestLog)?.bind({ actorId: identity.personId })
     return next()
   }

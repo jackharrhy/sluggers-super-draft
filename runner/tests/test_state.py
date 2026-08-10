@@ -79,6 +79,25 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         state.accept_run(envelope)
         state.save_configuration(envelope["attemptId"], configuration)
         state.update_stage(envelope["attemptId"], "running")
+        telemetry = {
+            "schemaVersion": 1,
+            "kind": "telemetry-envelope",
+            "protocolVersion": 1,
+            "correlationId": envelope["correlationId"],
+            "leagueId": envelope["leagueId"],
+            "matchId": envelope["matchId"],
+            "attemptId": envelope["attemptId"],
+            "attemptNonce": envelope["attemptNonce"],
+            "sequence": 1,
+            "frame": 120,
+            "eventType": "synthetic",
+            "observationSource": "synthetic",
+            "payload": {"value": 1},
+            "adapterVersion": configuration["adapterVersion"],
+            "gameBuildSha256": envelope["requiredGameBuildSha256"],
+        }
+        state.queue_telemetry(telemetry)
+        state.mark_execution_outcome(envelope["attemptId"], "complete")
         state.queue_update(f"{envelope['attemptId']}:complete", update)
         assert accepted.stage == "claimed"
 
@@ -86,6 +105,10 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         assert recovered.load_registration() == registration
         assert recovered.load_active_run().stage == "running"  # type: ignore[union-attr]
         assert recovered.load_active_run().configuration == configuration  # type: ignore[union-attr]
+        assert recovered.load_active_run().pending_outcome == "complete"  # type: ignore[union-attr]
+        spooled = recovered.list_pending_telemetry(envelope["attemptId"])
+        assert spooled[0].envelope == telemetry
+        recovered.acknowledge_telemetry(envelope["attemptId"], [1])
         pending = recovered.list_pending_updates()
         assert pending[0].message == update
         recovered.acknowledge_update(pending[0].event_id)

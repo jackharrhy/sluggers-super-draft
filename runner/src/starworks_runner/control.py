@@ -146,6 +146,19 @@ class RunnerControlClient:
             expected_kind="match-configuration-package",
         )
 
+    def upload_telemetry(self, message: dict[str, Any]) -> dict[str, Any]:
+        validate_contract("telemetry-upload", message)
+        attempt_id = message.get("attemptId")
+        if not isinstance(attempt_id, str):
+            raise TypeError("Telemetry upload requires attemptId")
+        return self._request(
+            "POST",
+            f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/telemetry",
+            message,
+            response_contract="telemetry-upload",
+            expected_kind="telemetry-upload-response",
+        )
+
     def _send(
         self,
         path: str,

@@ -29,12 +29,20 @@ class ActiveRun:
     configuration: dict[str, Any] | None
     stage: RunStage
     last_captured_sequence: int | None
+    pending_outcome: Literal["complete", "cancel"] | None
 
 
 @dataclass(frozen=True)
 class PendingUpdate:
     event_id: str
     message: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PendingTelemetry:
+    attempt_id: str
+    sequence: int
+    envelope: dict[str, Any]
 
 
 class RunnerStateStore:
@@ -124,7 +132,8 @@ class RunnerStateStore:
         with self._lock:
             row = self._connection.execute(
                 """
-                select envelope_json, configuration_json, stage, last_captured_sequence
+                select envelope_json, configuration_json, stage, last_captured_sequence,
+                       pending_outcome
                 from active_run where singleton = 1
                 """
             ).fetchone()
@@ -141,6 +150,9 @@ class RunnerStateStore:
             ),
             stage=cast(RunStage, row["stage"]),
             last_captured_sequence=row["last_captured_sequence"],
+            pending_outcome=cast(
+                Literal["complete", "cancel"] | None, row["pending_outcome"]
+            ),
         )
 
     def save_configuration(
@@ -260,6 +272,91 @@ class RunnerStateStore:
                         "delete from active_run where singleton = 1"
                     )
 
+    def queue_telemetry(self, envelope: dict[str, Any]) -> None:
+        validate_contract("telemetry-envelope", envelope)
+        attempt_id = cast(str, envelope["attemptId"])
+        attempt_nonce = cast(str, envelope["attemptNonce"])
+        sequence = cast(int, envelope["sequence"])
+        encoded = json.dumps(envelope, separators=(",", ":"), sort_keys=True)
+        with self._lock, self._connection:
+            active = self._connection.execute(
+                "select attempt_nonce from active_run where singleton = 1 and attempt_id = ?",
+                (attempt_id,),
+            ).fetchone()
+            if not active or active["attempt_nonce"] != attempt_nonce:
+                raise ActiveRunConflict("Telemetry does not belong to the active attempt")
+            prior = self._connection.execute(
+                "select envelope_json from telemetry_spool where attempt_id = ? and sequence = ?",
+                (attempt_id, sequence),
+            ).fetchone()
+            if prior and prior["envelope_json"] != encoded:
+                raise ActiveRunConflict(
+                    f"Telemetry sequence {sequence} changed after it was captured"
+                )
+            self._connection.execute(
+                """
+                insert into telemetry_spool (attempt_id, sequence, envelope_json)
+                values (?, ?, ?)
+                on conflict (attempt_id, sequence) do nothing
+                """,
+                (attempt_id, sequence, encoded),
+            )
+            self._connection.execute(
+                """
+                update active_run set last_captured_sequence = max(
+                  coalesce(last_captured_sequence, 0), ?
+                ) where singleton = 1 and attempt_id = ?
+                """,
+                (sequence, attempt_id),
+            )
+
+    def mark_execution_outcome(
+        self, attempt_id: str, outcome: Literal["complete", "cancel"]
+    ) -> None:
+        with self._lock, self._connection:
+            updated = self._connection.execute(
+                """
+                update active_run set pending_outcome = ?
+                where singleton = 1 and attempt_id = ?
+                """,
+                (outcome, attempt_id),
+            )
+            if updated.rowcount != 1:
+                raise ActiveRunConflict("Attempt changed before outcome was persisted")
+
+    def list_pending_telemetry(
+        self, attempt_id: str, *, limit: int = 256
+    ) -> list[PendingTelemetry]:
+        if not 1 <= limit <= 256:
+            raise ValueError("Telemetry batch limit must be between 1 and 256")
+        with self._lock:
+            rows = self._connection.execute(
+                """
+                select attempt_id, sequence, envelope_json from telemetry_spool
+                where attempt_id = ? order by sequence limit ?
+                """,
+                (attempt_id, limit),
+            ).fetchall()
+        return [
+            PendingTelemetry(
+                attempt_id=row["attempt_id"],
+                sequence=row["sequence"],
+                envelope=cast(dict[str, Any], json.loads(row["envelope_json"])),
+            )
+            for row in rows
+        ]
+
+    def acknowledge_telemetry(
+        self, attempt_id: str, sequences: list[int]
+    ) -> None:
+        if not sequences:
+            return
+        with self._lock, self._connection:
+            self._connection.executemany(
+                "delete from telemetry_spool where attempt_id = ? and sequence = ?",
+                ((attempt_id, sequence) for sequence in sequences),
+            )
+
     def _migrate(self) -> None:
         with self._lock, self._connection:
             self._connection.executescript(
@@ -277,6 +374,7 @@ class RunnerStateStore:
                   configuration_json text,
                   stage text not null check (stage in ('claimed', 'preparing', 'running')),
                   last_captured_sequence integer
+                  ,pending_outcome text check (pending_outcome in ('complete', 'cancel'))
                 );
                 create table if not exists pending_updates (
                   event_id text primary key,
@@ -291,6 +389,13 @@ class RunnerStateStore:
                   envelope_json text not null,
                   finished_at text not null default current_timestamp
                 );
+                create table if not exists telemetry_spool (
+                  attempt_id text not null,
+                  sequence integer not null check (sequence > 0),
+                  envelope_json text not null,
+                  captured_at text not null default current_timestamp,
+                  primary key (attempt_id, sequence)
+                );
                 """
             )
             columns = {
@@ -300,4 +405,8 @@ class RunnerStateStore:
             if "configuration_json" not in columns:
                 self._connection.execute(
                     "alter table active_run add column configuration_json text"
+                )
+            if "pending_outcome" not in columns:
+                self._connection.execute(
+                    "alter table active_run add column pending_outcome text"
                 )

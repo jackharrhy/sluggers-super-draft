@@ -17,6 +17,7 @@ export const routes = route({
     heartbeat: post('heartbeat'),
     claim: post('claim'),
     configuration: get('attempts/:attemptId/configuration'),
+    telemetry: post('attempts/:attemptId/telemetry'),
     updateLease: post('leases/:leaseId'),
   }),
   leagues: route('leagues', {

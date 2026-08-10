@@ -5,6 +5,7 @@ import { describe, it } from 'remix/test'
 import { MatchConfigurationPackageSchema } from '@starworks/contracts'
 
 import configurationFixture from '../../../../contracts/fixtures/valid/match-configuration-package.json' with { type: 'json' }
+import telemetryUploadFixture from '../../../../contracts/fixtures/valid/telemetry-upload.json' with { type: 'json' }
 
 import type { ConfigurationApplication } from '../../configuration/service.ts'
 import type { DiscordOAuthClient } from '../../platform/discord-oauth.ts'
@@ -168,6 +169,46 @@ describe('runner API controller', () => {
       credential: 'runner-secret',
     })
   })
+
+  it('binds telemetry uploads to the attempt URL and bearer credential', async () => {
+    let received: unknown
+    let telemetry: AppRuntime['telemetry'] = {
+      async ingest(credential, input) {
+        received = { credential, input }
+        return {
+          acceptedSequences: [1],
+          attemptId: telemetryUploadFixture.attemptId,
+          duplicateSequences: [],
+          issues: [],
+          kind: 'telemetry-upload-response',
+          maxAcceptedSequence: 1,
+          nextExpectedSequence: 2,
+          requiresReview: false,
+          schemaVersion: 1,
+        }
+      },
+      async dashboard() { return [] },
+      async derive() { throw new Error('Unexpected derive') },
+      async correct() { throw new Error('Unexpected correction') },
+      async confirm() { throw new Error('Unexpected confirmation') },
+      async rebuildSeason() { return { playerTotals: {}, standings: [] } },
+    }
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createRuntime(createRunnerControl(), telemetry),
+    })
+    let response = await router.fetch(new Request(
+      'http://localhost' + routes.runnerApi.telemetry.href({ attemptId: telemetryUploadFixture.attemptId }),
+      {
+        body: JSON.stringify(telemetryUploadFixture),
+        headers: { authorization: 'Bearer runner-secret', 'content-type': 'application/json' },
+        method: 'POST',
+      },
+    ))
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).kind, 'telemetry-upload-response')
+    assert.deepEqual(received, { credential: 'runner-secret', input: telemetryUploadFixture })
+  })
 })
 
 function createRunnerControl(
@@ -205,7 +246,10 @@ function createRunnerControl(
   }
 }
 
-function createRuntime(runnerControl: RunnerControlApplication): AppRuntime {
+function createRuntime(
+  runnerControl: RunnerControlApplication,
+  telemetry: AppRuntime['telemetry'] = {} as AppRuntime['telemetry'],
+): AppRuntime {
   let repository: PlatformRepository = {
     async bootstrapSiteAdmin() { throw new Error('Unexpected bootstrap') },
     async completeDiscordLogin() { throw new Error('Unexpected login') },
@@ -241,5 +285,6 @@ function createRuntime(runnerControl: RunnerControlApplication): AppRuntime {
     runnerControl,
     runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
+    telemetry,
   }
 }

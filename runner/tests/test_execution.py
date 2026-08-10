@@ -42,12 +42,15 @@ def test_synthetic_execution_binds_both_teams_and_attempt_nonce() -> None:
     executor = SyntheticSluggersExecutor()
 
     executor.prepare(envelope, configuration)  # type: ignore[arg-type]
+    telemetry: list[dict[str, object]] = []
     outcome = executor.execute(  # type: ignore[arg-type]
-        envelope, configuration, recovering=False
+        envelope, configuration, recovering=False, emit_telemetry=telemetry.append
     )
 
     assert outcome.action == "complete"
     assert executor.event_count == 1
+    assert telemetry[0]["attemptId"] == envelope["attemptId"]
+    assert telemetry[0]["sequence"] == 1
     assert executor.bound is not None
     assert (
         executor.bound.compiled.home["lineupRevisionId"]
