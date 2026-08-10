@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   foreignKey,
   index,
   integer,
@@ -13,7 +14,9 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { sql } from 'drizzle-orm'
 import type {
+  RunnerCapabilities,
   RulesetRevision,
   StatProfileRevision,
   TeamLineupRevision,
@@ -35,6 +38,13 @@ export const leagueRole = pgEnum('league_role', [
 export const seasonStatus = pgEnum('season_status', ['draft', 'active', 'complete', 'archived'])
 export const inviteStatus = pgEnum('invite_status', ['pending', 'redeemed', 'revoked', 'expired'])
 export const revisionStatus = pgEnum('revision_status', ['draft', 'published'])
+export const runnerStationStatus = pgEnum('runner_station_status', ['active', 'revoked'])
+export const runnerRuntimeState = pgEnum('runner_runtime_state', ['idle', 'preparing', 'running', 'recovering', 'degraded'])
+export const matchStatus = pgEnum('match_status', ['scheduled', 'in_progress', 'provisional', 'confirmed', 'cancelled'])
+export const matchAttemptStatus = pgEnum('match_attempt_status', ['queued', 'leased', 'running', 'provisional', 'confirmed', 'cancelled', 'failed', 'review'])
+export const runnerLeaseStatus = pgEnum('runner_lease_status', ['active', 'released', 'expired', 'revoked'])
+export const runnerFailureKind = pgEnum('runner_failure_kind', ['game-crash', 'runner-crash', 'bridge-failure', 'build-failure'])
+export const attemptLifecycleEventType = pgEnum('attempt_lifecycle_event_type', ['queued', 'claimed', 'renewed', 'started', 'completed', 'cancelled', 'failed', 'lease-expired', 'station-revoked'])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -319,6 +329,27 @@ export const oauthAttempts = pgTable(
   ],
 )
 
+export const runnerStations = pgTable(
+  'runner_stations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    status: runnerStationStatus('status').notNull().default('active'),
+    capabilities: jsonb('capabilities').$type<RunnerCapabilities>(),
+    runtimeState: runnerRuntimeState('runtime_state').notNull().default('idle'),
+    lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique('runner_stations_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('runner_stations_league_id_name_unique').on(table.leagueId, table.name),
+  ],
+)
+
 export const runnerCredentials = pgTable(
   'runner_credentials',
   {
@@ -326,6 +357,7 @@ export const runnerCredentials = pgTable(
     leagueId: uuid('league_id')
       .notNull()
       .references(() => leagues.id, { onDelete: 'cascade' }),
+    stationId: uuid('station_id'),
     name: text('name').notNull(),
     secretHash: text('secret_hash').notNull(),
     scopes: jsonb('scopes').$type<string[]>().notNull().default([]),
@@ -339,6 +371,11 @@ export const runnerCredentials = pgTable(
   },
   (table) => [
     uniqueIndex('runner_credentials_league_id_name_unique').on(table.leagueId, table.name),
+    foreignKey({
+      columns: [table.leagueId, table.stationId],
+      foreignColumns: [runnerStations.leagueId, runnerStations.id],
+      name: 'runner_credentials_station_fk',
+    }),
   ],
 )
 
@@ -520,6 +557,7 @@ export const rosterRevisions = pgTable(
     publishedAt: timestamp('published_at', { withTimezone: true }),
   },
   (table) => [
+    unique('roster_revisions_league_id_id_unique').on(table.leagueId, table.id),
     unique('roster_revisions_league_team_id_unique').on(
       table.leagueId,
       table.teamId,
@@ -561,6 +599,7 @@ export const lineupRevisions = pgTable(
     publishedAt: timestamp('published_at', { withTimezone: true }),
   },
   (table) => [
+    unique('lineup_revisions_league_id_id_unique').on(table.leagueId, table.id),
     unique('lineup_revisions_league_team_id_unique').on(
       table.leagueId,
       table.teamId,
@@ -616,5 +655,165 @@ export const matchLineupOverrides = pgTable(
       foreignColumns: [lineupRevisions.leagueId, lineupRevisions.teamId, lineupRevisions.id],
       name: 'match_lineup_overrides_lineup_fk',
     }),
+  ],
+)
+
+export const matches = pgTable(
+  'matches',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    seasonId: uuid('season_id').notNull(),
+    homeTeamId: uuid('home_team_id').notNull(),
+    awayTeamId: uuid('away_team_id').notNull(),
+    status: matchStatus('status').notNull().default('scheduled'),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique('matches_league_id_id_unique').on(table.leagueId, table.id),
+    check('matches_distinct_teams_check', sql`${table.homeTeamId} <> ${table.awayTeamId}`),
+    foreignKey({
+      columns: [table.leagueId, table.seasonId],
+      foreignColumns: [seasons.leagueId, seasons.id],
+      name: 'matches_season_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.homeTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'matches_home_team_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.awayTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'matches_away_team_fk',
+    }),
+    index('matches_league_status_scheduled_index').on(table.leagueId, table.status, table.scheduledAt),
+  ],
+)
+
+export const matchAttempts = pgTable(
+  'match_attempts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchId: uuid('match_id').notNull(),
+    attemptNumber: integer('attempt_number').notNull(),
+    status: matchAttemptStatus('status').notNull().default('queued'),
+    correlationId: uuid('correlation_id').notNull(),
+    attemptNonce: text('attempt_nonce').notNull(),
+    requiredGameBuildSha256: text('required_game_build_sha256').notNull(),
+    homeRosterRevisionId: uuid('home_roster_revision_id').notNull(),
+    homeLineupRevisionId: uuid('home_lineup_revision_id').notNull(),
+    awayRosterRevisionId: uuid('away_roster_revision_id').notNull(),
+    awayLineupRevisionId: uuid('away_lineup_revision_id').notNull(),
+    dynamicRuleOverrides: jsonb('dynamic_rule_overrides').$type<Record<string, string | number | boolean | null>>().notNull().default({}),
+    failureKind: runnerFailureKind('failure_kind'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    failedAt: timestamp('failed_at', { withTimezone: true }),
+    issuedAt: timestamp('issued_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('match_attempts_league_id_id_unique').on(table.leagueId, table.id),
+    check('match_attempts_positive_number_check', sql`${table.attemptNumber} > 0`),
+    check('match_attempts_nonce_check', sql`${table.attemptNonce} ~ '^[A-Za-z0-9_-]{32,128}$'`),
+    check('match_attempts_build_hash_check', sql`${table.requiredGameBuildSha256} ~ '^[a-f0-9]{64}$'`),
+    uniqueIndex('match_attempts_match_number_unique').on(table.leagueId, table.matchId, table.attemptNumber),
+    foreignKey({
+      columns: [table.leagueId, table.matchId],
+      foreignColumns: [matches.leagueId, matches.id],
+      name: 'match_attempts_match_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.homeRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'match_attempts_home_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.homeLineupRevisionId],
+      foreignColumns: [lineupRevisions.leagueId, lineupRevisions.id],
+      name: 'match_attempts_home_lineup_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.awayRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'match_attempts_away_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.awayLineupRevisionId],
+      foreignColumns: [lineupRevisions.leagueId, lineupRevisions.id],
+      name: 'match_attempts_away_lineup_fk',
+    }),
+    index('match_attempts_league_status_created_index').on(table.leagueId, table.status, table.createdAt),
+  ],
+)
+
+export const runnerLeases = pgTable(
+  'runner_leases',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchAttemptId: uuid('match_attempt_id').notNull(),
+    runnerStationId: uuid('runner_station_id').notNull(),
+    status: runnerLeaseStatus('status').notNull().default('active'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    lastRenewedAt: timestamp('last_renewed_at', { withTimezone: true }).notNull(),
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('runner_leases_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('runner_leases_attempt_unique').on(table.leagueId, table.matchAttemptId),
+    uniqueIndex('runner_leases_active_station_unique')
+      .on(table.leagueId, table.runnerStationId)
+      .where(sql`${table.status} = 'active'`),
+    foreignKey({
+      columns: [table.leagueId, table.matchAttemptId],
+      foreignColumns: [matchAttempts.leagueId, matchAttempts.id],
+      name: 'runner_leases_attempt_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.runnerStationId],
+      foreignColumns: [runnerStations.leagueId, runnerStations.id],
+      name: 'runner_leases_station_fk',
+    }),
+    index('runner_leases_station_status_index').on(table.leagueId, table.runnerStationId, table.status),
+  ],
+)
+
+export const attemptLifecycleEvents = pgTable(
+  'attempt_lifecycle_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchAttemptId: uuid('match_attempt_id').notNull(),
+    runnerStationId: uuid('runner_station_id'),
+    eventType: attemptLifecycleEventType('event_type').notNull(),
+    failureKind: runnerFailureKind('failure_kind'),
+    observedAt: timestamp('observed_at', { withTimezone: true }).notNull(),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    foreignKey({
+      columns: [table.leagueId, table.matchAttemptId],
+      foreignColumns: [matchAttempts.leagueId, matchAttempts.id],
+      name: 'attempt_lifecycle_events_attempt_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.runnerStationId],
+      foreignColumns: [runnerStations.leagueId, runnerStations.id],
+      name: 'attempt_lifecycle_events_station_fk',
+    }),
+    index('attempt_lifecycle_events_attempt_recorded_index').on(table.leagueId, table.matchAttemptId, table.recordedAt),
   ],
 )
