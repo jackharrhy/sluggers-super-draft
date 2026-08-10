@@ -1,0 +1,62 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.14.0
+          cache: npm
+          cache-dependency-path: |
+            contracts/package-lock.json
+            web/package-lock.json
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v9
+        with:
+          enable-cache: true
+          cache-dependency-glob: runner/uv.lock
+
+      - name: Install JavaScript dependencies
+        run: |
+          npm ci --prefix contracts
+          npm ci --prefix web
+
+      - name: Install runner dependencies
+        run: uv sync --project runner --locked --group test
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Validate shared contracts
+        run: npm run contracts:check
+
+      - name: Test Remix
+        run: npm --prefix web test
+
+      - name: Validate Compose topologies
+        run: |
+          docker compose config --quiet
+          docker compose --profile email config --quiet
+          docker compose \
+            --env-file deploy/prod/.env.example \
+            -f deploy/prod/compose.yml \
+            config --quiet
+
+      - name: Build web image
+        run: docker build --tag starworks-web:ci .
