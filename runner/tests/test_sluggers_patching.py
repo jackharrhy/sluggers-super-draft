@@ -5,7 +5,6 @@ import json
 from pathlib import Path, PurePosixPath
 
 import pytest
-
 from starworks_runner.games.sluggers.adapter import AdapterManifest
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 from starworks_runner.games.sluggers.patching import (

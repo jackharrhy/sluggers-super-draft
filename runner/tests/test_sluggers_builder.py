@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
 import pytest
-
 from starworks_runner.contracts import validate_contract
 from starworks_runner.games.sluggers.builder import BuildRequest, GameBuildService
 from starworks_runner.games.sluggers.content import (

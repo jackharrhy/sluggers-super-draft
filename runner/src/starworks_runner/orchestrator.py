@@ -119,9 +119,7 @@ class RunnerStation:
             self.flush_pending_updates()
             return RunOnceResult(
                 status=(
-                    "completed"
-                    if active.pending_outcome == "complete"
-                    else "cancelled"
+                    "completed" if active.pending_outcome == "complete" else "cancelled"
                 ),
                 attempt_id=attempt_id,
             )
@@ -188,15 +186,14 @@ class RunnerStation:
                 }
             )
             acknowledged = sorted(
-                set(response["acceptedSequences"])
-                | set(response["duplicateSequences"])
+                set(response["acceptedSequences"]) | set(response["duplicateSequences"])
             )
             expected = [item.sequence for item in pending]
             if acknowledged != expected:
-                raise RuntimeError("Telemetry server did not acknowledge the full batch")
-            self.state.acknowledge_telemetry(
-                active.envelope["attemptId"], acknowledged
-            )
+                raise RuntimeError(
+                    "Telemetry server did not acknowledge the full batch"
+                )
+            self.state.acknowledge_telemetry(active.envelope["attemptId"], acknowledged)
 
     def _report_failure(
         self,

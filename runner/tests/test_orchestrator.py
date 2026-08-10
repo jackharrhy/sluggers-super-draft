@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from starworks_runner.control import RunnerApiError
 from starworks_runner.orchestrator import (
     ExecutionOutcome,
@@ -138,7 +137,10 @@ def test_runner_spools_telemetry_and_finishes_without_replaying_the_game(
         assert active is not None
         assert active.pending_outcome == "complete"
         assert active.last_captured_sequence == 1
-        assert [item.sequence for item in state.list_pending_telemetry(active.envelope["attemptId"])] == [1]
+        assert [
+            item.sequence
+            for item in state.list_pending_telemetry(active.envelope["attemptId"])
+        ] == [1]
 
     with RunnerStateStore(state_path) as recovered:
         result = create_station(client, recovered).run_once(executor)
