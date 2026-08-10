@@ -33,6 +33,9 @@ export const routes = route({
       queueAttempt: post('matches/:matchId/attempts'),
       issueCredential: post('runner-credentials'),
       revokeStation: post('runner-stations/:stationId/revoke'),
+      deriveTelemetry: post('attempts/:attemptId/telemetry/derive'),
+      correctTelemetry: post('attempts/:attemptId/telemetry/corrections'),
+      confirmTelemetry: post('attempts/:attemptId/telemetry/confirm'),
     }),
     drafts: route(':leagueSlug/drafts', {
       dashboard: get('/'),
