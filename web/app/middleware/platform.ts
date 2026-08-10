@@ -3,6 +3,7 @@ import { createContextKey, type Middleware } from 'remix/router'
 
 import type { ConfigurationApplication } from '../configuration/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
+import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { IdentityService } from '../platform/identity-service.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import type { AppRuntime } from '../platform/runtime.ts'
@@ -15,6 +16,7 @@ export const IdentityServiceContext = createContextKey<IdentityService>()
 export const OAuthCookie = createContextKey<Cookie>()
 export const Platform = createContextKey<PlatformService>()
 export const RunnerControl = createContextKey<RunnerControlApplication>()
+export const RunnerAdmin = createContextKey<RunnerAdminApplication>()
 export const SessionCookie = createContextKey<Cookie>()
 
 export function platform(
@@ -27,6 +29,7 @@ export function platform(
     { key: typeof OAuthCookie; value: Cookie },
     { key: typeof Platform; value: PlatformService },
     { key: typeof RunnerControl; value: RunnerControlApplication },
+    { key: typeof RunnerAdmin; value: RunnerAdminApplication },
     { key: typeof SessionCookie; value: Cookie },
   ]
 > {
@@ -41,6 +44,7 @@ export function platform(
     context.set(OAuthCookie, runtime.oauthCookie)
     context.set(Platform, runtime.platform)
     context.set(RunnerControl, runtime.runnerControl)
+    context.set(RunnerAdmin, runtime.runnerAdmin)
     context.set(SessionCookie, runtime.sessionCookie)
     if (identity) context.get(RequestLog)?.bind({ actorId: identity.personId })
     return next()

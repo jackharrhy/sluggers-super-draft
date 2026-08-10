@@ -22,6 +22,13 @@ export const routes = route({
   leagues: route('leagues', {
     show: get(':leagueSlug'),
     updatePublication: post(':leagueSlug/publication'),
+    operations: route(':leagueSlug/operations', {
+      dashboard: get('/'),
+      scheduleMatch: post('matches'),
+      queueAttempt: post('matches/:matchId/attempts'),
+      issueCredential: post('runner-credentials'),
+      revokeStation: post('runner-stations/:stationId/revoke'),
+    }),
     configuration: route(':leagueSlug/configuration', {
       dashboard: get('/'),
       preview: post('preview'),

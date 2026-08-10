@@ -31,6 +31,13 @@ export function LeaguePage(
             </div>
             <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>Open configuration workspace</a>
           </section>
+          <section mix={[cardStyle, settingsStyle]} aria-labelledby="operations-heading">
+            <div>
+              <h2 id="operations-heading" mix={subheadingStyle}>Match operations</h2>
+              <p mix={mutedStyle}>Schedule games, queue immutable attempts, and manage native runner stations.</p>
+            </div>
+            <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Open operations workspace</a>
+          </section>
           <section mix={[cardStyle, settingsStyle]} aria-labelledby="publication-heading">
             <div>
               <h2 id="publication-heading" mix={subheadingStyle}>Publication policy</h2>

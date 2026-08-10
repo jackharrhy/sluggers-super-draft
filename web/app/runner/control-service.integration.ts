@@ -30,6 +30,7 @@ import {
   statProfiles,
 } from '../platform/database/schema.ts'
 import type { SessionIdentity } from '../platform/model.ts'
+import { PlatformError } from '../platform/errors.ts'
 import { hashSecret } from '../platform/security.ts'
 import { RunnerAdminService } from './admin-service.ts'
 import { RunnerControlService } from './control-service.ts'
@@ -92,6 +93,9 @@ test(
             configuration.teams.map((team) => [team.side, team.lineup.teamId]),
             [['home', fixture.home.teamId], ['away', fixture.away.teamId]],
           )
+          let operations = await admin.dashboard(fixture.identity, fixture.leagueId)
+          assert.equal(operations.matches[0]?.attempts[0]?.status, 'leased')
+          assert.equal(operations.stations.length, 2)
           let recoveryClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.deepEqual(recoveryClaim.run, firstClaim.run)
           let unavailableClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
@@ -179,6 +183,20 @@ test(
           })
           let replacementClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
           assert.equal(replacementClaim.run?.attemptId, replacementAttempt.attemptId)
+          await admin.revokeStation(fixture.identity, fixture.leagueId, secondRegistration.runnerId)
+          await assert.rejects(
+            control.heartbeat(fixture.credentials.second.raw, {
+              activeAttemptId: replacementAttempt.attemptId,
+              activeLeaseId: replacementClaim.run!.lease.leaseId,
+              kind: 'runner-heartbeat-request',
+              lastCapturedSequence: null,
+              runnerId: secondRegistration.runnerId,
+              schemaVersion: 1,
+              sentAt: now.toISOString(),
+              state: 'running',
+            }),
+            (error: unknown) => error instanceof PlatformError && error.code === 'unauthorized',
+          )
 
           let lifecycle = await database
             .select({ eventType: attemptLifecycleEvents.eventType })
@@ -186,7 +204,7 @@ test(
             .where(eq(attemptLifecycleEvents.leagueId, fixture.leagueId))
           assert.deepEqual(
             lifecycle.map((event) => event.eventType),
-            ['queued', 'claimed', 'started', 'renewed', 'completed', 'queued', 'claimed', 'cancelled', 'queued', 'claimed', 'lease-expired', 'queued', 'claimed'],
+            ['queued', 'claimed', 'started', 'renewed', 'completed', 'queued', 'claimed', 'cancelled', 'queued', 'claimed', 'lease-expired', 'queued', 'claimed', 'station-revoked'],
           )
           throw new RollbackFixture()
         }),
