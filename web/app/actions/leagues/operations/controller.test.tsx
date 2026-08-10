@@ -34,6 +34,14 @@ const league: LeagueDetail = {
 }
 
 const dashboard: RunnerOperationsDashboard = {
+  audit: [{
+    action: 'runner_station.revoked',
+    actorDisplayName: 'Commissioner Mario',
+    metadata: {},
+    occurredAt: new Date('2026-08-10T20:00:00Z'),
+    targetId: '33333333-3333-4333-8333-333333333333',
+    targetType: 'runner_station',
+  }],
   matches: [],
   rulesets: [],
   seasons: [],
@@ -64,6 +72,9 @@ describe('league operations controller', () => {
     assert.match(html, /Schedule a match/)
     assert.match(html, /Enroll a runner station/)
     assert.match(html, /Game telemetry/)
+    assert.match(html, /Audit history/)
+    assert.match(html, /runner_station\.revoked/)
+    assert.match(html, /Commissioner Mario/)
   })
 
   it('parses a scheduled match form through Remix FormData middleware', async () => {
