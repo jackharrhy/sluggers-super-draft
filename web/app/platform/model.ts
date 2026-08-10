@@ -3,6 +3,9 @@ export const leagueRoles = [
   'administrator',
   'commissioner',
   'manager',
+  'league_admin',
+  'scorekeeper',
+  'runner_operator',
   'member',
 ] as const
 

@@ -27,7 +27,7 @@ import {
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
-import { administrativeRoles } from '../platform/repository.ts'
+import { scoringRoles } from '../platform/repository.ts'
 import { hashSecret } from '../platform/security.ts'
 import { correctionValue, deriveTelemetry } from './derive.ts'
 import type {
@@ -528,8 +528,8 @@ export class TelemetryService implements TelemetryApplication {
   #requireAdmin(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {
     this.#requireMember(identity, leagueId)
     let membership = identity.memberships.find((candidate) => candidate.leagueId === leagueId)
-    if (!identity.isSiteAdmin && !membership?.roles.some((role) => administrativeRoles.has(role))) {
-      throw new PlatformError('League administrator access is required', 'forbidden')
+    if (!identity.isSiteAdmin && !membership?.roles.some((role) => scoringRoles.has(role))) {
+      throw new PlatformError('Scorekeeper access is required', 'forbidden')
     }
   }
 }

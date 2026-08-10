@@ -73,5 +73,16 @@ export interface PlatformRepository {
 export const administrativeRoles = new Set<LeagueRole>([
   'owner',
   'administrator',
+  'league_admin',
   'commissioner',
+])
+
+export const scoringRoles = new Set<LeagueRole>([
+  ...administrativeRoles,
+  'scorekeeper',
+])
+
+export const runnerOperationRoles = new Set<LeagueRole>([
+  ...administrativeRoles,
+  'runner_operator',
 ])
