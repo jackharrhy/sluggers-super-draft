@@ -4,6 +4,7 @@ import { css } from 'remix/ui'
 import type { ContentDashboard } from '../content/service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { routes } from '../routes.ts'
+import { SLUGGERS_ADAPTER_VERSION } from '../runner/adapter-version.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
 
 export function ContentDashboardPage(
@@ -35,7 +36,7 @@ export function ContentDashboardPage(
             <Field label="Slug" name="slug" defaultValue="league-balance-pack" />
             <Select label="Published stat profile" name="statProfileRevisionId" options={dashboard.publishedStatProfiles.map((item) => ({ label: `${item.name} · r${item.revisionNumber}`, value: item.id }))} />
             <Select label="Published ruleset" name="rulesetRevisionId" options={dashboard.publishedRulesets.map((item) => ({ label: `${item.name} · r${item.revisionNumber}`, value: item.id }))} />
-            <Field label="Adapter version" name="adapterVersion" defaultValue="0.1.0" />
+            <Field label="Adapter version" name="adapterVersion" defaultValue={SLUGGERS_ADAPTER_VERSION} />
             <Field label="Supported clean main.dol SHA-256" name="mainDolSha256" defaultValue="" />
             <label>Characters receiving build-time stats<textarea name="statCharacterIds" rows={5} placeholder={'mario\nluigi'} mix={inputStyle} /></label>
             <button type="submit" mix={buttonStyle}>Create immutable draft</button>

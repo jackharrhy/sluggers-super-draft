@@ -348,7 +348,7 @@ async function createContentPackFixture(
   let revisionId = randomUUID()
   let objectKey = `leagues/${fixture.leagueId}/content-assets/${sha256}`
   let manifest = ContentPackManifestSchema.parse({
-    adapterVersion: '0.1.0',
+    adapterVersion: '0.2.0',
     assets: [{ displayName: 'Runner icon', mediaType: 'image/png', sha256, sizeBytes: bytes.byteLength }],
     assignments: [{ assignmentType: 'character-asset', assetSha256: sha256, characterId: 'mario', slot: 'icon' }],
     contentPackId,
@@ -377,7 +377,7 @@ async function createContentPackFixture(
     uploadedByPersonId: fixture.identity.personId,
   })
   await database.insert(contentPackRevisions).values({
-    adapterVersion: '0.1.0',
+    adapterVersion: '0.2.0',
     contentPackId,
     createdByPersonId: fixture.identity.personId,
     id: revisionId,

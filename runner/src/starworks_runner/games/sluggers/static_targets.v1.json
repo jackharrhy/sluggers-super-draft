@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "sluggers-static-target-catalog",
-  "adapterVersion": "0.1.0",
+  "adapterVersion": "0.2.0",
   "target": {
     "gameId": "RMBE01",
     "region": "NTSC-U",
@@ -9,5 +9,5 @@
   },
   "valueTargets": [],
   "assetTargets": [],
-  "provisioningNote": "Production offsets and original bytes remain gated on a reviewed lawful RMBE01 fingerprint and independent format research. Synthetic catalogs exercise the complete compiler without distributing game data."
+  "provisioningNote": "The lawful RMBE01 base is reviewed, but production stat and asset offsets still require independent mapping and exact-byte validation. The bridge release does not guess these targets; synthetic catalogs exercise the compiler without distributing game data."
 }
