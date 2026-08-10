@@ -1,7 +1,11 @@
 .DS_Store
 *.swp
 .git
+.github
 .env
+contracts
+deploy
+docs
 legacy
 node_modules
-runner/.venv
+runner

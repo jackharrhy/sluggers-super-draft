@@ -36,6 +36,14 @@ Start local infrastructure:
 docker compose up -d
 ```
 
+Garage's S3 API is available on `127.0.0.1:3900`. Email is not required; start
+the optional Mailpit UI on `127.0.0.1:8025` only when working on future email
+features:
+
+```shell
+docker compose --profile email up -d mailpit
+```
+
 Copy `.env.example` to `.env`, then start Remix:
 
 ```shell
