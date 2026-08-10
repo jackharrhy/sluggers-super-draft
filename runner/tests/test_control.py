@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -41,7 +42,7 @@ class FakeTransport:
                 "method": method,
                 "url": url,
                 "headers": headers,
-                "body": json.loads(body),
+                "body": json.loads(body) if body else None,
                 "timeout": timeout_seconds,
             }
         )
@@ -92,3 +93,28 @@ def test_api_errors_preserve_status_and_server_message() -> None:
         client.claim("11111111-1111-4111-8111-111111111111")
 
     assert captured.value.status == 409
+
+
+def test_configuration_download_is_scoped_to_an_attempt() -> None:
+    transport = FakeTransport()
+    fixture_path = (
+        Path(__file__).resolve().parents[2]
+        / "contracts/fixtures/valid/match-configuration-package.json"
+    )
+    configuration = json.loads(fixture_path.read_text(encoding="utf-8"))
+    transport.response = HttpResponse(
+        status=200,
+        body=json.dumps(configuration).encode(),
+    )
+    client = RunnerControlClient(
+        "https://starworks.example", "credential", transport=transport
+    )
+
+    received = client.configuration(configuration["attemptId"])
+
+    assert received == configuration
+    assert transport.requests[0]["method"] == "GET"
+    assert transport.requests[0]["body"] is None
+    assert transport.requests[0]["url"].endswith(
+        f"/attempts/{configuration['attemptId']}/configuration"
+    )

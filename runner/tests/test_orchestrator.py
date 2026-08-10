@@ -18,8 +18,9 @@ RUNNER_ID = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
 
 
 class FakeControlClient:
-    def __init__(self, envelope: dict[str, Any]) -> None:
+    def __init__(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.envelope = envelope
+        self.match_configuration = configuration
         self.claimed = False
         self.fail_complete_once = True
         self.updates: list[str] = []
@@ -44,6 +45,10 @@ class FakeControlClient:
         self.heartbeats.append(message["state"])
         return {"accepted": True}
 
+    def configuration(self, attempt_id: str) -> dict[str, Any]:
+        assert attempt_id == self.envelope["attemptId"]
+        return self.match_configuration
+
     def update_lease(self, message: dict[str, Any]) -> dict[str, Any]:
         action = message["action"]
         self.updates.append(action)
@@ -58,11 +63,15 @@ class RecordingExecutor:
         self.prepared = 0
         self.executions: list[bool] = []
 
-    def prepare(self, envelope: dict[str, Any]) -> None:
+    def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.prepared += 1
 
     def execute(
-        self, envelope: dict[str, Any], *, recovering: bool
+        self,
+        envelope: dict[str, Any],
+        configuration: dict[str, Any],
+        *,
+        recovering: bool,
     ) -> ExecutionOutcome:
         self.executions.append(recovering)
         return ExecutionOutcome()
@@ -71,8 +80,8 @@ class RecordingExecutor:
 def test_runner_recovers_unsent_completion_without_executing_twice(
     tmp_path: Path,
 ) -> None:
-    envelope = load_run_envelope()
-    client = FakeControlClient(envelope)
+    envelope, configuration = execution_fixtures()
+    client = FakeControlClient(envelope, configuration)
     executor = RecordingExecutor()
     state_path = tmp_path / "runner.sqlite3"
     with RunnerStateStore(state_path) as state:
@@ -104,9 +113,34 @@ def create_station(client: FakeControlClient, state: RunnerStateStore) -> Runner
     )
 
 
-def load_run_envelope() -> dict[str, Any]:
-    path = (
+def execution_fixtures() -> tuple[dict[str, Any], dict[str, Any]]:
+    envelope_path = (
         Path(__file__).resolve().parents[2]
         / "contracts/fixtures/valid/run-envelope.json"
     )
-    return json.loads(path.read_text(encoding="utf-8"))
+    configuration_path = (
+        Path(__file__).resolve().parents[2]
+        / "contracts/fixtures/valid/match-configuration-package.json"
+    )
+    envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+    configuration = json.loads(configuration_path.read_text(encoding="utf-8"))
+    envelope.update(
+        {
+            "leagueId": configuration["leagueId"],
+            "matchId": configuration["matchId"],
+            "attemptId": configuration["attemptId"],
+            "attemptNonce": configuration["attemptNonce"],
+            "statProfileRevisionId": configuration["statProfile"]["revisionId"],
+            "rulesetRevisionId": configuration["ruleset"]["revisionId"],
+            "teams": [
+                {
+                    "side": team["side"],
+                    "teamId": team["lineup"]["teamId"],
+                    "rosterRevisionId": team["lineup"]["rosterRevisionId"],
+                    "lineupRevisionId": team["lineup"]["lineupRevisionId"],
+                }
+                for team in configuration["teams"]
+            ],
+        }
+    )
+    return envelope, configuration
