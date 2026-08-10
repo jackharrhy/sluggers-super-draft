@@ -9,7 +9,7 @@
     "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
     "test": "remix test",
-    "test:db": "node --import remix/node-tsx --test app/platform/database/schema.integration.ts",
+    "test:db": "node --import remix/node-tsx --test app/platform/database/schema.integration.ts app/platform/platform.integration.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
