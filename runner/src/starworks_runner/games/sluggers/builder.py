@@ -30,6 +30,7 @@ from starworks_runner.games.sluggers.hashing import (
     sha256_tree,
     write_json,
 )
+from starworks_runner.games.sluggers.patching import PrecompiledPatchSetApplier
 from starworks_runner.games.sluggers.tools import DtkDiscTool
 
 EMPTY_CONTENT_PACK_SHA256 = (
@@ -97,11 +98,13 @@ class GameBuildService:
         *,
         clock: Clock = _utc_now,
         content_compiler: ContentPackCompiler | None = None,
+        trusted_patch_set: PrecompiledPatchSetApplier | None = None,
     ) -> None:
         self.disc_tool = disc_tool
         self.registry = registry
         self.clock = clock
         self.content_compiler = content_compiler or ContentPackCompiler()
+        self.trusted_patch_set = trusted_patch_set
 
     def build(self, request: BuildRequest) -> BuildResult:
         image = request.image_path.expanduser().resolve()
@@ -179,7 +182,13 @@ class GameBuildService:
             game_directory = artifact / "game"
             shutil.copytree(extracted, game_directory, copy_function=shutil.copy2)
 
-            patch_receipts = content_plan.apply(game_directory) if content_plan else []
+            patch_receipts = (
+                self.trusted_patch_set.apply(game_directory)
+                if self.trusted_patch_set
+                else []
+            )
+            if content_plan:
+                patch_receipts.extend(content_plan.apply(game_directory))
 
             outputs = tuple(
                 fingerprint_file(game_directory, path) for path in OUTPUT_PATHS
@@ -303,7 +312,7 @@ class GameBuildService:
     def _warnings(
         content_pack_sha256: str, patch_receipts: list[dict[str, str]]
     ) -> list[dict[str, str]]:
-        if content_pack_sha256 == EMPTY_CONTENT_PACK_SHA256:
+        if content_pack_sha256 == EMPTY_CONTENT_PACK_SHA256 and not patch_receipts:
             return [
                 {
                     "code": "NO_OP_BUILD",

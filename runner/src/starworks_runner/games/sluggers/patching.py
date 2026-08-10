@@ -153,6 +153,58 @@ class PrecompiledPatchPlan:
             "outputSha256": self.expected_output_sha256,
         }
 
+    def apply_to_bytes(self, source: bytes, artifact_root: Path) -> bytes:
+        input_sha256 = hashlib.sha256(source).hexdigest()
+        if input_sha256 != self.expected_input_sha256:
+            raise BuildIntegrityError(
+                f"Patch {self.patch_id} input hash does not match its reviewed base"
+            )
+        artifact = self._read_artifact(artifact_root)
+        output = bytearray(source)
+        for write in self.writes:
+            target_end = write.target_offset + write.size_bytes
+            if target_end > len(output):
+                raise BuildIntegrityError(
+                    f"Patch {self.patch_id} write exceeds the target file"
+                )
+            actual_bytes = bytes(output[write.target_offset : target_end])
+            if actual_bytes != write.expected_bytes:
+                raise BuildIntegrityError(
+                    f"Patch {self.patch_id} expected-byte guard failed at "
+                    f"0x{write.target_offset:X}: expected {write.expected_bytes.hex()}, "
+                    f"got {actual_bytes.hex()}"
+                )
+            artifact_end = write.artifact_offset + write.size_bytes
+            output[write.target_offset : target_end] = artifact[
+                write.artifact_offset : artifact_end
+            ]
+        actual_output_sha256 = hashlib.sha256(output).hexdigest()
+        if actual_output_sha256 != self.expected_output_sha256:
+            raise BuildIntegrityError(
+                f"Patch {self.patch_id} output hash did not match its reviewed result"
+            )
+        return bytes(output)
+
+    def _read_artifact(self, artifact_root: Path) -> bytes:
+        artifact_root_path = artifact_root.resolve()
+        artifact_path = (artifact_root_path / self.artifact_path).resolve()
+        try:
+            artifact_path.relative_to(artifact_root_path)
+        except ValueError as error:
+            raise BuildIntegrityError(
+                "Patch artifact escapes its trusted root"
+            ) from error
+        if not artifact_path.is_file():
+            raise BuildIntegrityError(f"Patch artifact does not exist: {artifact_path}")
+        if (
+            artifact_path.stat().st_size != self.artifact_size_bytes
+            or sha256_file(artifact_path) != self.artifact_sha256
+        ):
+            raise BuildIntegrityError(
+                f"Patch {self.patch_id} artifact hash or size is invalid"
+            )
+        return artifact_path.read_bytes()
+
 
 class PrecompiledPatchApplier:
     """Apply a reviewed artifact to a new file, never to the source in place."""
@@ -178,52 +230,7 @@ class PrecompiledPatchApplier:
             raise BuildIntegrityError(
                 f"Patch destination already exists: {destination_path}"
             )
-        if sha256_file(source_path) != plan.expected_input_sha256:
-            raise BuildIntegrityError(
-                f"Patch {plan.patch_id} input hash does not match its reviewed base"
-            )
-
-        artifact_path = (artifact_root_path / plan.artifact_path).resolve()
-        try:
-            artifact_path.relative_to(artifact_root_path)
-        except ValueError as error:
-            raise BuildIntegrityError(
-                "Patch artifact escapes its trusted root"
-            ) from error
-        if not artifact_path.is_file():
-            raise BuildIntegrityError(f"Patch artifact does not exist: {artifact_path}")
-        if (
-            artifact_path.stat().st_size != plan.artifact_size_bytes
-            or sha256_file(artifact_path) != plan.artifact_sha256
-        ):
-            raise BuildIntegrityError(
-                f"Patch {plan.patch_id} artifact hash or size is invalid"
-            )
-
-        output = bytearray(source_path.read_bytes())
-        artifact = artifact_path.read_bytes()
-        for write in plan.writes:
-            target_end = write.target_offset + write.size_bytes
-            if target_end > len(output):
-                raise BuildIntegrityError(
-                    f"Patch {plan.patch_id} write exceeds the target file"
-                )
-            actual_bytes = bytes(output[write.target_offset : target_end])
-            if actual_bytes != write.expected_bytes:
-                raise BuildIntegrityError(
-                    f"Patch {plan.patch_id} expected-byte guard failed at "
-                    f"0x{write.target_offset:X}: expected {write.expected_bytes.hex()}, "
-                    f"got {actual_bytes.hex()}"
-                )
-            artifact_end = write.artifact_offset + write.size_bytes
-            output[write.target_offset : target_end] = artifact[
-                write.artifact_offset : artifact_end
-            ]
-        actual_output_sha256 = hashlib.sha256(output).hexdigest()
-        if actual_output_sha256 != plan.expected_output_sha256:
-            raise BuildIntegrityError(
-                f"Patch {plan.patch_id} output hash did not match its reviewed result"
-            )
+        output = plan.apply_to_bytes(source_path.read_bytes(), artifact_root_path)
 
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         descriptor, temporary_name = tempfile.mkstemp(
@@ -246,3 +253,72 @@ class PrecompiledPatchApplier:
                 f"Patch {plan.patch_id} promoted output failed final verification"
             )
         return plan.receipt()
+
+
+class PrecompiledPatchSetApplier:
+    """Preflight a trusted patch set completely before changing a fresh build tree."""
+
+    def __init__(self, artifact_root: Path, plans: tuple[PrecompiledPatchPlan, ...]):
+        self.artifact_root = artifact_root
+        self.plans = plans
+
+    def apply(self, game_root: Path) -> list[dict[str, str]]:
+        self._reject_conflicts()
+        root = game_root.resolve()
+        by_path: dict[PurePosixPath, list[PrecompiledPatchPlan]] = {}
+        for plan in self.plans:
+            by_path.setdefault(plan.target_path, []).append(plan)
+        outputs: dict[Path, bytes] = {}
+        receipts: list[dict[str, str]] = []
+        for relative_path, plans in by_path.items():
+            target = (root / relative_path).resolve()
+            try:
+                target.relative_to(root)
+            except ValueError as error:
+                raise BuildIntegrityError(
+                    "Patch target escapes the managed game tree"
+                ) from error
+            if not target.is_file():
+                raise BuildIntegrityError(
+                    f"Patch target does not exist: {relative_path}"
+                )
+            output = target.read_bytes()
+            for plan in plans:
+                output = plan.apply_to_bytes(output, self.artifact_root)
+                receipts.append(plan.receipt())
+            outputs[target] = output
+
+        for target, output in outputs.items():
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{target.name}.", suffix=".patch-set", dir=target.parent
+            )
+            temporary_path = Path(temporary_name)
+            try:
+                with os.fdopen(descriptor, "wb") as file:
+                    file.write(output)
+                    file.flush()
+                    os.fsync(file.fileno())
+                os.replace(temporary_path, target)
+            finally:
+                temporary_path.unlink(missing_ok=True)
+        return receipts
+
+    def _reject_conflicts(self) -> None:
+        writes = sorted(
+            (
+                (
+                    plan.target_path,
+                    write.target_offset,
+                    write.target_offset + write.size_bytes,
+                    plan.patch_id,
+                )
+                for plan in self.plans
+                for write in plan.writes
+            ),
+            key=lambda item: (item[0].as_posix(), item[1], item[3]),
+        )
+        for left, right in pairwise(writes):
+            if left[0] == right[0] and left[2] > right[1]:
+                raise BuildIntegrityError(
+                    f"Trusted patch writes conflict: {left[3]} and {right[3]}"
+                )

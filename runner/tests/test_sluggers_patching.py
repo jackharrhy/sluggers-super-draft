@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
+
 from starworks_runner.games.sluggers.adapter import AdapterManifest
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 from starworks_runner.games.sluggers.patching import (
+    GuardedWrite,
     PrecompiledPatchApplier,
     PrecompiledPatchPlan,
+    PrecompiledPatchSetApplier,
     encode_ppc_branch,
 )
 
@@ -179,3 +182,44 @@ def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> 
     assert manifest.artifacts == ()
     assert manifest.patch_plans == ()
     assert len(manifest.release_gates) == 5
+
+
+def test_patch_set_rejects_cross_plan_conflicts_before_touching_the_tree(
+    tmp_path: Path,
+) -> None:
+    game_root = tmp_path / "game"
+    (game_root / "sys").mkdir(parents=True)
+    target = game_root / "sys/main.dol"
+    original = bytes(32)
+    target.write_bytes(original)
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "first.bin").write_bytes(b"AAAA")
+    (artifacts / "second.bin").write_bytes(b"BBBB")
+    plans = (
+        PrecompiledPatchPlan(
+            patch_id="first",
+            target_path=PurePosixPath("sys/main.dol"),
+            expected_input_sha256=sha256(original),
+            expected_output_sha256="1" * 64,
+            artifact_path=PurePosixPath("first.bin"),
+            artifact_sha256=sha256(b"AAAA"),
+            artifact_size_bytes=4,
+            writes=(GuardedWrite(4, 0, 4, bytes(4)),),
+        ),
+        PrecompiledPatchPlan(
+            patch_id="second",
+            target_path=PurePosixPath("sys/main.dol"),
+            expected_input_sha256=sha256(original),
+            expected_output_sha256="2" * 64,
+            artifact_path=PurePosixPath("second.bin"),
+            artifact_sha256=sha256(b"BBBB"),
+            artifact_size_bytes=4,
+            writes=(GuardedWrite(6, 0, 4, bytes(4)),),
+        ),
+    )
+
+    with pytest.raises(BuildIntegrityError, match="Trusted patch writes conflict"):
+        PrecompiledPatchSetApplier(artifacts, plans).apply(game_root)
+
+    assert target.read_bytes() == original
