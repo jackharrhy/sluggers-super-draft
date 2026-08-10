@@ -118,3 +118,36 @@ def test_configuration_download_is_scoped_to_an_attempt() -> None:
     assert transport.requests[0]["url"].endswith(
         f"/attempts/{configuration['attemptId']}/configuration"
     )
+
+
+def test_telemetry_upload_uses_the_shared_batch_contract() -> None:
+    root = Path(__file__).resolve().parents[2] / "contracts/fixtures/valid"
+    upload = json.loads((root / "telemetry-upload.json").read_text(encoding="utf-8"))
+    transport = FakeTransport()
+    transport.response = HttpResponse(
+        status=200,
+        body=json.dumps(
+            {
+                "schemaVersion": 1,
+                "kind": "telemetry-upload-response",
+                "attemptId": upload["attemptId"],
+                "acceptedSequences": [1],
+                "duplicateSequences": [],
+                "nextExpectedSequence": 2,
+                "maxAcceptedSequence": 1,
+                "requiresReview": False,
+                "issues": [],
+            }
+        ).encode(),
+    )
+    client = RunnerControlClient(
+        "https://starworks.example", "credential", transport=transport
+    )
+
+    response = client.upload_telemetry(upload)
+
+    assert response["acceptedSequences"] == [1]
+    assert transport.requests[0]["body"] == upload
+    assert transport.requests[0]["url"].endswith(
+        f"/attempts/{upload['attemptId']}/telemetry"
+    )

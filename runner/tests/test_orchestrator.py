@@ -23,8 +23,10 @@ class FakeControlClient:
         self.match_configuration = configuration
         self.claimed = False
         self.fail_complete_once = True
+        self.fail_telemetry_once = False
         self.updates: list[str] = []
         self.heartbeats: list[str] = []
+        self.telemetry_sequences: list[int] = []
 
     def register(
         self, station_name: str, capabilities: dict[str, Any]
@@ -57,11 +59,23 @@ class FakeControlClient:
             raise RunnerApiError("temporary outage")
         return {"attemptStatus": "provisional", "expiresAt": None}
 
+    def upload_telemetry(self, message: dict[str, Any]) -> dict[str, Any]:
+        if self.fail_telemetry_once:
+            self.fail_telemetry_once = False
+            raise RunnerApiError("telemetry outage")
+        sequences = [event["sequence"] for event in message["events"]]
+        self.telemetry_sequences.extend(sequences)
+        return {
+            "acceptedSequences": sequences,
+            "duplicateSequences": [],
+        }
+
 
 class RecordingExecutor:
-    def __init__(self) -> None:
+    def __init__(self, telemetry: dict[str, Any] | None = None) -> None:
         self.prepared = 0
         self.executions: list[bool] = []
+        self.telemetry = telemetry
 
     def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.prepared += 1
@@ -72,8 +86,11 @@ class RecordingExecutor:
         configuration: dict[str, Any],
         *,
         recovering: bool,
+        emit_telemetry: Any,
     ) -> ExecutionOutcome:
         self.executions.append(recovering)
+        if self.telemetry:
+            emit_telemetry(self.telemetry)
         return ExecutionOutcome()
 
 
@@ -101,6 +118,35 @@ def test_runner_recovers_unsent_completion_without_executing_twice(
         assert executor.prepared == 1
         assert executor.executions == [False]
         assert client.updates == ["started", "complete", "complete"]
+
+
+def test_runner_spools_telemetry_and_finishes_without_replaying_the_game(
+    tmp_path: Path,
+) -> None:
+    envelope, configuration = execution_fixtures()
+    telemetry = telemetry_fixture(envelope, configuration)
+    client = FakeControlClient(envelope, configuration)
+    client.fail_complete_once = False
+    client.fail_telemetry_once = True
+    executor = RecordingExecutor(telemetry)
+    state_path = tmp_path / "runner.sqlite3"
+    with RunnerStateStore(state_path) as state:
+        state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
+        with pytest.raises(RunnerApiError, match="telemetry outage"):
+            create_station(client, state).run_once(executor)
+        active = state.load_active_run()
+        assert active is not None
+        assert active.pending_outcome == "complete"
+        assert active.last_captured_sequence == 1
+        assert [item.sequence for item in state.list_pending_telemetry(active.envelope["attemptId"])] == [1]
+
+    with RunnerStateStore(state_path) as recovered:
+        result = create_station(client, recovered).run_once(executor)
+        assert result.status == "completed"
+        assert recovered.load_active_run() is None
+        assert recovered.list_pending_telemetry(envelope["attemptId"]) == []
+        assert executor.executions == [False]
+        assert client.telemetry_sequences == [1]
 
 
 def create_station(client: FakeControlClient, state: RunnerStateStore) -> RunnerStation:
@@ -144,3 +190,25 @@ def execution_fixtures() -> tuple[dict[str, Any], dict[str, Any]]:
         }
     )
     return envelope, configuration
+
+
+def telemetry_fixture(
+    envelope: dict[str, Any], configuration: dict[str, Any]
+) -> dict[str, Any]:
+    return {
+        "schemaVersion": 1,
+        "kind": "telemetry-envelope",
+        "protocolVersion": 1,
+        "correlationId": envelope["correlationId"],
+        "leagueId": envelope["leagueId"],
+        "matchId": envelope["matchId"],
+        "attemptId": envelope["attemptId"],
+        "attemptNonce": envelope["attemptNonce"],
+        "sequence": 1,
+        "frame": 120,
+        "eventType": "synthetic",
+        "observationSource": "synthetic",
+        "payload": {"value": 1},
+        "adapterVersion": configuration["adapterVersion"],
+        "gameBuildSha256": envelope["requiredGameBuildSha256"],
+    }

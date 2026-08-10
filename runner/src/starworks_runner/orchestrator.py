@@ -33,6 +33,7 @@ class AttemptExecutor(Protocol):
         configuration: dict[str, Any],
         *,
         recovering: bool,
+        emit_telemetry: Callable[[dict[str, Any]], None],
     ) -> ExecutionOutcome: ...
 
 
@@ -110,7 +111,20 @@ class RunnerStation:
             if active is None or active.configuration is None:
                 raise RuntimeError("Match configuration was not persisted")
 
+        self.flush_pending_telemetry(active, registration.runner_id)
+
         attempt_id = active.envelope["attemptId"]
+        if active.pending_outcome:
+            self._queue_update(active, registration.runner_id, active.pending_outcome)
+            self.flush_pending_updates()
+            return RunOnceResult(
+                status=(
+                    "completed"
+                    if active.pending_outcome == "complete"
+                    else "cancelled"
+                ),
+                attempt_id=attempt_id,
+            )
         recovering = active.stage == "running"
         self.heartbeat("recovering" if active.stage == "running" else "preparing")
         if active.stage != "running":
@@ -136,6 +150,7 @@ class RunnerStation:
                 active.envelope,
                 active.configuration,
                 recovering=recovering,
+                emit_telemetry=self.state.queue_telemetry,
             )
         except AttemptExecutionError as error:
             self._report_failure(active, registration.runner_id, error.failure_kind)
@@ -143,12 +158,45 @@ class RunnerStation:
         except Exception:
             self._report_failure(active, registration.runner_id, "runner-crash")
             raise
+        active = self.state.load_active_run()
+        if active is None:
+            raise RuntimeError("Active attempt disappeared during execution")
+        self.state.mark_execution_outcome(attempt_id, outcome.action)
+        active = self.state.load_active_run()
+        if active is None:
+            raise RuntimeError("Active attempt disappeared after its outcome")
+        self.flush_pending_telemetry(active, registration.runner_id)
         self._queue_update(active, registration.runner_id, outcome.action)
         self.flush_pending_updates()
         return RunOnceResult(
             status="completed" if outcome.action == "complete" else "cancelled",
             attempt_id=attempt_id,
         )
+
+    def flush_pending_telemetry(self, active: ActiveRun, runner_id: str) -> None:
+        while pending := self.state.list_pending_telemetry(
+            active.envelope["attemptId"]
+        ):
+            response = self.client.upload_telemetry(
+                {
+                    "schemaVersion": 1,
+                    "kind": "telemetry-upload-request",
+                    "runnerId": runner_id,
+                    "attemptId": active.envelope["attemptId"],
+                    "leaseId": active.envelope["lease"]["leaseId"],
+                    "events": [item.envelope for item in pending],
+                }
+            )
+            acknowledged = sorted(
+                set(response["acceptedSequences"])
+                | set(response["duplicateSequences"])
+            )
+            expected = [item.sequence for item in pending]
+            if acknowledged != expected:
+                raise RuntimeError("Telemetry server did not acknowledge the full batch")
+            self.state.acknowledge_telemetry(
+                active.envelope["attemptId"], acknowledged
+            )
 
     def _report_failure(
         self,

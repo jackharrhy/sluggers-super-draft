@@ -183,6 +183,7 @@ function createRuntime(
     runnerAdmin,
     runnerControl: {} as AppRuntime['runnerControl'],
     sessionCookie: createCookie('test_session', cookies),
+    telemetry: {} as AppRuntime['telemetry'],
   }
 }
 

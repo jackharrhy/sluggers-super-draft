@@ -6,6 +6,7 @@ import { DraftService, type DraftApplication } from '../draft/service.ts'
 import { LeagueOperationsService, type LeagueOperationsApplication } from '../league-operations/service.ts'
 import { RunnerControlService, type RunnerControlApplication } from '../runner/control-service.ts'
 import { RunnerAdminService, type RunnerAdminApplication } from '../runner/admin-service.ts'
+import { TelemetryService, type TelemetryApplication } from '../telemetry/service.ts'
 import { createDatabase } from './database/connection.ts'
 import { PostgresPlatformRepository } from './database/postgres-repository.ts'
 import {
@@ -26,6 +27,7 @@ export interface AppRuntime {
   runnerControl: RunnerControlApplication
   runnerAdmin: RunnerAdminApplication
   sessionCookie: Cookie
+  telemetry: TelemetryApplication
 }
 
 let runtime: (AppRuntime & { close(): Promise<void> }) | undefined
@@ -62,6 +64,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
       ...cookieOptions,
       maxAge: 30 * 24 * 60 * 60,
     }),
+    telemetry: new TelemetryService(connection.database),
   }
   return runtime
 }

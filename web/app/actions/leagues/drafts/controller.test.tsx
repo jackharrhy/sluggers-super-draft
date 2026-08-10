@@ -239,5 +239,6 @@ function createRuntime(draft: DraftApplication): AppRuntime {
     runnerAdmin: {} as AppRuntime['runnerAdmin'],
     runnerControl: {} as AppRuntime['runnerControl'],
     sessionCookie: createCookie('test_session', cookies),
+    telemetry: {} as AppRuntime['telemetry'],
   }
 }

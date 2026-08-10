@@ -19,6 +19,7 @@ ContractName = Literal[
     "stat-profile-revision",
     "team-lineup-revision",
     "telemetry-envelope",
+    "telemetry-upload",
 ]
 
 CONTRACT_NAMES: tuple[ContractName, ...] = (
@@ -32,6 +33,7 @@ CONTRACT_NAMES: tuple[ContractName, ...] = (
     "stat-profile-revision",
     "team-lineup-revision",
     "telemetry-envelope",
+    "telemetry-upload",
 )
 
 

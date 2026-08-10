@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any
 
 from starworks_runner.execution import BoundMatchExecution, bind_match_execution
@@ -27,6 +28,7 @@ class SyntheticSluggersExecutor:
         configuration: dict[str, Any],
         *,
         recovering: bool,
+        emit_telemetry: Callable[[dict[str, Any]], None],
     ) -> ExecutionOutcome:
         bound = bind_match_execution(envelope, configuration)
         if self.bound is not None and bound != self.bound:
@@ -55,4 +57,23 @@ class SyntheticSluggersExecutor:
         if len(events) != 1 or events[0].sequence != 1:
             raise RuntimeError("Synthetic bridge did not produce the attributed event")
         self.event_count = len(events)
+        emit_telemetry(
+            {
+                "schemaVersion": 1,
+                "kind": "telemetry-envelope",
+                "protocolVersion": 1,
+                "correlationId": envelope["correlationId"],
+                "leagueId": envelope["leagueId"],
+                "matchId": envelope["matchId"],
+                "attemptId": envelope["attemptId"],
+                "attemptNonce": envelope["attemptNonce"],
+                "sequence": events[0].sequence,
+                "frame": events[0].frame,
+                "eventType": "synthetic",
+                "observationSource": "synthetic",
+                "payload": {"value": events[0].payload_value},
+                "adapterVersion": configuration["adapterVersion"],
+                "gameBuildSha256": envelope["requiredGameBuildSha256"],
+            }
+        )
         return ExecutionOutcome(action="complete")

@@ -1,6 +1,6 @@
 import { createController } from 'remix/router'
 
-import { RunnerControl } from '../../middleware/platform.ts'
+import { RunnerControl, Telemetry } from '../../middleware/platform.ts'
 import { RequestLog, type StructuredLogger } from '../../middleware/request-logging.ts'
 import { PlatformError } from '../../platform/errors.ts'
 import { routes } from '../../routes.ts'
@@ -66,6 +66,19 @@ export default createController(routes.runnerApi, {
         }
         bindRunnerIdentifiers(context.get(RequestLog), body)
         return json(await context.get(RunnerControl).updateLease(
+          readBearerCredential(context.request),
+          body,
+        ))
+      })
+    },
+    async telemetry(context) {
+      return handle(async () => {
+        let body = await readJson(context.request)
+        if (!isRecord(body) || body.attemptId !== context.params.attemptId) {
+          throw new PlatformError('Telemetry URL and message do not match', 'invalid_input')
+        }
+        bindRunnerIdentifiers(context.get(RequestLog), body)
+        return json(await context.get(Telemetry).ingest(
           readBearerCredential(context.request),
           body,
         ))
