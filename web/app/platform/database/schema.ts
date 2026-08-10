@@ -2,6 +2,7 @@ import {
   boolean,
   foreignKey,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -12,6 +13,11 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import type {
+  RulesetRevision,
+  StatProfileRevision,
+  TeamLineupRevision,
+} from '@starworks/contracts'
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -28,6 +34,7 @@ export const leagueRole = pgEnum('league_role', [
 ])
 export const seasonStatus = pgEnum('season_status', ['draft', 'active', 'complete', 'archived'])
 export const inviteStatus = pgEnum('invite_status', ['pending', 'redeemed', 'revoked', 'expired'])
+export const revisionStatus = pgEnum('revision_status', ['draft', 'published'])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -380,5 +387,234 @@ export const importReferences = pgTable(
       table.targetEntityType,
       table.targetEntityId,
     ),
+  ],
+)
+
+export const statProfiles = pgTable(
+  'stat_profiles',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique('stat_profiles_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('stat_profiles_league_id_slug_unique').on(table.leagueId, table.slug),
+  ],
+)
+
+export const statProfileRevisions = pgTable(
+  'stat_profile_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    profileId: uuid('profile_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    status: revisionStatus('status').notNull().default('draft'),
+    name: text('name').notNull(),
+    definitions: jsonb('definitions')
+      .$type<StatProfileRevision['definitions']>()
+      .notNull(),
+    characterValues: jsonb('character_values')
+      .$type<StatProfileRevision['characterValues']>()
+      .notNull(),
+    basedOnRevisionId: uuid('based_on_revision_id'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('stat_profile_revisions_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('stat_profile_revisions_profile_number_unique').on(
+      table.leagueId,
+      table.profileId,
+      table.revisionNumber,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.profileId],
+      foreignColumns: [statProfiles.leagueId, statProfiles.id],
+      name: 'stat_profile_revisions_profile_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.basedOnRevisionId],
+      foreignColumns: [table.leagueId, table.id],
+      name: 'stat_profile_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const rulesets = pgTable(
+  'rulesets',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique('rulesets_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('rulesets_league_id_slug_unique').on(table.leagueId, table.slug),
+  ],
+)
+
+export const rulesetRevisions = pgTable(
+  'ruleset_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    rulesetId: uuid('ruleset_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    status: revisionStatus('status').notNull().default('draft'),
+    name: text('name').notNull(),
+    settings: jsonb('settings').$type<RulesetRevision['settings']>().notNull(),
+    basedOnRevisionId: uuid('based_on_revision_id'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('ruleset_revisions_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('ruleset_revisions_ruleset_number_unique').on(
+      table.leagueId,
+      table.rulesetId,
+      table.revisionNumber,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.rulesetId],
+      foreignColumns: [rulesets.leagueId, rulesets.id],
+      name: 'ruleset_revisions_ruleset_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.basedOnRevisionId],
+      foreignColumns: [table.leagueId, table.id],
+      name: 'ruleset_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const rosterRevisions = pgTable(
+  'roster_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    teamId: uuid('team_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    status: revisionStatus('status').notNull().default('draft'),
+    rosterCharacterIds: jsonb('roster_character_ids').$type<string[]>().notNull(),
+    basedOnRevisionId: uuid('based_on_revision_id'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('roster_revisions_league_team_id_unique').on(
+      table.leagueId,
+      table.teamId,
+      table.id,
+    ),
+    uniqueIndex('roster_revisions_team_number_unique').on(
+      table.leagueId,
+      table.teamId,
+      table.revisionNumber,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'roster_revisions_team_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.teamId, table.basedOnRevisionId],
+      foreignColumns: [table.leagueId, table.teamId, table.id],
+      name: 'roster_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const lineupRevisions = pgTable(
+  'lineup_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    teamId: uuid('team_id').notNull(),
+    rosterRevisionId: uuid('roster_revision_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    status: revisionStatus('status').notNull().default('draft'),
+    lineup: jsonb('lineup').$type<TeamLineupRevision['lineup']>().notNull(),
+    basedOnRevisionId: uuid('based_on_revision_id'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('lineup_revisions_league_team_id_unique').on(
+      table.leagueId,
+      table.teamId,
+      table.id,
+    ),
+    uniqueIndex('lineup_revisions_team_number_unique').on(
+      table.leagueId,
+      table.teamId,
+      table.revisionNumber,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'lineup_revisions_team_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.teamId, table.rosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.teamId, rosterRevisions.id],
+      name: 'lineup_revisions_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.teamId, table.basedOnRevisionId],
+      foreignColumns: [table.leagueId, table.teamId, table.id],
+      name: 'lineup_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const matchLineupOverrides = pgTable(
+  'match_lineup_overrides',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchId: uuid('match_id').notNull(),
+    teamId: uuid('team_id').notNull(),
+    baseLineupRevisionId: uuid('base_lineup_revision_id').notNull(),
+    effectiveLineup: jsonb('effective_lineup')
+      .$type<TeamLineupRevision['lineup']>()
+      .notNull(),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('match_lineup_overrides_match_team_unique').on(
+      table.leagueId,
+      table.matchId,
+      table.teamId,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.teamId, table.baseLineupRevisionId],
+      foreignColumns: [lineupRevisions.leagueId, lineupRevisions.teamId, lineupRevisions.id],
+      name: 'match_lineup_overrides_lineup_fk',
+    }),
   ],
 )

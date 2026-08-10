@@ -6,7 +6,7 @@ import {
   TimestampSchema,
   UuidSchema,
   VersionSchema,
-} from "./common";
+} from "./common.ts";
 
 const CharacterStatAssignmentSchema = z.strictObject({
   assignmentType: z.literal("character-stats"),

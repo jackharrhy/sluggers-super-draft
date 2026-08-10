@@ -3,7 +3,6 @@
 .git
 .github
 .env
-contracts
 deploy
 docs
 legacy

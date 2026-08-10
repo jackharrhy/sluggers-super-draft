@@ -4,8 +4,8 @@ import {
   TimestampSchema,
   UuidSchema,
   VersionSchema,
-} from "./common";
-import { FieldingPositionSchema } from "./team-lineup-revision";
+} from "./common.ts";
+import { FieldingPositionSchema } from "./team-lineup-revision.ts";
 
 const SetCharacterStatOperationSchema = z.strictObject({
   operation: z.literal("set-character-stat"),

@@ -5,7 +5,7 @@ import {
   Sha256Schema,
   TimestampSchema,
   UuidSchema,
-} from "./common";
+} from "./common.ts";
 
 const TeamSelectionSchema = z.strictObject({
   teamId: UuidSchema,

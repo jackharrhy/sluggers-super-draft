@@ -3,8 +3,8 @@ import {
   JsonScalarSchema,
   TimestampSchema,
   UuidSchema,
-} from "./common";
-import { StatKeySchema } from "./stat-profile-revision";
+} from "./common.ts";
+import { StatKeySchema } from "./stat-profile-revision.ts";
 
 export const RuleSettingSchema = z.strictObject({
   key: StatKeySchema,

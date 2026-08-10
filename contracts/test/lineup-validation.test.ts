@@ -6,7 +6,7 @@ import {
   TeamLineupRevisionSchema,
   validateTeamLineupRevision,
   type LineupIssueCode,
-} from "../src/team-lineup-revision";
+} from "../src/team-lineup-revision.ts";
 
 interface FixtureCase {
   name: string;

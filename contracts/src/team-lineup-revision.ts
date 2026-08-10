@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TimestampSchema, UuidSchema } from "./common";
+import { TimestampSchema, UuidSchema } from "./common.ts";
 
 export const FieldingPositionSchema = z.enum([
   "P",

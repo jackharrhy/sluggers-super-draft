@@ -94,4 +94,60 @@ test(
   },
 )
 
+test(
+  'published configuration revisions are immutable in PostgreSQL',
+  { skip: databaseUrl ? false : 'STARWORKS_TEST_DATABASE_URL is not set' },
+  async () => {
+    let sql = postgres(databaseUrl!, { max: 1, onnotice: () => {} })
+    let personId = randomUUID()
+    let leagueId = randomUUID()
+    let profileId = randomUUID()
+    let revisionId = randomUUID()
+
+    try {
+      await sql.begin(async (transaction) => {
+        await transaction`insert into people (id, display_name) values (${personId}, 'Publisher')`
+        await transaction`
+          insert into leagues (id, slug, name, created_by_person_id)
+          values (${leagueId}, ${`immutable-${leagueId}`}, 'Immutable League', ${personId})
+        `
+        await transaction`
+          insert into stat_profiles (id, league_id, slug, name)
+          values (${profileId}, ${leagueId}, 'competitive', 'Competitive')
+        `
+        await transaction`
+          insert into stat_profile_revisions (
+            id, league_id, profile_id, revision_number, name, definitions,
+            character_values, created_by_person_id
+          ) values (
+            ${revisionId}, ${leagueId}, ${profileId}, 1, 'Revision One', '[]'::jsonb,
+            '[]'::jsonb, ${personId}
+          )
+        `
+        await transaction`
+          update stat_profile_revisions
+          set status = 'published', published_at = now()
+          where id = ${revisionId}
+        `
+
+        await assert.rejects(
+          transaction`
+            update stat_profile_revisions
+            set name = 'Mutated in place'
+            where id = ${revisionId}
+          `,
+          (error: unknown) =>
+            error instanceof postgres.PostgresError &&
+            error.message.includes('published revisions are immutable'),
+        )
+        throw new RollbackFixture()
+      })
+    } catch (error) {
+      if (!(error instanceof RollbackFixture)) throw error
+    } finally {
+      await sql.end()
+    }
+  },
+)
+
 class RollbackFixture extends Error {}

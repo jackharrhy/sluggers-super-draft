@@ -1,20 +1,21 @@
-export * from "./adapter-operation-bundle";
-export * from "./common";
-export * from "./content-pack-manifest";
-export * from "./game-build-manifest";
-export * from "./run-envelope";
-export * from "./ruleset-revision";
-export * from "./stat-profile-revision";
-export * from "./team-lineup-revision";
-export * from "./telemetry-envelope";
+export * from "./adapter-operation-bundle.ts";
+export * from "./common.ts";
+export * from "./content-pack-manifest.ts";
+export * from "./game-build-manifest.ts";
+export * from "./run-envelope.ts";
+export * from "./ruleset-revision.ts";
+export * from "./stat-profile-revision.ts";
+export * from "./team-lineup-revision.ts";
+export * from "./telemetry-envelope.ts";
 
-import { ContentPackManifestSchema } from "./content-pack-manifest";
-import { GameBuildManifestSchema } from "./game-build-manifest";
-import { RunEnvelopeSchema } from "./run-envelope";
-import { RulesetRevisionSchema } from "./ruleset-revision";
-import { StatProfileRevisionSchema } from "./stat-profile-revision";
-import { TeamLineupRevisionSchema } from "./team-lineup-revision";
-import { TelemetryEnvelopeSchema } from "./telemetry-envelope";
+import { AdapterOperationBundleSchema } from "./adapter-operation-bundle.ts";
+import { ContentPackManifestSchema } from "./content-pack-manifest.ts";
+import { GameBuildManifestSchema } from "./game-build-manifest.ts";
+import { RunEnvelopeSchema } from "./run-envelope.ts";
+import { RulesetRevisionSchema } from "./ruleset-revision.ts";
+import { StatProfileRevisionSchema } from "./stat-profile-revision.ts";
+import { TeamLineupRevisionSchema } from "./team-lineup-revision.ts";
+import { TelemetryEnvelopeSchema } from "./telemetry-envelope.ts";
 
 export const contractSchemas = {
   "adapter-operation-bundle": AdapterOperationBundleSchema,
@@ -28,4 +29,3 @@ export const contractSchemas = {
 } as const;
 
 export type ContractName = keyof typeof contractSchemas;
-import { AdapterOperationBundleSchema } from "./adapter-operation-bundle";

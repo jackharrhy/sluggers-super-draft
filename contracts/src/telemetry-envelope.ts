@@ -5,7 +5,7 @@ import {
   Sha256Schema,
   UuidSchema,
   VersionSchema,
-} from "./common";
+} from "./common.ts";
 
 export const TelemetryEventTypeSchema = z.enum([
   "synthetic",
