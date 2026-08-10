@@ -9,16 +9,24 @@ from typing import Any, Literal, cast
 from jsonschema import Draft202012Validator, FormatChecker
 
 ContractName = Literal[
+    "adapter-operation-bundle",
     "content-pack-manifest",
     "game-build-manifest",
     "run-envelope",
+    "ruleset-revision",
+    "stat-profile-revision",
+    "team-lineup-revision",
     "telemetry-envelope",
 ]
 
 CONTRACT_NAMES: tuple[ContractName, ...] = (
+    "adapter-operation-bundle",
     "content-pack-manifest",
     "game-build-manifest",
     "run-envelope",
+    "ruleset-revision",
+    "stat-profile-revision",
+    "team-lineup-revision",
     "telemetry-envelope",
 )
 

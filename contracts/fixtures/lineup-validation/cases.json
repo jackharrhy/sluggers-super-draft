@@ -1,0 +1,82 @@
+{
+  "cases": [
+    {
+      "name": "legal lineup with one bench player",
+      "rosterCharacterIds": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+      "lineup": {
+        "captainCharacterId": "a",
+        "pitcherCharacterId": "b",
+        "battingOrder": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+        "bench": ["j"],
+        "fielding": [
+          { "position": "P", "characterId": "b" },
+          { "position": "C", "characterId": "a" },
+          { "position": "1B", "characterId": "c" },
+          { "position": "2B", "characterId": "d" },
+          { "position": "3B", "characterId": "e" },
+          { "position": "SS", "characterId": "f" },
+          { "position": "LF", "characterId": "g" },
+          { "position": "CF", "characterId": "h" },
+          { "position": "RF", "characterId": "i" }
+        ]
+      },
+      "expectedIssues": []
+    },
+    {
+      "name": "missing active players and invalid bench and fielding assignments",
+      "rosterCharacterIds": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+      "lineup": {
+        "captainCharacterId": "j",
+        "pitcherCharacterId": "i",
+        "battingOrder": ["a", "b", "c", "d", "e", "f", "g", "h"],
+        "bench": ["h", "k"],
+        "fielding": [
+          { "position": "P", "characterId": "a" },
+          { "position": "C", "characterId": "b" },
+          { "position": "1B", "characterId": "c" },
+          { "position": "2B", "characterId": "d" },
+          { "position": "3B", "characterId": "e" },
+          { "position": "SS", "characterId": "f" },
+          { "position": "LF", "characterId": "g" },
+          { "position": "CF", "characterId": "k" }
+        ]
+      },
+      "expectedIssues": [
+        "batting-order-must-have-nine",
+        "bench-character-not-on-roster",
+        "active-bench-overlap",
+        "roster-partition-incomplete",
+        "captain-not-active",
+        "pitcher-not-active",
+        "fielding-positions-incomplete",
+        "fielding-character-not-active",
+        "pitcher-position-mismatch"
+      ]
+    },
+    {
+      "name": "duplicate roster and fielding characters",
+      "rosterCharacterIds": ["a", "a", "b", "c", "d", "e", "f", "g", "h", "i"],
+      "lineup": {
+        "captainCharacterId": "a",
+        "pitcherCharacterId": "b",
+        "battingOrder": ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+        "bench": [],
+        "fielding": [
+          { "position": "P", "characterId": "b" },
+          { "position": "C", "characterId": "a" },
+          { "position": "1B", "characterId": "a" },
+          { "position": "2B", "characterId": "c" },
+          { "position": "3B", "characterId": "d" },
+          { "position": "SS", "characterId": "e" },
+          { "position": "LF", "characterId": "f" },
+          { "position": "CF", "characterId": "g" },
+          { "position": "RF", "characterId": "h" }
+        ]
+      },
+      "expectedIssues": [
+        "duplicate-roster-character",
+        "duplicate-fielding-character"
+      ]
+    }
+  ]
+}

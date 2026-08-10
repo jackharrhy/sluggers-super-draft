@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "kind": "team-lineup-revision",
+  "leagueId": "11111111-1111-4111-8111-111111111111",
+  "teamId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+  "rosterRevisionId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+  "rosterRevisionNumber": 4,
+  "lineupRevisionId": "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  "lineupRevisionNumber": 7,
+  "status": "published",
+  "rosterCharacterIds": [
+    "mario",
+    "luigi",
+    "peach",
+    "daisy",
+    "yoshi",
+    "birdo",
+    "toad",
+    "toadette",
+    "bowser",
+    "wario"
+  ],
+  "lineup": {
+    "captainCharacterId": "mario",
+    "pitcherCharacterId": "luigi",
+    "battingOrder": [
+      "mario",
+      "luigi",
+      "peach",
+      "daisy",
+      "yoshi",
+      "birdo",
+      "toad",
+      "toadette",
+      "bowser"
+    ],
+    "bench": ["wario"],
+    "fielding": [
+      { "position": "P", "characterId": "luigi" },
+      { "position": "C", "characterId": "mario" },
+      { "position": "1B", "characterId": "peach" },
+      { "position": "2B", "characterId": "daisy" },
+      { "position": "3B", "characterId": "yoshi" },
+      { "position": "SS", "characterId": "birdo" },
+      { "position": "LF", "characterId": "toad" },
+      { "position": "CF", "characterId": "toadette" },
+      { "position": "RF", "characterId": "bowser" }
+    ]
+  },
+  "basedOnLineupRevisionId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  "createdAt": "2026-08-10T12:00:00Z",
+  "publishedAt": "2026-08-10T13:00:00Z"
+}
