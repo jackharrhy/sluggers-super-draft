@@ -18,10 +18,16 @@ See the [architecture and product plan](PLAN.md), the [phased delivery plan](doc
 
 ## Setting up
 
-Install the Remix application:
+Install the JavaScript packages:
 
 ```shell
-npm install --prefix web
+npm run setup
+```
+
+Create the Python runner environment:
+
+```shell
+uv sync --project runner --group test
 ```
 
 Start local infrastructure:

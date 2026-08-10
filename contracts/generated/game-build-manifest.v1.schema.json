@@ -1,0 +1,177 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "kind": {
+      "type": "string",
+      "const": "game-build-manifest"
+    },
+    "baseGame": {
+      "type": "object",
+      "properties": {
+        "gameId": {
+          "type": "string",
+          "const": "RMBE01"
+        },
+        "region": {
+          "type": "string",
+          "const": "NTSC-U"
+        },
+        "revision": {
+          "type": "number",
+          "const": 0
+        },
+        "mainDolSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "dataArchiveSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "fstSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      },
+      "required": [
+        "gameId",
+        "region",
+        "revision",
+        "mainDolSha256",
+        "dataArchiveSha256",
+        "fstSha256"
+      ],
+      "additionalProperties": false
+    },
+    "adapterVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "compilerVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+    },
+    "contentPackSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "buildSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "outputs": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!\\/)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "sizeBytes": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "sizeBytes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "patchReceipts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "patchId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 127
+          },
+          "targetPath": {
+            "type": "string",
+            "pattern": "^(?!\\/)(?!.*(?:^|\\/)\\.\\.(?:\\/|$))[A-Za-z0-9_.-]+(?:\\/[A-Za-z0-9_.-]+)*$"
+          },
+          "expectedInputSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "outputSha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "patchId",
+          "targetPath",
+          "expectedInputSha256",
+          "outputSha256"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "compatible": {
+      "type": "boolean"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 127
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "kind",
+    "baseGame",
+    "adapterVersion",
+    "compilerVersion",
+    "contentPackSha256",
+    "buildSha256",
+    "outputs",
+    "patchReceipts",
+    "compatible",
+    "warnings",
+    "createdAt"
+  ],
+  "additionalProperties": false,
+  "title": "GameBuildManifest v1",
+  "description": "A deterministic local build receipt containing hashes but no game data.",
+  "$id": "https://starworks.community/contracts/game-build-manifest/v1.schema.json"
+}

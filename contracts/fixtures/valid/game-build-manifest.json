@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "kind": "game-build-manifest",
+  "baseGame": {
+    "gameId": "RMBE01",
+    "region": "NTSC-U",
+    "revision": 0,
+    "mainDolSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "dataArchiveSha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "fstSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "adapterVersion": "0.1.0",
+  "compilerVersion": "0.1.0",
+  "contentPackSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "buildSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "outputs": [
+    {
+      "path": "sys/main.dol",
+      "sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "sizeBytes": 7340032
+    }
+  ],
+  "patchReceipts": [
+    {
+      "patchId": "starworks-bridge-v1",
+      "targetPath": "sys/main.dol",
+      "expectedInputSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "outputSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+    }
+  ],
+  "compatible": true,
+  "warnings": [],
+  "createdAt": "2026-08-10T12:05:00Z"
+}

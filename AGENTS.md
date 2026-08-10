@@ -23,6 +23,9 @@ see `PRIOR_ART.md` before adapting an implementation.
 Run the narrowest test while developing, then the root checks before a commit:
 
 ```shell
+npm run contracts:check
 npm run typecheck
 npm test
 ```
+
+Runner tests use `uv run --project runner --group test pytest runner/tests`.

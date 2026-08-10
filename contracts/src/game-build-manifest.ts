@@ -1,0 +1,55 @@
+import { z } from "zod";
+import {
+  RelativeBuildPathSchema,
+  Sha256Schema,
+  TimestampSchema,
+  VersionSchema,
+} from "./common";
+
+const FingerprintedFileSchema = z.strictObject({
+  path: RelativeBuildPathSchema,
+  sha256: Sha256Schema,
+  sizeBytes: z.number().int().nonnegative(),
+});
+
+const PatchReceiptSchema = z.strictObject({
+  patchId: z.string().min(1).max(127),
+  targetPath: RelativeBuildPathSchema,
+  expectedInputSha256: Sha256Schema,
+  outputSha256: Sha256Schema,
+});
+
+export const GameBuildManifestSchema = z
+  .strictObject({
+    schemaVersion: z.literal(1),
+    kind: z.literal("game-build-manifest"),
+    baseGame: z.strictObject({
+      gameId: z.literal("RMBE01"),
+      region: z.literal("NTSC-U"),
+      revision: z.literal(0),
+      mainDolSha256: Sha256Schema,
+      dataArchiveSha256: Sha256Schema,
+      fstSha256: Sha256Schema,
+    }),
+    adapterVersion: VersionSchema,
+    compilerVersion: VersionSchema,
+    contentPackSha256: Sha256Schema,
+    buildSha256: Sha256Schema,
+    outputs: z.array(FingerprintedFileSchema).min(1),
+    patchReceipts: z.array(PatchReceiptSchema),
+    compatible: z.boolean(),
+    warnings: z.array(
+      z.strictObject({
+        code: z.string().min(1).max(127),
+        message: z.string().min(1).max(1_024),
+      }),
+    ),
+    createdAt: TimestampSchema,
+  })
+  .meta({
+    title: "GameBuildManifest v1",
+    description:
+      "A deterministic local build receipt containing hashes but no game data.",
+  });
+
+export type GameBuildManifest = z.infer<typeof GameBuildManifestSchema>;
