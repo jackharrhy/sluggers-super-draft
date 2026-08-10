@@ -143,6 +143,24 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
             {!dashboard.stations.length ? <p mix={emptyStyle}>No station has enrolled with an issued credential.</p> : null}
           </div>
         </section>
+
+        <section aria-labelledby="audit-heading" mix={sectionStyle}>
+          <div mix={sectionHeadingStyle}>
+            <div><p mix={eyebrowStyle}>Append-only record</p><h2 id="audit-heading">Audit history</h2></div>
+            <span mix={countStyle}>Latest {dashboard.audit.length}</span>
+          </div>
+          <ol mix={auditListStyle}>
+            {dashboard.audit.map((record) => <li mix={cardStyle}>
+              <div mix={matchHeaderStyle}>
+                <div><strong>{record.action}</strong><p mix={mutedStyle}>{record.actorDisplayName ?? 'System'} · {record.occurredAt.toLocaleString()}</p></div>
+                <code>{record.targetType}</code>
+              </div>
+              <p mix={mutedStyle}>Target <code>{record.targetId}</code></p>
+              {Object.keys(record.metadata).length ? <pre mix={codeStyle}>{JSON.stringify(record.metadata, null, 2)}</pre> : null}
+            </li>)}
+            {!dashboard.audit.length ? <li mix={emptyStyle}>No audited changes have been recorded.</li> : null}
+          </ol>
+        </section>
         </> : null}
       </AppShell>
     )
@@ -335,6 +353,7 @@ const queueFormStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 
 const wideStyle = css({ gridColumn: '1 / -1' })
 const stationGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' })
 const healthListStyle = css({ display: 'grid', gap: '7px', listStyle: 'none', margin: '12px 0 0', padding: 0, '& li': { alignItems: 'center', background: '#0c1220', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', padding: '7px 9px' }, '& span': { color: '#9faec8', textTransform: 'capitalize' }, '& strong': { color: '#8ee0bd', fontSize: '11px', textTransform: 'uppercase' } })
+const auditListStyle = css({ display: 'grid', gap: '12px', listStyle: 'none', margin: 0, padding: 0, '& li': { display: 'grid', gap: '8px' }, '& p': { margin: 0 } })
 const dangerStyle = css({ background: '#7d2433', border: '1px solid #c44d61', borderRadius: '9px', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 800, marginTop: '12px', padding: '9px 12px' })
 const emptyStyle = css({ border: '1px dashed #445171', borderRadius: '14px', color: '#9faec8', padding: '22px' })
 const rosterGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' })

@@ -295,7 +295,7 @@ async function loadDashboards(
 }
 
 function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
-  return { matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
+  return { audit: [], matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
 }
 
 function operationsError(context: { render(node: RemixNode, init?: ResponseInit): Response }, error: unknown) {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 
-import { and, eq, max } from 'drizzle-orm'
+import { and, desc, eq, max } from 'drizzle-orm'
 import { z } from 'zod'
 
 import { Sha256Schema, TeamLineupRevisionSchema } from '@starworks/contracts'
@@ -13,6 +13,7 @@ import {
   lineupRevisions,
   matches,
   matchAttempts,
+  people,
   rosterRevisions,
   rulesetRevisions,
   runnerCredentials,
@@ -49,6 +50,14 @@ export interface RunnerAdminServiceOptions {
 }
 
 export interface RunnerOperationsDashboard {
+  audit: Array<{
+    action: string
+    actorDisplayName: string | null
+    metadata: Record<string, unknown>
+    occurredAt: Date
+    targetId: string
+    targetType: string
+  }>
   seasons: Array<{
     id: string
     name: string
@@ -107,7 +116,7 @@ export class RunnerAdminService {
     leagueId: string,
   ): Promise<RunnerOperationsDashboard> {
     this.#requireAdmin(identity, leagueId)
-    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, matchRows, attemptRows, stationRows] = await Promise.all([
+    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, matchRows, attemptRows, stationRows, auditRows] = await Promise.all([
       this.database.select({ id: seasons.id, name: seasons.name }).from(seasons).where(eq(seasons.leagueId, leagueId)),
       this.database.select({ id: leagueTeams.id, name: leagueTeams.name, seasonId: leagueTeams.seasonId }).from(leagueTeams).where(eq(leagueTeams.leagueId, leagueId)),
       this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))),
@@ -116,9 +125,24 @@ export class RunnerAdminService {
       this.database.select().from(matches).where(eq(matches.leagueId, leagueId)),
       this.database.select({ attemptNumber: matchAttempts.attemptNumber, failureKind: matchAttempts.failureKind, id: matchAttempts.id, matchId: matchAttempts.matchId, status: matchAttempts.status }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
       this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
+      this.database
+        .select({
+          action: auditRecords.action,
+          actorDisplayName: people.displayName,
+          metadata: auditRecords.metadata,
+          occurredAt: auditRecords.occurredAt,
+          targetId: auditRecords.targetId,
+          targetType: auditRecords.targetType,
+        })
+        .from(auditRecords)
+        .leftJoin(people, eq(people.id, auditRecords.actorPersonId))
+        .where(eq(auditRecords.leagueId, leagueId))
+        .orderBy(desc(auditRecords.occurredAt), desc(auditRecords.id))
+        .limit(100),
     ])
     let teamNames = new Map(teamRows.map((team) => [team.id, team.name]))
     return {
+      audit: auditRows,
       seasons: seasonRows.map((season) => ({
         ...season,
         teams: teamRows.filter((team) => team.seasonId === season.id).map((team) => ({
