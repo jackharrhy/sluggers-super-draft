@@ -12,6 +12,7 @@ import type { AppRuntime } from '../../../platform/runtime.ts'
 import { PlatformService } from '../../../platform/service.ts'
 import { createAppRouter } from '../../../router.ts'
 import type { RunnerAdminApplication, RunnerOperationsDashboard } from '../../../runner/admin-service.ts'
+import type { TelemetryApplication } from '../../../telemetry/service.ts'
 import { routes } from '../../../routes.ts'
 
 const identity: SessionIdentity = {
@@ -62,6 +63,7 @@ describe('league operations controller', () => {
     assert.match(html, /Shell League operations/)
     assert.match(html, /Schedule a match/)
     assert.match(html, /Enroll a runner station/)
+    assert.match(html, /Game telemetry/)
   })
 
   it('parses a scheduled match form through Remix FormData middleware', async () => {
@@ -137,6 +139,34 @@ describe('league operations controller', () => {
       leagueId: league.id,
     })
   })
+
+  it('parses an audited telemetry correction form', async () => {
+    let received: unknown
+    let telemetry = createTelemetry({
+      async correct(_identity, leagueId, attemptId, input) {
+        received = { attemptId, input, leagueId }
+        throw new Error('stop after parse')
+      },
+    })
+    let runtime = createRuntime(createRunnerAdmin(), createLeagueOperations(), telemetry)
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+      new Request('http://localhost' + routes.leagues.operations.correctTelemetry.href({ leagueSlug: league.slug, attemptId: '33333333-3333-4333-8333-333333333333' }), {
+        body: new URLSearchParams({
+          afterValue: '3', beforeValue: '2', entityId: 'away-team', entityType: 'team',
+          reason: 'Official scorer ruling', statPath: 'hits',
+        }),
+        headers: { cookie: session, origin: 'http://localhost' },
+        method: 'POST',
+      }),
+    )
+    assert.equal(response.status, 400)
+    assert.deepEqual(received, {
+      attemptId: '33333333-3333-4333-8333-333333333333',
+      input: { afterValue: 3, beforeValue: 2, entityId: 'away-team', entityType: 'team', reason: 'Official scorer ruling', statPath: 'hits' },
+      leagueId: league.id,
+    })
+  })
 })
 
 function createRunnerAdmin(overrides: Partial<RunnerAdminApplication> = {}): RunnerAdminApplication {
@@ -152,6 +182,7 @@ function createRunnerAdmin(overrides: Partial<RunnerAdminApplication> = {}): Run
 function createRuntime(
   runnerAdmin: RunnerAdminApplication,
   leagueOperations = createLeagueOperations(),
+  telemetry = createTelemetry(),
 ): AppRuntime {
   let repository: PlatformRepository = {
     async bootstrapSiteAdmin() { return identity },
@@ -183,7 +214,19 @@ function createRuntime(
     runnerAdmin,
     runnerControl: {} as AppRuntime['runnerControl'],
     sessionCookie: createCookie('test_session', cookies),
-    telemetry: {} as AppRuntime['telemetry'],
+    telemetry,
+  }
+}
+
+function createTelemetry(overrides: Partial<TelemetryApplication> = {}): TelemetryApplication {
+  return {
+    async confirm() {},
+    async correct() { throw new Error('Unexpected correction') },
+    async dashboard() { return [] },
+    async derive() { throw new Error('Unexpected derivation') },
+    async ingest() { throw new Error('Unexpected telemetry upload') },
+    async rebuildSeason() { return { playerTotals: {}, standings: [] } },
+    ...overrides,
   }
 }
 

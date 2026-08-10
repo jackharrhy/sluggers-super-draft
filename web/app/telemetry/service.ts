@@ -59,6 +59,7 @@ export interface TelemetryAttemptSummary {
   attemptNumber: number
   attemptStatus: string
   matchId: string
+  seasonId: string
   matchStatus: string
   homeTeamId: string
   homeTeamName: string
@@ -254,6 +255,7 @@ export class TelemetryService implements TelemetryApplication {
         homeTeamName: teamNames.get(match.homeTeamId) ?? 'Unknown team',
         matchId: match.id,
         matchStatus: match.status,
+        seasonId: match.seasonId,
       }
     })
   }

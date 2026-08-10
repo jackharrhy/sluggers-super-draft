@@ -2,12 +2,13 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 import type { RemixNode } from 'remix/ui'
 
-import { Identity, LeagueOperations, Platform, RunnerAdmin } from '../../../middleware/platform.ts'
+import { Identity, LeagueOperations, Platform, RunnerAdmin, Telemetry } from '../../../middleware/platform.ts'
 import type { LeagueOperationsApplication } from '../../../league-operations/service.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
 import { administrativeRoles } from '../../../platform/repository.ts'
 import type { RunnerAdminApplication } from '../../../runner/admin-service.ts'
+import type { TelemetryApplication } from '../../../telemetry/service.ts'
 import { routes } from '../../../routes.ts'
 import { LeagueOperationsPage } from '../../../ui/league-operations-page.tsx'
 import { MessagePage } from '../../../ui/message-page.tsx'
@@ -25,6 +26,7 @@ export default createController(routes.leagues.operations, {
           league,
           context.get(RunnerAdmin),
           context.get(LeagueOperations),
+          context.get(Telemetry),
         )
         return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} />)
       } catch (error) {
@@ -152,6 +154,7 @@ export default createController(routes.leagues.operations, {
           league,
           context.get(RunnerAdmin),
           context.get(LeagueOperations),
+          context.get(Telemetry),
         )
         return context.render(
           <LeagueOperationsPage {...dashboards} identity={identity!} league={league} oneTimeCredential={issued.credential} />,
@@ -172,6 +175,56 @@ export default createController(routes.leagues.operations, {
         return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
+    async deriveTelemetry(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        await context.get(Telemetry).derive(identity, league.id, context.params.attemptId)
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async correctTelemetry(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        let beforeValue = Number(readString(data, 'beforeValue'))
+        let afterValue = Number(readString(data, 'afterValue'))
+        if (!Number.isInteger(beforeValue) || !Number.isInteger(afterValue)) {
+          throw new PlatformError('Correction values must be whole numbers', 'invalid_input')
+        }
+        let entityType = readString(data, 'entityType')
+        if (entityType !== 'team' && entityType !== 'character') {
+          throw new PlatformError('Correction entity type is invalid', 'invalid_input')
+        }
+        await context.get(Telemetry).correct(identity, league.id, context.params.attemptId, {
+          afterValue,
+          beforeValue,
+          entityId: readString(data, 'entityId'),
+          entityType,
+          reason: readString(data, 'reason'),
+          statPath: readString(data, 'statPath'),
+        })
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async confirmTelemetry(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        await context.get(Telemetry).confirm(identity, league.id, context.params.attemptId)
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
   },
 })
 
@@ -186,6 +239,7 @@ async function renderDashboardError(
     league,
     context.runnerAdmin,
     context.leagueOperations,
+    context.telemetry,
   )
   let message = error instanceof PlatformError ? error.message : 'The league operation could not be completed.'
   let status = error instanceof PlatformError && error.code === 'forbidden' ? 403 : 400
@@ -224,13 +278,20 @@ async function loadDashboards(
   league: LeagueDetail,
   runnerAdmin: RunnerAdminApplication,
   leagueOperations: LeagueOperationsApplication,
+  telemetry: TelemetryApplication,
 ) {
   let mayAdminister = Boolean(identity?.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role)))
-  let [leagueOperationsDashboard, runnerDashboard] = await Promise.all([
+  let [leagueOperationsDashboard, runnerDashboard, telemetryDashboard] = await Promise.all([
     leagueOperations.dashboard(identity, league.id),
     mayAdminister ? runnerAdmin.dashboard(identity, league.id) : Promise.resolve(emptyRunnerDashboard()),
+    telemetry.dashboard(identity, league.id),
   ])
-  return { dashboard: runnerDashboard, leagueOperations: leagueOperationsDashboard }
+  let seasonStatistics = await Promise.all(leagueOperationsDashboard.seasons.map(async (season) => ({
+    name: season.name,
+    seasonId: season.id,
+    statistics: await telemetry.rebuildSeason(identity, league.id, season.id),
+  })))
+  return { dashboard: runnerDashboard, leagueOperations: leagueOperationsDashboard, seasonStatistics, telemetry: telemetryDashboard }
 }
 
 function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
@@ -250,18 +311,19 @@ function notFound(context: { render(node: RemixNode, init?: ResponseInit): Respo
 interface OperationsRenderContext {
   leagueOperations: LeagueOperationsApplication
   runnerAdmin: RunnerAdminApplication
+  telemetry: TelemetryApplication
   render(node: RemixNode, init?: ResponseInit): Response
 }
 
-function renderContext(context: {
-  get(key: typeof RunnerAdmin): RunnerAdminApplication
-  render(node: RemixNode, init?: ResponseInit): Response
-} & {
-  get(key: typeof LeagueOperations): LeagueOperationsApplication
-}): OperationsRenderContext {
+function renderContext(context: unknown): OperationsRenderContext {
+  let runnerContext = context as { get(key: typeof RunnerAdmin): RunnerAdminApplication }
+  let operationsContext = context as { get(key: typeof LeagueOperations): LeagueOperationsApplication }
+  let telemetryContext = context as { get(key: typeof Telemetry): TelemetryApplication }
+  let renderer = context as { render(node: RemixNode, init?: ResponseInit): Response }
   return {
-    leagueOperations: context.get(LeagueOperations),
-    render: (node, init) => context.render(node, init),
-    runnerAdmin: context.get(RunnerAdmin),
+    leagueOperations: operationsContext.get(LeagueOperations),
+    render: (node, init) => renderer.render(node, init),
+    runnerAdmin: runnerContext.get(RunnerAdmin),
+    telemetry: telemetryContext.get(Telemetry),
   }
 }
