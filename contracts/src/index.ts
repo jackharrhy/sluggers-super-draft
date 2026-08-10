@@ -3,6 +3,7 @@ export * from "./common.ts";
 export * from "./compile-adapter-operations.ts";
 export * from "./content-pack-manifest.ts";
 export * from "./game-build-manifest.ts";
+export * from "./match-configuration-package.ts";
 export * from "./run-envelope.ts";
 export * from "./runner-control.ts";
 export * from "./ruleset-revision.ts";
@@ -13,6 +14,7 @@ export * from "./telemetry-envelope.ts";
 import { AdapterOperationBundleSchema } from "./adapter-operation-bundle.ts";
 import { ContentPackManifestSchema } from "./content-pack-manifest.ts";
 import { GameBuildManifestSchema } from "./game-build-manifest.ts";
+import { MatchConfigurationPackageSchema } from "./match-configuration-package.ts";
 import { RunEnvelopeSchema } from "./run-envelope.ts";
 import { RunnerControlMessageSchema } from "./runner-control.ts";
 import { RulesetRevisionSchema } from "./ruleset-revision.ts";
@@ -24,6 +26,7 @@ export const contractSchemas = {
   "adapter-operation-bundle": AdapterOperationBundleSchema,
   "content-pack-manifest": ContentPackManifestSchema,
   "game-build-manifest": GameBuildManifestSchema,
+  "match-configuration-package": MatchConfigurationPackageSchema,
   "run-envelope": RunEnvelopeSchema,
   "runner-control": RunnerControlMessageSchema,
   "ruleset-revision": RulesetRevisionSchema,

@@ -1,0 +1,4 @@
+ALTER TABLE "match_attempts" ADD COLUMN "stat_profile_revision_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD COLUMN "ruleset_revision_id" uuid NOT NULL;--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_stat_profile_fk" FOREIGN KEY ("league_id","stat_profile_revision_id") REFERENCES "public"."stat_profile_revisions"("league_id","id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_ruleset_fk" FOREIGN KEY ("league_id","ruleset_revision_id") REFERENCES "public"."ruleset_revisions"("league_id","id") ON DELETE no action ON UPDATE no action;

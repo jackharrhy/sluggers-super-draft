@@ -14,9 +14,11 @@ import {
   matches,
   matchAttempts,
   rosterRevisions,
+  rulesetRevisions,
   runnerCredentials,
   runnerLeases,
   runnerStations,
+  statProfileRevisions,
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
@@ -35,6 +37,8 @@ const QueueAttemptSchema = z.strictObject({
   dynamicRuleOverrides: z.record(z.string().min(1), z.union([z.string(), z.number().finite(), z.boolean(), z.null()])),
   homeLineupRevisionId: z.uuid(),
   requiredGameBuildSha256: Sha256Schema,
+  rulesetRevisionId: z.uuid(),
+  statProfileRevisionId: z.uuid(),
 })
 
 export interface RunnerAdminServiceOptions {
@@ -122,6 +126,35 @@ export class RunnerAdminService {
     if (!home || home.teamId !== match.homeTeamId || !away || away.teamId !== match.awayTeamId) {
       throw new PlatformError('Attempt lineups must be published for the scheduled teams', 'invalid_input')
     }
+    let [[profile], [ruleset]] = await Promise.all([
+      this.database
+        .select({ id: statProfileRevisions.id })
+        .from(statProfileRevisions)
+        .where(and(
+          eq(statProfileRevisions.leagueId, leagueId),
+          eq(statProfileRevisions.id, parsed.data.statProfileRevisionId),
+          eq(statProfileRevisions.status, 'published'),
+        ))
+        .limit(1),
+      this.database
+        .select({ id: rulesetRevisions.id, settings: rulesetRevisions.settings })
+        .from(rulesetRevisions)
+        .where(and(
+          eq(rulesetRevisions.leagueId, leagueId),
+          eq(rulesetRevisions.id, parsed.data.rulesetRevisionId),
+          eq(rulesetRevisions.status, 'published'),
+        ))
+        .limit(1),
+    ])
+    if (!profile || !ruleset) {
+      throw new PlatformError('Attempt stat profile and ruleset must be published', 'invalid_input')
+    }
+    for (let [key, value] of Object.entries(parsed.data.dynamicRuleOverrides)) {
+      let setting = ruleset.settings.find((candidate) => candidate.key === key)
+      if (!setting || setting.loadPhase !== 'runtime' || !sameJsonScalarType(setting.value, value)) {
+        throw new PlatformError(`Dynamic rule override ${key} is not compatible with the published ruleset`, 'invalid_input')
+      }
+    }
     let attemptId = this.#createId()
     let correlationId = this.#createId()
     let now = this.#clock()
@@ -155,6 +188,8 @@ export class RunnerAdminService {
         leagueId,
         matchId,
         requiredGameBuildSha256: parsed.data.requiredGameBuildSha256,
+        rulesetRevisionId: parsed.data.rulesetRevisionId,
+        statProfileRevisionId: parsed.data.statProfileRevisionId,
       })
       await transaction.insert(attemptLifecycleEvents).values({
         eventType: 'queued',
@@ -262,4 +297,8 @@ export class RunnerAdminService {
       throw new PlatformError('League administrator access is required', 'forbidden')
     }
   }
+}
+
+function sameJsonScalarType(left: string | number | boolean | null, right: string | number | boolean | null): boolean {
+  return left === null ? right === null : right !== null && typeof left === typeof right
 }

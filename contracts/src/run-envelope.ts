@@ -33,6 +33,8 @@ export const RunEnvelopeSchema = z
     attemptId: UuidSchema,
     attemptNonce: AttemptNonceSchema,
     requiredGameBuildSha256: Sha256Schema,
+    statProfileRevisionId: UuidSchema,
+    rulesetRevisionId: UuidSchema,
     teams: z.union([
       z.tuple([HomeTeamSelectionSchema, AwayTeamSelectionSchema]),
       z.tuple([AwayTeamSelectionSchema, HomeTeamSelectionSchema]),

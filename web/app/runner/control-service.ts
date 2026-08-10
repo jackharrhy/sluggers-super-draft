@@ -4,6 +4,8 @@ import { and, asc, eq, lte } from 'drizzle-orm'
 
 import {
   RunEnvelopeSchema,
+  MatchConfigurationPackageSchema,
+  RulesetRevisionSchema,
   RunnerClaimRequestSchema,
   RunnerClaimResponseSchema,
   RunnerHeartbeatRequestSchema,
@@ -12,6 +14,9 @@ import {
   RunnerLeaseUpdateResponseSchema,
   RunnerRegistrationRequestSchema,
   RunnerRegistrationResponseSchema,
+  StatProfileRevisionSchema,
+  TeamLineupRevisionSchema,
+  type MatchConfigurationPackage,
   type RunEnvelope,
   type RunnerClaimRequest,
   type RunnerClaimResponse,
@@ -26,11 +31,15 @@ import {
 import type { StarworksDatabase } from '../platform/database/connection.ts'
 import {
   attemptLifecycleEvents,
+  lineupRevisions,
   matches,
   matchAttempts,
+  rosterRevisions,
+  rulesetRevisions,
   runnerCredentials,
   runnerLeases,
   runnerStations,
+  statProfileRevisions,
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { RunnerCredentialScope } from '../platform/model.ts'
@@ -50,6 +59,7 @@ export interface RunnerControlApplication {
   heartbeat(bearerCredential: string, input: unknown): Promise<RunnerHeartbeatResponse>
   claim(bearerCredential: string, input: unknown): Promise<RunnerClaimResponse>
   updateLease(bearerCredential: string, input: unknown): Promise<RunnerLeaseUpdateResponse>
+  configuration(bearerCredential: string, attemptId: string): Promise<MatchConfigurationPackage>
 }
 
 export interface RunnerControlServiceOptions {
@@ -57,6 +67,7 @@ export interface RunnerControlServiceOptions {
   createId?: () => string
   heartbeatSeconds?: number
   leaseSeconds?: number
+  adapterVersion?: string
 }
 
 export class RunnerControlService {
@@ -64,6 +75,7 @@ export class RunnerControlService {
   readonly #createId: () => string
   readonly #heartbeatSeconds: number
   readonly #leaseSeconds: number
+  readonly #adapterVersion: string
 
   constructor(
     readonly database: StarworksDatabase,
@@ -73,6 +85,7 @@ export class RunnerControlService {
     this.#createId = options.createId ?? randomUUID
     this.#heartbeatSeconds = options.heartbeatSeconds ?? 15
     this.#leaseSeconds = options.leaseSeconds ?? 60
+    this.#adapterVersion = options.adapterVersion ?? '0.1.0'
   }
 
   async register(
@@ -433,6 +446,102 @@ export class RunnerControlService {
     })
   }
 
+  async configuration(
+    bearerCredential: string,
+    attemptId: string,
+  ): Promise<MatchConfigurationPackage> {
+    let authenticated = await this.#authenticate(bearerCredential, 'runs:read')
+    let stationId = this.#requireBoundStation(authenticated, authenticated.stationId ?? '')
+    let [execution] = await this.database
+      .select({ attempt: matchAttempts, lease: runnerLeases, match: matches })
+      .from(matchAttempts)
+      .innerJoin(matches, and(
+        eq(matches.leagueId, matchAttempts.leagueId),
+        eq(matches.id, matchAttempts.matchId),
+      ))
+      .innerJoin(runnerLeases, and(
+        eq(runnerLeases.leagueId, matchAttempts.leagueId),
+        eq(runnerLeases.matchAttemptId, matchAttempts.id),
+      ))
+      .where(and(
+        eq(matchAttempts.leagueId, authenticated.leagueId),
+        eq(matchAttempts.id, attemptId),
+        eq(runnerLeases.runnerStationId, stationId),
+        eq(runnerLeases.status, 'active'),
+      ))
+      .limit(1)
+    if (!execution || execution.lease.expiresAt <= this.#clock() || !execution.attempt.issuedAt) {
+      throw new PlatformError('Active attempt configuration was not found', 'not_found')
+    }
+    let [[profile], [ruleset], home, away] = await Promise.all([
+      this.database
+        .select()
+        .from(statProfileRevisions)
+        .where(and(
+          eq(statProfileRevisions.leagueId, authenticated.leagueId),
+          eq(statProfileRevisions.id, execution.attempt.statProfileRevisionId),
+          eq(statProfileRevisions.status, 'published'),
+        ))
+        .limit(1),
+      this.database
+        .select()
+        .from(rulesetRevisions)
+        .where(and(
+          eq(rulesetRevisions.leagueId, authenticated.leagueId),
+          eq(rulesetRevisions.id, execution.attempt.rulesetRevisionId),
+          eq(rulesetRevisions.status, 'published'),
+        ))
+        .limit(1),
+      this.#loadPublishedLineup(authenticated.leagueId, execution.attempt.homeLineupRevisionId),
+      this.#loadPublishedLineup(authenticated.leagueId, execution.attempt.awayLineupRevisionId),
+    ])
+    if (!profile || !ruleset || !home || !away) {
+      throw new PlatformError('Published attempt configuration is incomplete', 'conflict')
+    }
+    return MatchConfigurationPackageSchema.parse({
+      adapterId: 'sluggers-rmbe01',
+      adapterVersion: this.#adapterVersion,
+      attemptId: execution.attempt.id,
+      attemptNonce: execution.attempt.attemptNonce,
+      dynamicRuleOverrides: execution.attempt.dynamicRuleOverrides,
+      generatedAt: execution.attempt.issuedAt.toISOString(),
+      kind: 'match-configuration-package',
+      leagueId: authenticated.leagueId,
+      matchId: execution.match.id,
+      ruleset: RulesetRevisionSchema.parse({
+        basedOnRevisionId: ruleset.basedOnRevisionId,
+        createdAt: ruleset.createdAt.toISOString(),
+        kind: 'ruleset-revision',
+        leagueId: ruleset.leagueId,
+        name: ruleset.name,
+        publishedAt: ruleset.publishedAt?.toISOString() ?? null,
+        revisionId: ruleset.id,
+        revisionNumber: ruleset.revisionNumber,
+        rulesetId: ruleset.rulesetId,
+        schemaVersion: 1,
+        settings: ruleset.settings,
+        status: ruleset.status,
+      }),
+      schemaVersion: 1,
+      statProfile: StatProfileRevisionSchema.parse({
+        basedOnRevisionId: profile.basedOnRevisionId,
+        characterValues: profile.characterValues,
+        createdAt: profile.createdAt.toISOString(),
+        definitions: profile.definitions,
+        kind: 'stat-profile-revision',
+        leagueId: profile.leagueId,
+        name: profile.name,
+        profileId: profile.profileId,
+        publishedAt: profile.publishedAt?.toISOString() ?? null,
+        revisionId: profile.id,
+        revisionNumber: profile.revisionNumber,
+        schemaVersion: 1,
+        status: profile.status,
+      }),
+      teams: [{ side: 'home', lineup: home }, { side: 'away', lineup: away }],
+    })
+  }
+
   async #authenticate(
     bearerCredential: string,
     requiredScope: RunnerCredentialScope,
@@ -506,8 +615,10 @@ export class RunnerControlService {
       },
       matchId: row.match.id,
       requiredGameBuildSha256: row.attempt.requiredGameBuildSha256,
+      rulesetRevisionId: row.attempt.rulesetRevisionId,
       schemaVersion: 1,
       seasonId: row.match.seasonId,
+      statProfileRevisionId: row.attempt.statProfileRevisionId,
       teams: [
         {
           lineupRevisionId: row.attempt.homeLineupRevisionId,
@@ -522,6 +633,40 @@ export class RunnerControlService {
           teamId: row.match.awayTeamId,
         },
       ],
+    })
+  }
+
+  async #loadPublishedLineup(leagueId: string, revisionId: string) {
+    let [row] = await this.database
+      .select({ lineup: lineupRevisions, roster: rosterRevisions })
+      .from(lineupRevisions)
+      .innerJoin(rosterRevisions, and(
+        eq(rosterRevisions.leagueId, lineupRevisions.leagueId),
+        eq(rosterRevisions.id, lineupRevisions.rosterRevisionId),
+      ))
+      .where(and(
+        eq(lineupRevisions.leagueId, leagueId),
+        eq(lineupRevisions.id, revisionId),
+        eq(lineupRevisions.status, 'published'),
+        eq(rosterRevisions.status, 'published'),
+      ))
+      .limit(1)
+    if (!row) return null
+    return TeamLineupRevisionSchema.parse({
+      basedOnLineupRevisionId: row.lineup.basedOnRevisionId,
+      createdAt: row.lineup.createdAt.toISOString(),
+      kind: 'team-lineup-revision',
+      leagueId,
+      lineup: row.lineup.lineup,
+      lineupRevisionId: row.lineup.id,
+      lineupRevisionNumber: row.lineup.revisionNumber,
+      publishedAt: row.lineup.publishedAt?.toISOString() ?? null,
+      rosterCharacterIds: row.roster.rosterCharacterIds,
+      rosterRevisionId: row.roster.id,
+      rosterRevisionNumber: row.roster.revisionNumber,
+      schemaVersion: 1,
+      status: row.lineup.status,
+      teamId: row.lineup.teamId,
     })
   }
 

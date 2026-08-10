@@ -16,6 +16,7 @@ export const routes = route({
     register: post('register'),
     heartbeat: post('heartbeat'),
     claim: post('claim'),
+    configuration: get('attempts/:attemptId/configuration'),
     updateLease: post('leases/:leaseId'),
   }),
   leagues: route('leagues', {
