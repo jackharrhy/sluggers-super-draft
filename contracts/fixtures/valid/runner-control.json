@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "kind": "runner-registration-request",
+  "stationName": "Tournament desk one",
+  "capabilities": {
+    "architecture": "arm64",
+    "operatingSystem": "macos",
+    "runnerVersion": "0.1.0",
+    "adapterIds": ["sluggers-rmbe01"],
+    "features": [
+      "build-sluggers",
+      "launch-dolphin",
+      "runtime-bridge-v1",
+      "telemetry-spool-v1"
+    ],
+    "dolphinVersion": "2603"
+  }
+}

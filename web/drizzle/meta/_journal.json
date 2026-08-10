@@ -36,6 +36,27 @@
       "when": 1786339023066,
       "tag": "0004_slim_garia",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786340910169,
+      "tag": "0005_faulty_havok",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1786340941127,
+      "tag": "0006_ambitious_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786340973318,
+      "tag": "0007_peaceful_thunderball",
+      "breakpoints": true
     }
   ]
 }

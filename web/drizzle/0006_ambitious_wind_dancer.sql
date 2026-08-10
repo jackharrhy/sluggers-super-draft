@@ -1,0 +1,5 @@
+CREATE UNIQUE INDEX "runner_leases_active_station_unique" ON "runner_leases" USING btree ("league_id","runner_station_id") WHERE "runner_leases"."status" = 'active';--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_positive_number_check" CHECK ("match_attempts"."attempt_number" > 0);--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_nonce_check" CHECK ("match_attempts"."attempt_nonce" ~ '^[A-Za-z0-9_-]{32,128}$');--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_build_hash_check" CHECK ("match_attempts"."required_game_build_sha256" ~ '^[a-f0-9]{64}$');--> statement-breakpoint
+ALTER TABLE "matches" ADD CONSTRAINT "matches_distinct_teams_check" CHECK ("matches"."home_team_id" <> "matches"."away_team_id");
