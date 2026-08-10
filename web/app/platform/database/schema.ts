@@ -71,6 +71,18 @@ export const draftEventType = pgEnum('draft_event_type', [
   'completed',
   'cancelled',
 ])
+export const leagueDeadlineKind = pgEnum('league_deadline_kind', ['trade', 'roster', 'lineup'])
+export const tradeProposalStatus = pgEnum('trade_proposal_status', [
+  'pending',
+  'applied',
+  'rejected',
+  'cancelled',
+])
+export const tradeDecision = pgEnum('trade_decision', ['approved', 'rejected'])
+export const rosterTransactionKind = pgEnum('roster_transaction_kind', [
+  'trade',
+  'commissioner',
+])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -856,6 +868,205 @@ export const rosterRevisions = pgTable(
       foreignColumns: [table.leagueId, table.teamId, table.id],
       name: 'roster_revisions_based_on_fk',
     }),
+  ],
+)
+
+export const leagueDeadlines = pgTable(
+  'league_deadlines',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    seasonId: uuid('season_id').notNull(),
+    kind: leagueDeadlineKind('kind').notNull(),
+    closesAt: timestamp('closes_at', { withTimezone: true }).notNull(),
+    note: text('note'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique('league_deadlines_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('league_deadlines_season_kind_unique').on(
+      table.leagueId,
+      table.seasonId,
+      table.kind,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.seasonId],
+      foreignColumns: [seasons.leagueId, seasons.id],
+      name: 'league_deadlines_season_fk',
+    }).onDelete('cascade'),
+  ],
+)
+
+export const tradeProposals = pgTable(
+  'trade_proposals',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    seasonId: uuid('season_id').notNull(),
+    proposerTeamId: uuid('proposer_team_id').notNull(),
+    counterpartyTeamId: uuid('counterparty_team_id').notNull(),
+    status: tradeProposalStatus('status').notNull().default('pending'),
+    message: text('message'),
+    proposedByPersonId: uuid('proposed_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    proposedAt: timestamp('proposed_at', { withTimezone: true }).notNull(),
+    appliedAt: timestamp('applied_at', { withTimezone: true }),
+    rejectedAt: timestamp('rejected_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique('trade_proposals_league_id_id_unique').on(table.leagueId, table.id),
+    check(
+      'trade_proposals_distinct_teams_check',
+      sql`${table.proposerTeamId} <> ${table.counterpartyTeamId}`,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.seasonId],
+      foreignColumns: [seasons.leagueId, seasons.id],
+      name: 'trade_proposals_season_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.proposerTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'trade_proposals_proposer_team_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.counterpartyTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'trade_proposals_counterparty_team_fk',
+    }),
+    index('trade_proposals_league_status_index').on(table.leagueId, table.status, table.proposedAt),
+  ],
+)
+
+export const tradeItems = pgTable(
+  'trade_items',
+  {
+    leagueId: uuid('league_id').notNull(),
+    proposalId: uuid('proposal_id').notNull(),
+    characterId: text('character_id').notNull(),
+    fromTeamId: uuid('from_team_id').notNull(),
+    toTeamId: uuid('to_team_id').notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.proposalId, table.characterId] }),
+    check('trade_items_distinct_teams_check', sql`${table.fromTeamId} <> ${table.toTeamId}`),
+    foreignKey({
+      columns: [table.leagueId, table.proposalId],
+      foreignColumns: [tradeProposals.leagueId, tradeProposals.id],
+      name: 'trade_items_proposal_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.fromTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'trade_items_from_team_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.toTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'trade_items_to_team_fk',
+    }),
+  ],
+)
+
+export const tradeApprovals = pgTable(
+  'trade_approvals',
+  {
+    leagueId: uuid('league_id').notNull(),
+    proposalId: uuid('proposal_id').notNull(),
+    teamId: uuid('team_id').notNull(),
+    decision: tradeDecision('decision').notNull(),
+    decidedByPersonId: uuid('decided_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    reason: text('reason'),
+    decidedAt: timestamp('decided_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.proposalId, table.teamId] }),
+    foreignKey({
+      columns: [table.leagueId, table.proposalId],
+      foreignColumns: [tradeProposals.leagueId, tradeProposals.id],
+      name: 'trade_approvals_proposal_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'trade_approvals_team_fk',
+    }),
+  ],
+)
+
+export const rosterTransactions = pgTable(
+  'roster_transactions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    seasonId: uuid('season_id').notNull(),
+    kind: rosterTransactionKind('kind').notNull(),
+    sourceId: uuid('source_id'),
+    characterId: text('character_id').notNull(),
+    fromTeamId: uuid('from_team_id'),
+    toTeamId: uuid('to_team_id'),
+    fromBeforeRosterRevisionId: uuid('from_before_roster_revision_id'),
+    fromAfterRosterRevisionId: uuid('from_after_roster_revision_id'),
+    toBeforeRosterRevisionId: uuid('to_before_roster_revision_id'),
+    toAfterRosterRevisionId: uuid('to_after_roster_revision_id'),
+    actorPersonId: uuid('actor_person_id')
+      .notNull()
+      .references(() => people.id),
+    reason: text('reason'),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      'roster_transactions_team_change_check',
+      sql`${table.fromTeamId} is not null or ${table.toTeamId} is not null`,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.seasonId],
+      foreignColumns: [seasons.leagueId, seasons.id],
+      name: 'roster_transactions_season_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.fromTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'roster_transactions_from_team_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.toTeamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'roster_transactions_to_team_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.fromBeforeRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'roster_transactions_from_before_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.fromAfterRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'roster_transactions_from_after_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.toBeforeRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'roster_transactions_to_before_roster_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.toAfterRosterRevisionId],
+      foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],
+      name: 'roster_transactions_to_after_roster_fk',
+    }),
+    index('roster_transactions_league_occurred_index').on(
+      table.leagueId,
+      table.occurredAt,
+    ),
   ],
 )
 
