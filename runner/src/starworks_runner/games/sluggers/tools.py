@@ -230,7 +230,9 @@ class DtkDiscTool:
         ):
             raise DiscImageError(
                 "The selected image did not produce an exact Redump match in "
-                "decomp-toolkit; use a clean, lossless dump"
+                "decomp-toolkit. Scrubbed WBFS images without verification data "
+                "cannot satisfy this gate; use a clean full ISO or lossless RVZ "
+                "dump instead"
             )
         return DiscVerification(redump_name=redump_name, output=output)
 

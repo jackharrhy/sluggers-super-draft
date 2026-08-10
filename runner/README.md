@@ -57,6 +57,14 @@ uv run --project runner starworks-runner build-sluggers \
   --dtk .starworks/tools/dtk/1.8.3/dtk-macos-arm64
 ```
 
+The one-time production fingerprint review requires an image for which the
+pinned `decomp-toolkit` reports an exact Redump match. A full ISO or lossless
+RVZ dump can satisfy that gate. A commonly scrubbed WBFS may still boot and its
+data partition may validate, but missing unused disc sectors mean it cannot
+independently prove the exact retail base. Converting that WBFS to another
+format does not restore the discarded evidence; make a new lossless dump from
+the owned disc instead.
+
 The checked-in retail fingerprint registry is intentionally empty until a
 maintainer reviews hashes produced from a lawfully dumped, exact Redump match.
 The command fails closed until that one-time provisioning step is complete.

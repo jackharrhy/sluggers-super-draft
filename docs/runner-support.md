@@ -47,8 +47,11 @@ explicitly. Production sets `RUNNER_MINIMUM_VERSION` and
 - FFmpeg for recording or RTMP publishing.
 - The runner-managed, pinned decomp-toolkit installed with
   `starworks-runner install-dtk`.
-- A user-owned, clean North American `RMBE01` Rev 0 dump whose reviewed
-  fingerprint appears in the runner registry.
+- A user-owned, clean North American `RMBE01` Rev 0 full ISO or lossless RVZ
+  dump whose exact Redump match and reviewed fingerprint appear in the runner
+  registry. A scrubbed WBFS without verification data is suitable only for
+  non-production investigation; converting it cannot restore discarded disc
+  sectors.
 - A private runner credential issued from the league operations workspace.
 
 The supported-base registry intentionally remains empty until a maintainer can

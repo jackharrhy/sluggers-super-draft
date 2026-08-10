@@ -19,5 +19,6 @@ public/images
 *.context.md
 
 backups
+.starworks/
 deploy/prod/.env
 deploy/prod/garage.toml
