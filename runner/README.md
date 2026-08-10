@@ -1,9 +1,25 @@
 # Starworks runner
 
-The runner is the local, Python 3.12 side of Starworks. It will own game-image
+The runner is the local, Python 3.12 side of Starworks. It owns game-image
 verification, deterministic build construction, Dolphin control, the Sluggers
-adapter, telemetry spooling, and capture. This package starts headless so those
-boundaries can be tested before a PySide6 interface is added.
+adapter, telemetry spooling, and capture. Its tested headless core is shared by
+the PySide6 native application and the diagnostic CLI.
+
+Install the native UI extra and open a runner station:
+
+```shell
+uv sync --project runner --extra gui --group test
+STARWORKS_RUNNER_CREDENTIAL='paste-the-issued-credential' \
+  uv run --project runner --extra gui starworks-runner desktop \
+  --url http://127.0.0.1:3000 \
+  --station-name 'Tournament desk one'
+```
+
+The credential is held in process and is never written into the runner's local
+SQLite database. Registration metadata, an active match envelope, and pending
+lifecycle acknowledgements are journaled there so restarting the runner cannot
+silently claim or execute a second attempt. The same server-side lease remains
+authoritative; local recovery does not extend an expired lease by itself.
 
 Validate the shared contract fixtures directly:
 

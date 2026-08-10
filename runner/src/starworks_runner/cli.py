@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -10,6 +11,7 @@ import time
 from pathlib import Path, PurePosixPath
 
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
+from starworks_runner.desktop import default_state_path
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
 from starworks_runner.games.sluggers.bridge.layout import BridgeLayout
 from starworks_runner.games.sluggers.bridge.memory import (
@@ -116,6 +118,22 @@ def create_parser() -> argparse.ArgumentParser:
     )
     patcher_parser.add_argument("--size-mib", type=int, default=8)
     patcher_parser.add_argument("--iterations", type=int, default=5)
+
+    desktop_parser = subparsers.add_parser(
+        "desktop", help="open the native Starworks runner station"
+    )
+    desktop_parser.add_argument(
+        "--url", default=os.environ.get("STARWORKS_URL", "http://127.0.0.1:3000")
+    )
+    desktop_parser.add_argument(
+        "--station-name",
+        default=os.environ.get("STARWORKS_RUNNER_NAME", "Sluggers station"),
+    )
+    desktop_parser.add_argument(
+        "--state",
+        type=Path,
+        default=default_state_path(),
+    )
     return parser
 
 
@@ -326,6 +344,17 @@ def run(arguments: argparse.Namespace) -> int:
         }
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
+    if arguments.command == "desktop":
+        from starworks_runner.desktop import DesktopDefaults, launch_desktop
+
+        return launch_desktop(
+            DesktopDefaults(
+                base_url=arguments.url,
+                credential=os.environ.get("STARWORKS_RUNNER_CREDENTIAL", ""),
+                station_name=arguments.station_name,
+                state_path=arguments.state,
+            )
+        )
     raise AssertionError(f"Unhandled command {arguments.command}")
 
 
