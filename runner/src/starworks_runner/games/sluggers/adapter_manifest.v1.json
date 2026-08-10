@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "adapterVersion": "0.1.0",
+  "adapterVersion": "0.2.0",
   "target": {
     "gameId": "RMBE01",
     "revision": 0
@@ -13,25 +13,66 @@
   },
   "bridgeSource": {
     "path": "bridge/bridge_v1.c",
-    "sha256": "0bd1838c1db55eb9aaa8e9eccdba0f21c755751e003289b53161881a481cf4f6",
+    "sha256": "70c703ad8fa794d27f9179502bbfd9fd5ba7261ee1018f083b763ef660b88ff3",
     "license": "MIT",
-    "status": "source-ready-artifact-pending"
+    "status": "reviewed-and-compiled"
   },
+  "bridgeBuildSources": [
+    {
+      "path": "bridge/trampoline_v1.S",
+      "sha256": "cb2ac806301b82dea6f801c69882bbc2d7c36d469c33ad76c4842259347b1d07",
+      "license": "MIT"
+    },
+    {
+      "path": "bridge/bridge_v1.ld",
+      "sha256": "7ec0bb8142e8bfadc33cf35fd459a70ccc7f55686a14d3bf8778d9938116515c",
+      "license": "MIT"
+    }
+  ],
   "toolchain": {
-    "developmentCompiler": "Kamek plus NXP CodeWarrior Special Edition for MPC55xx/MPC56xx v2.10",
+    "developmentCompiler": "LLVM/Clang/LLD 22.1.8 targeting powerpc-unknown-eabi",
     "endUserStrategy": "hash-pinned-precompiled-artifact",
-    "kamekSource": "https://github.com/Treeki/Kamek",
-    "kamekCommit": "c6d21f458f6c0d7c4106f7d2228f80d8321b9174",
-    "kamekLicense": "MIT",
-    "decision": "Compile in a trusted release environment and distribute only reviewed artifacts. End users never install a compiler or CodeWarrior."
+    "llvmSource": "https://github.com/llvm/llvm-project",
+    "llvmVersion": "22.1.8",
+    "llvmLicense": "Apache-2.0 WITH LLVM-exception",
+    "decision": "Compile in a trusted release environment and distribute only the reviewed hash-pinned artifact. End users do not install the compiler."
   },
-  "artifacts": [],
-  "patchPlans": [],
-  "releaseGates": [
-    "Provision a reviewed clean RMBE01 Rev 0 fingerprint from a lawful dump.",
-    "Select and document a clean-room hook site and its exact original bytes.",
-    "Insert and verify the required PowerPC cache and ordering barriers.",
-    "Compile the bridge in the trusted toolchain and review exported symbols.",
-    "Boot the patched build and complete the nonce/event test in pinned Dolphin."
-  ]
+  "artifacts": [
+    {
+      "path": "artifacts/bridge-v1-rmbe01.bin",
+      "sha256": "86f373bc4ec8741bd966b8232702f839206195988a782da93c0f323022cef09d",
+      "sizeBytes": 5904,
+      "license": "MIT"
+    }
+  ],
+  "patchPlans": [
+    {
+      "path": "patches/bridge-v1-rmbe01.json",
+      "sha256": "cd10bd6cdbae46daacfad356421a8c21ef2aa7c41af968e59e8217d20d80374f"
+    }
+  ],
+  "releaseEvidence": [
+    {
+      "kind": "reviewed-base",
+      "mainDolSha256": "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"
+    },
+    {
+      "kind": "clean-room-hook",
+      "hookAddress": "0x8039A688",
+      "hookFileOffset": "0x33A388",
+      "expectedInstructionHex": "48170c5d",
+      "originalCallTarget": "0x8050B2E4",
+      "bridgeEntry": "0x80002A00"
+    },
+    {
+      "kind": "live-acceptance",
+      "platform": "macos-arm64",
+      "dolphinVersion": "2606",
+      "gameBuildSha256": "bf5e090823e22c31ac393b318a54358e7fd50e63d1eb69668e65b210cdd4330c",
+      "acknowledgedEpoch": 1,
+      "eventSequence": 1,
+      "heartbeatObserved": 121
+    }
+  ],
+  "releaseGates": []
 }

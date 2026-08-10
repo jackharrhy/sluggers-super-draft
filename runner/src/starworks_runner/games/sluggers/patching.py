@@ -42,6 +42,13 @@ class GuardedWrite:
 
 
 @dataclass(frozen=True)
+class ArtifactAppend:
+    target_offset: int
+    artifact_offset: int
+    size_bytes: int
+
+
+@dataclass(frozen=True)
 class PrecompiledPatchPlan:
     patch_id: str
     target_path: PurePosixPath
@@ -51,6 +58,7 @@ class PrecompiledPatchPlan:
     artifact_sha256: str
     artifact_size_bytes: int
     writes: tuple[GuardedWrite, ...]
+    append: ArtifactAppend | None = None
 
     @classmethod
     def load(cls, path: Path) -> PrecompiledPatchPlan:
@@ -58,6 +66,7 @@ class PrecompiledPatchPlan:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise BuildIntegrityError(f"Patch plan is unreadable: {path}") from error
+        schema_version = raw.get("schemaVersion")
         expected_keys = {
             "schemaVersion",
             "kind",
@@ -68,9 +77,11 @@ class PrecompiledPatchPlan:
             "artifact",
             "writes",
         }
+        if schema_version == 2:
+            expected_keys.add("append")
         if set(raw) != expected_keys:
             raise BuildIntegrityError("Patch plan has missing or unknown fields")
-        if raw["schemaVersion"] != 1 or raw["kind"] != "precompiled-patch-plan":
+        if schema_version not in {1, 2} or raw["kind"] != "precompiled-patch-plan":
             raise BuildIntegrityError("Unsupported patch-plan contract")
         artifact = raw["artifact"]
         if set(artifact) != {"path", "sha256", "sizeBytes"}:
@@ -104,6 +115,26 @@ class PrecompiledPatchPlan:
             ):
                 raise BuildIntegrityError("Guarded write sizes or offsets are invalid")
             writes.append(write)
+        append = None
+        if schema_version == 2:
+            append_value = raw["append"]
+            if set(append_value) != {
+                "targetOffset",
+                "artifactOffset",
+                "sizeBytes",
+            }:
+                raise BuildIntegrityError("Patch append has missing or unknown fields")
+            append = ArtifactAppend(
+                target_offset=append_value["targetOffset"],
+                artifact_offset=append_value["artifactOffset"],
+                size_bytes=append_value["sizeBytes"],
+            )
+            if (
+                append.target_offset < 0
+                or append.artifact_offset < 0
+                or append.size_bytes <= 0
+            ):
+                raise BuildIntegrityError("Patch append sizes or offsets are invalid")
         plan = cls(
             patch_id=raw["patchId"],
             target_path=_safe_relative_path(raw["targetPath"], "targetPath"),
@@ -113,6 +144,7 @@ class PrecompiledPatchPlan:
             artifact_sha256=artifact["sha256"],
             artifact_size_bytes=artifact["sizeBytes"],
             writes=tuple(writes),
+            append=append,
         )
         plan.validate()
         return plan
@@ -132,18 +164,33 @@ class PrecompiledPatchPlan:
         if self.artifact_size_bytes <= 0 or not self.writes:
             raise BuildIntegrityError("Patch artifact and writes must be non-empty")
         by_target = sorted(self.writes, key=lambda item: item.target_offset)
-        by_artifact = sorted(self.writes, key=lambda item: item.artifact_offset)
+        artifact_ranges = [
+            (write.artifact_offset, write.artifact_offset + write.size_bytes)
+            for write in self.writes
+        ]
+        if self.append is not None:
+            artifact_ranges.append(
+                (
+                    self.append.artifact_offset,
+                    self.append.artifact_offset + self.append.size_bytes,
+                )
+            )
+        artifact_ranges.sort()
         for left, right in pairwise(by_target):
             if left.target_offset + left.size_bytes > right.target_offset:
                 raise BuildIntegrityError("Guarded patch writes overlap in the target")
-        for left, right in pairwise(by_artifact):
-            if left.artifact_offset + left.size_bytes > right.artifact_offset:
-                raise BuildIntegrityError(
-                    "Guarded patch writes overlap in the artifact"
-                )
+        for left, right in pairwise(artifact_ranges):
+            if left[1] > right[0]:
+                raise BuildIntegrityError("Patch operations overlap in the artifact")
         for write in self.writes:
             if write.artifact_offset + write.size_bytes > self.artifact_size_bytes:
                 raise BuildIntegrityError("Guarded write exceeds the patch artifact")
+        if (
+            self.append is not None
+            and self.append.artifact_offset + self.append.size_bytes
+            > self.artifact_size_bytes
+        ):
+            raise BuildIntegrityError("Patch append exceeds the patch artifact")
 
     def receipt(self) -> dict[str, str]:
         return {
@@ -178,6 +225,13 @@ class PrecompiledPatchPlan:
             output[write.target_offset : target_end] = artifact[
                 write.artifact_offset : artifact_end
             ]
+        if self.append is not None:
+            if self.append.target_offset != len(output):
+                raise BuildIntegrityError(
+                    f"Patch {self.patch_id} append does not start at the target EOF"
+                )
+            artifact_end = self.append.artifact_offset + self.append.size_bytes
+            output.extend(artifact[self.append.artifact_offset : artifact_end])
         actual_output_sha256 = hashlib.sha256(output).hexdigest()
         if actual_output_sha256 != self.expected_output_sha256:
             raise BuildIntegrityError(
@@ -304,17 +358,28 @@ class PrecompiledPatchSetApplier:
         return receipts
 
     def _reject_conflicts(self) -> None:
-        writes = sorted(
-            (
+        operations = []
+        for plan in self.plans:
+            operations.extend(
                 (
                     plan.target_path,
                     write.target_offset,
                     write.target_offset + write.size_bytes,
                     plan.patch_id,
                 )
-                for plan in self.plans
                 for write in plan.writes
-            ),
+            )
+            if plan.append is not None:
+                operations.append(
+                    (
+                        plan.target_path,
+                        plan.append.target_offset,
+                        plan.append.target_offset + plan.append.size_bytes,
+                        plan.patch_id,
+                    )
+                )
+        writes = sorted(
+            operations,
             key=lambda item: (item[0].as_posix(), item[1], item[3]),
         )
         for left, right in pairwise(writes):

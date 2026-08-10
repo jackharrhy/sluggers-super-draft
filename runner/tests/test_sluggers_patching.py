@@ -8,6 +8,7 @@ import pytest
 from starworks_runner.games.sluggers.adapter import AdapterManifest
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 from starworks_runner.games.sluggers.patching import (
+    ArtifactAppend,
     GuardedWrite,
     PrecompiledPatchApplier,
     PrecompiledPatchPlan,
@@ -173,14 +174,83 @@ def test_overlapping_patch_writes_and_invalid_branches_are_rejected(
         encode_ppc_branch(0x80000000, 0x84000000)
 
 
+def test_schema_v2_appends_a_reviewed_artifact_slice_at_exact_eof(
+    tmp_path: Path,
+) -> None:
+    source_bytes = bytes.fromhex("0000000011223344")
+    artifact_bytes = b"TAIL" + b"PATCHED"
+    artifact_directory = tmp_path / "artifacts"
+    artifact_directory.mkdir()
+    (artifact_directory / "append.bin").write_bytes(artifact_bytes)
+    output = bytearray(source_bytes)
+    output[0:4] = b"TAIL"
+    output.extend(b"PATCHED")
+    plan_value = {
+        "schemaVersion": 2,
+        "kind": "precompiled-patch-plan",
+        "patchId": "append-v2",
+        "targetPath": "sys/main.dol",
+        "expectedInputSha256": sha256(source_bytes),
+        "expectedOutputSha256": sha256(output),
+        "artifact": {
+            "path": "append.bin",
+            "sha256": sha256(artifact_bytes),
+            "sizeBytes": len(artifact_bytes),
+        },
+        "append": {
+            "targetOffset": len(source_bytes),
+            "artifactOffset": 4,
+            "sizeBytes": 7,
+        },
+        "writes": [
+            {
+                "targetOffset": 0,
+                "artifactOffset": 0,
+                "sizeBytes": 4,
+                "expectedBytesHex": "00000000",
+            }
+        ],
+    }
+    plan_path = tmp_path / "append-plan.json"
+    plan_path.write_text(json.dumps(plan_value), encoding="utf-8")
+
+    plan = PrecompiledPatchPlan.load(plan_path)
+
+    assert plan.append == ArtifactAppend(len(source_bytes), 4, 7)
+    assert plan.apply_to_bytes(source_bytes, artifact_directory) == bytes(output)
+
+
+def test_schema_v2_append_must_start_at_eof(tmp_path: Path) -> None:
+    source_bytes = bytes(8)
+    artifact_bytes = b"ABCDWXYZ"
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "append.bin").write_bytes(artifact_bytes)
+    plan = PrecompiledPatchPlan(
+        patch_id="bad-append",
+        target_path=PurePosixPath("sys/main.dol"),
+        expected_input_sha256=sha256(source_bytes),
+        expected_output_sha256="0" * 64,
+        artifact_path=PurePosixPath("append.bin"),
+        artifact_sha256=sha256(artifact_bytes),
+        artifact_size_bytes=len(artifact_bytes),
+        writes=(GuardedWrite(0, 0, 4, bytes(4)),),
+        append=ArtifactAppend(7, 4, 4),
+    )
+
+    with pytest.raises(BuildIntegrityError, match="does not start at the target EOF"):
+        plan.apply_to_bytes(source_bytes, artifacts)
+
+
 def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> None:
     manifest = AdapterManifest.load()
-    assert manifest.adapter_version == "0.1.0"
+    assert manifest.adapter_version == "0.2.0"
     assert manifest.protocol_version == 1
     assert manifest.bridge_source.name == "bridge_v1.c"
-    assert manifest.artifacts == ()
-    assert manifest.patch_plans == ()
-    assert len(manifest.release_gates) == 5
+    assert len(manifest.artifacts) == 1
+    assert len(manifest.patch_plans) == 1
+    assert len(manifest.trusted_patch_set().plans) == 1
+    assert manifest.release_gates == ()
 
 
 def test_patch_set_rejects_cross_plan_conflicts_before_touching_the_tree(

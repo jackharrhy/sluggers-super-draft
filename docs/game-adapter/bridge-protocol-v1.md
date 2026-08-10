@@ -5,15 +5,17 @@ memory. Web payloads remain declarative; they never contain addresses or
 executable code.
 
 All multibyte values are unsigned and big-endian, matching the Wii's
-PowerPC CPU. The v1 reservation is 8 KiB at candidate virtual address
-`0x807A5000`. The machine-readable source of truth is
+PowerPC CPU. The v1 reservation is `0x1700` bytes at virtual address
+`0x80001900`. The machine-readable source of truth is
 `runner/src/starworks_runner/games/sluggers/memory_map.v1.json`.
 
-That candidate address begins after the last known RMBE01 DOL symbol at
-`0x807A4E80` and does not overlap the legacy Gecko/AutoTeam low-memory area.
-The static collision check is automated. It is not yet labelled production
-safe: a lawful retail build must still boot in Dolphin while the arena lower
-bound and the full match lifecycle are observed.
+The exact DOL map disproved the earlier `0x807A5000` candidate because it falls
+inside the static stack. The supported low-memory reservation instead begins
+after Dolphin's observed `STUBHAXX` marker and ends before the exception and
+runtime tables at `0x80003000`. A reversible live probe verified the guarded
+main-loop hook at `0x8039A688`, then restored its original bytes before the game
+continued normally. This reservation replaces legacy Gecko/AutoTeam use of the
+same cave; those systems must not run alongside the Starworks adapter.
 
 ## Control block
 
@@ -24,7 +26,7 @@ The 256-byte control block starts at offset `0x000`.
 | `0x00` | 4 | Magic `SWB1` |
 | `0x04` | 2 | Protocol version (`1`) |
 | `0x06` | 2 | Control-block size (`0x100`) |
-| `0x08` | 4 | Total reservation size (`0x2000`) |
+| `0x08` | 4 | Total reservation size (`0x1700`) |
 | `0x0C` | 4 | Capability flags |
 | `0x10` | 32 | Adapter build SHA-256, raw bytes |
 | `0x30` | 32 | Game build SHA-256, raw bytes |

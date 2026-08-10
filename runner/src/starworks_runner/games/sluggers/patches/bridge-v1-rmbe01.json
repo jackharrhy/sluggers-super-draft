@@ -1,0 +1,44 @@
+{
+  "append": {
+    "artifactOffset": 0,
+    "sizeBytes": 5888,
+    "targetOffset": 7434016
+  },
+  "artifact": {
+    "path": "artifacts/bridge-v1-rmbe01.bin",
+    "sha256": "86f373bc4ec8741bd966b8232702f839206195988a782da93c0f323022cef09d",
+    "sizeBytes": 5904
+  },
+  "expectedInputSha256": "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151",
+  "expectedOutputSha256": "077211c054c8bf977d4f387ad4945a7baeb0aadf2a95d2a132dd4d6e78b472e2",
+  "kind": "precompiled-patch-plan",
+  "patchId": "starworks-bridge-v1-rmbe01-rev0",
+  "schemaVersion": 2,
+  "targetPath": "sys/main.dol",
+  "writes": [
+    {
+      "artifactOffset": 5892,
+      "expectedBytesHex": "00000000",
+      "sizeBytes": 4,
+      "targetOffset": 60
+    },
+    {
+      "artifactOffset": 5896,
+      "expectedBytesHex": "00000000",
+      "sizeBytes": 4,
+      "targetOffset": 132
+    },
+    {
+      "artifactOffset": 5900,
+      "expectedBytesHex": "00000000",
+      "sizeBytes": 4,
+      "targetOffset": 204
+    },
+    {
+      "artifactOffset": 5888,
+      "expectedBytesHex": "48170c5d",
+      "sizeBytes": 4,
+      "targetOffset": 3384200
+    }
+  ]
+}

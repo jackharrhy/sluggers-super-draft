@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import socket
+import time
+from pathlib import Path
 from typing import Any, Protocol
 
 from starworks_runner.games.sluggers.bridge.layout import (
@@ -58,6 +61,188 @@ class ByteArrayMemoryTransport:
                 "Synthetic transport write outside allocated memory"
             )
         self.data[offset : offset + len(value)] = value
+
+
+class GdbRemoteMemoryTransport:
+    """Cross-platform transport over Dolphin's built-in GDB remote stub."""
+
+    _MAX_TRANSFER_BYTES = 4096
+
+    def __init__(
+        self,
+        *,
+        socket_path: Path | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        timeout_seconds: float = 5.0,
+        connection: socket.socket | None = None,
+    ) -> None:
+        if connection is None and (socket_path is None) == (host is None):
+            raise BridgeProtocolError(
+                "Choose exactly one Dolphin GDB endpoint: socket_path or host/port"
+            )
+        if host is not None and port is None:
+            raise BridgeProtocolError("A Dolphin GDB TCP host requires a port")
+        if timeout_seconds <= 0:
+            raise BridgeProtocolError("Dolphin GDB timeout must be positive")
+        self.socket_path = socket_path.expanduser().resolve() if socket_path else None
+        self.host = host
+        self.port = port
+        self.timeout_seconds = timeout_seconds
+        self._socket = connection
+
+    def attach(self) -> None:
+        if self._socket is not None:
+            return
+        deadline = time.monotonic() + self.timeout_seconds
+        last_error: OSError | None = None
+        while time.monotonic() < deadline:
+            family = socket.AF_UNIX if self.socket_path else socket.AF_INET
+            candidate = socket.socket(family, socket.SOCK_STREAM)
+            candidate.settimeout(min(0.25, max(0.01, deadline - time.monotonic())))
+            endpoint: str | tuple[str, int]
+            if self.socket_path is not None:
+                endpoint = str(self.socket_path)
+            else:
+                assert self.host is not None and self.port is not None
+                endpoint = (self.host, self.port)
+            try:
+                candidate.connect(endpoint)
+                candidate.settimeout(self.timeout_seconds)
+                self._socket = candidate
+                supported = self._request(b"qSupported")
+                if b"swbreak+" not in supported:
+                    raise BridgeProtocolError(
+                        "Dolphin GDB endpoint did not identify its supported protocol"
+                    )
+                return
+            except (OSError, BridgeProtocolError) as error:
+                candidate.close()
+                if isinstance(error, OSError):
+                    last_error = error
+                else:
+                    raise
+                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+        detail = f": {last_error}" if last_error else ""
+        raise BridgeProtocolError(
+            f"Timed out connecting to Dolphin's GDB endpoint{detail}"
+        )
+
+    def close(self) -> None:
+        if self._socket is not None:
+            self._socket.close()
+            self._socket = None
+
+    def read(self, address: int, size: int) -> bytes:
+        if address < 0 or address > 0xFFFFFFFF or size < 0:
+            raise BridgeProtocolError("Dolphin GDB memory read range is invalid")
+        result = bytearray()
+        while len(result) < size:
+            chunk_size = min(self._MAX_TRANSFER_BYTES, size - len(result))
+            chunk_address = address + len(result)
+            reply = self._request(f"m{chunk_address:x},{chunk_size:x}".encode("ascii"))
+            if reply.startswith(b"E"):
+                raise BridgeProtocolError(
+                    f"Dolphin GDB memory read failed at 0x{chunk_address:08X}: "
+                    f"{reply.decode('ascii', errors='replace')}"
+                )
+            try:
+                chunk = bytes.fromhex(reply.decode("ascii"))
+            except (UnicodeDecodeError, ValueError) as error:
+                raise BridgeProtocolError(
+                    "Dolphin GDB returned malformed memory bytes"
+                ) from error
+            if len(chunk) != chunk_size:
+                raise BridgeProtocolError(
+                    f"Dolphin GDB memory read was short: expected {chunk_size}, "
+                    f"received {len(chunk)}"
+                )
+            result.extend(chunk)
+        return bytes(result)
+
+    def write(self, address: int, value: bytes) -> None:
+        if address < 0 or address > 0xFFFFFFFF:
+            raise BridgeProtocolError("Dolphin GDB memory write address is invalid")
+        for offset in range(0, len(value), self._MAX_TRANSFER_BYTES):
+            chunk = value[offset : offset + self._MAX_TRANSFER_BYTES]
+            chunk_address = address + offset
+            reply = self._request(
+                f"M{chunk_address:x},{len(chunk):x}:".encode("ascii")
+                + chunk.hex().encode()
+            )
+            if reply != b"OK":
+                raise BridgeProtocolError(
+                    f"Dolphin GDB memory write failed at 0x{chunk_address:08X}: "
+                    f"{reply.decode('ascii', errors='replace')}"
+                )
+
+    def continue_execution(self) -> None:
+        self._send_packet(b"c")
+        self._require_ack()
+
+    def _request(self, payload: bytes) -> bytes:
+        self._send_packet(payload)
+        self._require_ack()
+        return self._receive_packet()
+
+    def _send_packet(self, payload: bytes) -> None:
+        connection = self._require_socket()
+        checksum = sum(payload) & 0xFF
+        try:
+            connection.sendall(b"$" + payload + f"#{checksum:02x}".encode("ascii"))
+        except OSError as error:
+            raise BridgeProtocolError(f"Dolphin GDB send failed: {error}") from error
+
+    def _require_ack(self) -> None:
+        acknowledgement = self._receive_byte()
+        if acknowledgement != b"+":
+            raise BridgeProtocolError(
+                f"Dolphin GDB rejected a command with {acknowledgement!r}"
+            )
+
+    def _receive_packet(self) -> bytes:
+        while self._receive_byte() != b"$":
+            pass
+        payload = bytearray()
+        while True:
+            value = self._receive_byte()
+            if value == b"#":
+                break
+            payload.extend(value)
+        checksum_bytes = self._receive_exact(2)
+        try:
+            expected_checksum = int(checksum_bytes, 16)
+        except ValueError as error:
+            raise BridgeProtocolError(
+                "Dolphin GDB reply checksum is malformed"
+            ) from error
+        actual_checksum = sum(payload) & 0xFF
+        connection = self._require_socket()
+        connection.sendall(b"+" if actual_checksum == expected_checksum else b"-")
+        if actual_checksum != expected_checksum:
+            raise BridgeProtocolError("Dolphin GDB reply checksum did not match")
+        return bytes(payload)
+
+    def _receive_byte(self) -> bytes:
+        return self._receive_exact(1)
+
+    def _receive_exact(self, size: int) -> bytes:
+        connection = self._require_socket()
+        result = bytearray()
+        try:
+            while len(result) < size:
+                value = connection.recv(size - len(result))
+                if not value:
+                    raise BridgeProtocolError("Dolphin GDB connection closed")
+                result.extend(value)
+        except OSError as error:
+            raise BridgeProtocolError(f"Dolphin GDB receive failed: {error}") from error
+        return bytes(result)
+
+    def _require_socket(self) -> socket.socket:
+        if self._socket is None:
+            raise BridgeProtocolError("Dolphin GDB transport is not attached")
+        return self._socket
 
 
 class DolphinMemoryEngineTransport:

@@ -12,7 +12,7 @@ typedef unsigned short sw_u16;
 typedef unsigned int sw_u32;
 typedef unsigned long long sw_u64;
 
-#define SW_BRIDGE_ADDRESS 0x807A5000u
+#define SW_BRIDGE_ADDRESS 0x80001900u
 #define SW_MAGIC 0x53574231u
 #define SW_PROTOCOL_VERSION 1u
 #define SW_STATE_ACTIVE 2u
@@ -59,6 +59,10 @@ static void StarworksCopyDigest(volatile sw_u8 *destination,
     }
 }
 
+static void StarworksPublishBarrier(void) {
+    __asm__ volatile("sync" ::: "memory");
+}
+
 /*
  * This is the single function a reviewed, expected-byte-guarded game hook
  * calls once per frame. The target hook address is intentionally not guessed:
@@ -83,6 +87,7 @@ void StarworksBridgeTick(void) {
     bridge->consumer_sequence = 0;
     bridge->dropped_events = 0;
     bridge->state = SW_STATE_ACTIVE;
+    StarworksPublishBarrier();
     bridge->acknowledged_epoch = bridge->request_epoch;
 
     event = &bridge->events[0];
@@ -95,7 +100,8 @@ void StarworksBridgeTick(void) {
     event->flags = 0;
     event->payload_value = 1;
 
-    /* The release wrapper inserts the PowerPC ordering/cache barrier here. */
+    StarworksPublishBarrier();
     event->sequence = 1;
+    StarworksPublishBarrier();
     bridge->producer_sequence = 1;
 }

@@ -303,6 +303,25 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
         str(result.game_directory / "sys/main.dol"),
     )
     assert command[command.index("--user") + 1] == str(tmp_path / "profile")
+    gdb_command = launcher.command_for(
+        result.build_directory,
+        tmp_path / "profile",
+        gdb_socket=tmp_path / "bridge.sock",
+    )
+    assert "Dolphin.General.GDBSocket=" in " ".join(gdb_command)
+    tcp_command = launcher.command_for(
+        result.build_directory,
+        tmp_path / "profile",
+        gdb_port=55020,
+    )
+    assert "Dolphin.General.GDBPort=55020" in tcp_command
+    with pytest.raises(DolphinLaunchError, match="either"):
+        launcher.command_for(
+            result.build_directory,
+            tmp_path / "profile",
+            gdb_socket=tmp_path / "bridge.sock",
+            gdb_port=55020,
+        )
 
     (result.game_directory / "sys/main.dol").write_bytes(b"tampered")
     with pytest.raises(DolphinLaunchError, match="modified managed output"):

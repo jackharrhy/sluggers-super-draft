@@ -67,12 +67,12 @@ match on that target.
 
 | Profile | Package/CLI | Real Dolphin + bridge | Capture/RTMP | Status |
 | --- | --- | --- | --- | --- |
-| macOS 14+ arm64 | verified | Dolphin 2606 boot verified; bridge pending | synthetic FFmpeg verified; real input pending | preview |
-| macOS 14+ x64 | dependency wheel available | hardware pending | hardware pending | preview |
-| Windows 11 x64 | dependency wheel available | hardware pending | `gdigrab`/`dshow` pending | preview |
+| macOS 14+ arm64 | verified | Dolphin 2606 boot + bridge v1 handshake verified | real Dolphin screen recorded to H.264; audio/RTMP pending | preview |
+| macOS 14+ x64 | package supported | hardware pending | hardware pending | preview |
+| Windows 11 x64 | package supported; GDB TCP path implemented | hardware pending | `gdigrab`/`dshow` pending | preview |
 | Linux x64 native | test suite verified | hardware pending | `x11grab`/Pulse pending | preview |
 | Linux amd64 container | image build and synthetic H.264 capture verified | GPU/input/bridge pending | real RTMP pending | experimental |
-| Windows ARM64 | unavailable bridge dependency | not tested | not tested | unsupported |
+| Windows ARM64 | package supported; hardware untested | not tested | not tested | unsupported |
 | Linux ARM64 container | pinned upstream image unavailable | not tested | not tested | unsupported |
 
 The native release-support gate for a row is:
