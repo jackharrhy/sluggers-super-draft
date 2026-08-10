@@ -25,6 +25,7 @@ import {
   rulesetRevisions,
   rulesets,
   runnerCredentials,
+  runnerStations,
   seasons,
   statProfileRevisions,
   statProfiles,
@@ -104,6 +105,7 @@ test(
           let heartbeat = await control.heartbeat(fixture.credentials.first.raw, {
             activeAttemptId: firstClaim.run.attemptId,
             activeLeaseId: firstClaim.run.lease.leaseId,
+            components: { bridge: 'healthy', dolphin: 'healthy', publishing: 'failed', recording: 'healthy' },
             kind: 'runner-heartbeat-request',
             lastCapturedSequence: 12,
             runnerId: firstRegistration.runnerId,
@@ -112,6 +114,13 @@ test(
             state: 'preparing',
           })
           assert.equal(heartbeat.accepted, true)
+          let [stationHealth] = await database.select({ componentHealth: runnerStations.componentHealth }).from(runnerStations).where(eq(runnerStations.id, firstRegistration.runnerId))
+          assert.deepEqual(stationHealth?.componentHealth, {
+            bridge: 'healthy',
+            dolphin: 'healthy',
+            publishing: 'failed',
+            recording: 'healthy',
+          })
 
           let started = await control.updateLease(
             fixture.credentials.first.raw,

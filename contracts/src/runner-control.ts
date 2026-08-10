@@ -20,6 +20,22 @@ export const RunnerCapabilitiesSchema = z.strictObject({
   dolphinVersion: z.string().min(1).max(100).nullable(),
 });
 
+export const RunnerComponentStateSchema = z.enum([
+  "disabled",
+  "starting",
+  "healthy",
+  "degraded",
+  "failed",
+  "stopped",
+]);
+
+export const RunnerComponentHealthSchema = z.strictObject({
+  dolphin: RunnerComponentStateSchema.optional(),
+  bridge: RunnerComponentStateSchema.optional(),
+  recording: RunnerComponentStateSchema.optional(),
+  publishing: RunnerComponentStateSchema.optional(),
+});
+
 export const RunnerRegistrationRequestSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("runner-registration-request"),
@@ -44,6 +60,7 @@ export const RunnerHeartbeatRequestSchema = z.strictObject({
   activeAttemptId: UuidSchema.nullable(),
   activeLeaseId: UuidSchema.nullable(),
   lastCapturedSequence: z.number().int().nonnegative().nullable(),
+  components: RunnerComponentHealthSchema.optional(),
 });
 
 export const RunnerHeartbeatResponseSchema = z.strictObject({
@@ -109,6 +126,7 @@ export const RunnerControlMessageSchema = z.union([
 });
 
 export type RunnerCapabilities = z.infer<typeof RunnerCapabilitiesSchema>;
+export type RunnerComponentHealth = z.infer<typeof RunnerComponentHealthSchema>;
 export type RunnerControlMessage = z.infer<typeof RunnerControlMessageSchema>;
 export type RunnerRegistrationRequest = z.infer<typeof RunnerRegistrationRequestSchema>;
 export type RunnerRegistrationResponse = z.infer<typeof RunnerRegistrationResponseSchema>;

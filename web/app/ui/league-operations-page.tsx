@@ -132,6 +132,9 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
                 <h3>{station.name}</h3>
                 <p mix={mutedStyle}>{station.status} · {station.runtimeState}</p>
                 <p mix={mutedStyle}>Last heartbeat: {station.lastHeartbeatAt?.toLocaleString() ?? 'never'}</p>
+                {Object.keys(station.componentHealth).length ? <ul mix={healthListStyle} aria-label="Runner component health">
+                  {Object.entries(station.componentHealth).map(([component, state]) => <li><span>{component}</span><strong>{state}</strong></li>)}
+                </ul> : null}
                 {station.status === 'active' ? <form action={routes.leagues.operations.revokeStation.href({ leagueSlug: league.slug, stationId: station.id })} method="post">
                   <button type="submit" mix={dangerStyle}>Revoke station</button>
                 </form> : null}
@@ -331,6 +334,7 @@ const attemptListStyle = css({ color: '#c9d4e9', display: 'grid', gap: '6px', ma
 const queueFormStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })
 const wideStyle = css({ gridColumn: '1 / -1' })
 const stationGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' })
+const healthListStyle = css({ display: 'grid', gap: '7px', listStyle: 'none', margin: '12px 0 0', padding: 0, '& li': { alignItems: 'center', background: '#0c1220', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', padding: '7px 9px' }, '& span': { color: '#9faec8', textTransform: 'capitalize' }, '& strong': { color: '#8ee0bd', fontSize: '11px', textTransform: 'uppercase' } })
 const dangerStyle = css({ background: '#7d2433', border: '1px solid #c44d61', borderRadius: '9px', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 800, marginTop: '12px', padding: '9px 12px' })
 const emptyStyle = css({ border: '1px dashed #445171', borderRadius: '14px', color: '#9faec8', padding: '22px' })
 const rosterGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' })

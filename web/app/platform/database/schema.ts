@@ -18,6 +18,7 @@ import { sql } from 'drizzle-orm'
 import type {
   ContentPackManifest,
   RunnerCapabilities,
+  RunnerComponentHealth,
   RulesetRevision,
   StatProfileRevision,
   TeamLineupRevision,
@@ -436,6 +437,7 @@ export const runnerStations = pgTable(
     name: text('name').notNull(),
     status: runnerStationStatus('status').notNull().default('active'),
     capabilities: jsonb('capabilities').$type<RunnerCapabilities>(),
+    componentHealth: jsonb('component_health').$type<RunnerComponentHealth>().notNull().default({}),
     runtimeState: runnerRuntimeState('runtime_state').notNull().default('idle'),
     lastHeartbeatAt: timestamp('last_heartbeat_at', { withTimezone: true }),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),

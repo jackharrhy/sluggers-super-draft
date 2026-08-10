@@ -70,8 +70,8 @@ def native_capabilities(*, dolphin_version: str | None = None) -> dict[str, Any]
             "launch-dolphin",
             "runtime-bridge-v1",
             "telemetry-spool-v1",
-            "ffmpeg-capture-v1",
-            "rtmp-publish-v1",
+            "capture-ffmpeg",
+            "broadcast-rtmp",
         ],
         "dolphinVersion": dolphin_version,
     }

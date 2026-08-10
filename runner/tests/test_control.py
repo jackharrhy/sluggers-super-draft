@@ -94,6 +94,38 @@ def test_api_errors_preserve_status_and_server_message() -> None:
     assert captured.value.status == 409
 
 
+def test_heartbeat_reports_component_health_without_credentials_in_its_body() -> None:
+    transport = FakeTransport()
+    transport.response = HttpResponse(
+        status=200,
+        body=json.dumps(
+            {
+                "schemaVersion": 1,
+                "kind": "runner-heartbeat-response",
+                "serverTime": "2026-08-10T12:00:00Z",
+                "accepted": True,
+            }
+        ).encode(),
+    )
+    client = RunnerControlClient(
+        "https://starworks.example", "private-credential", transport=transport
+    )
+
+    client.heartbeat(
+        runner_id="11111111-1111-4111-8111-111111111111",
+        sent_at="2026-08-10T12:00:00Z",
+        state="degraded",
+        active_attempt_id=None,
+        active_lease_id=None,
+        last_captured_sequence=None,
+        component_health={"recording": "healthy", "publishing": "failed"},
+    )
+
+    body = transport.requests[0]["body"]
+    assert body["components"] == {"recording": "healthy", "publishing": "failed"}
+    assert "private-credential" not in json.dumps(body)
+
+
 def test_configuration_download_is_scoped_to_an_attempt() -> None:
     transport = FakeTransport()
     fixture_path = (
