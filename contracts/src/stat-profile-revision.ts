@@ -3,7 +3,7 @@ import {
   JsonScalarSchema,
   TimestampSchema,
   UuidSchema,
-} from "./common";
+} from "./common.ts";
 
 export const StatKeySchema = z
   .string()

@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { contractSchemas } from "./src/index";
+import { contractSchemas } from "./src/index.ts";
 
 const contractsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const generatedDirectory = path.join(contractsDirectory, "generated");

@@ -17,6 +17,7 @@
     "node": ">=24.3.0"
   },
   "dependencies": {
+    "@starworks/contracts": "file:../contracts",
     "drizzle-orm": "^0.45.2",
     "postgres": "^3.4.9",
     "remix": "^3.0.0-beta.5",

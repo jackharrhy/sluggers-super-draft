@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "check": "tsx generate.ts --check && vitest run test",
     "generate": "tsx generate.ts",

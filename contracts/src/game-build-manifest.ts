@@ -3,7 +3,7 @@ import {
   RelativeBuildPathSchema,
   Sha256Schema,
   VersionSchema,
-} from "./common";
+} from "./common.ts";
 
 const FingerprintedFileSchema = z.strictObject({
   path: RelativeBuildPathSchema,
