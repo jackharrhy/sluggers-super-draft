@@ -14,6 +14,7 @@ from starworks_runner.capture import (
     CaptureRequest,
     CaptureSource,
     FfmpegCaptureController,
+    resolve_local_secret,
 )
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
 from starworks_runner.desktop import default_state_path
@@ -410,7 +411,7 @@ def run(arguments: argparse.Namespace) -> int:
             video_size=arguments.video_size,
         )
         rtmp_url = (
-            os.environ.get(arguments.rtmp_url_environment)
+            resolve_local_secret(arguments.rtmp_url_environment)
             if arguments.rtmp_url_environment
             else None
         )

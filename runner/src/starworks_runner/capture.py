@@ -103,12 +103,26 @@ class CaptureProfile:
             source=self.source,
             recording_path=recording_path,
             rtmp_url=(
-                values.get(self.rtmp_url_environment)
+                resolve_local_secret(self.rtmp_url_environment, values)
                 if self.rtmp_url_environment
                 else None
             ),
             publish_configured=self.rtmp_url_environment is not None,
         )
+
+
+def resolve_local_secret(
+    name: str, environment: Mapping[str, str] | None = None
+) -> str | None:
+    values = os.environ if environment is None else environment
+    direct = values.get(name)
+    if direct:
+        return direct
+    file_name = values.get(f"{name}_FILE")
+    if not file_name:
+        return None
+    value = Path(file_name).expanduser().read_text(encoding="utf-8").strip()
+    return value or None
 
 
 @dataclass(frozen=True)

@@ -21,7 +21,7 @@ class DolphinLaunch:
 class DolphinLauncher:
     """Launch a managed extracted filesystem in an isolated Dolphin profile."""
 
-    def __init__(self, executable: Path, *, expected_version: str = "2603") -> None:
+    def __init__(self, executable: Path, *, expected_version: str = "2606") -> None:
         self.executable = executable.expanduser().resolve()
         self.expected_version = expected_version
 

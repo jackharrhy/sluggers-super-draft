@@ -52,10 +52,10 @@
     },
     "dolphin": {
       "license": "GPL-2.0-or-later",
-      "releaseTag": "2603",
-      "sourceCommit": "d8558142ead21b3fa39809c4aedb982fbfc85feb",
+      "releaseTag": "2606",
+      "sourceCommit": "6094cfcf7b8fba733b3116fdf3414d51c1c0e4a4",
       "sourceUrl": "https://github.com/dolphin-emu/dolphin",
-      "version": "2603"
+      "version": "2606"
     }
   }
 }

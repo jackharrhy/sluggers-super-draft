@@ -3,9 +3,11 @@
 .git
 .github
 .env
-deploy
 docs
 legacy
 node_modules
 **/node_modules
-runner
+runner/.pytest_cache
+runner/.ruff_cache
+runner/.venv
+runner/**/__pycache__

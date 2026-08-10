@@ -44,7 +44,7 @@ describe('runner API controller', () => {
       capabilities: {
         adapterIds: ['sluggers-rmbe01'],
         architecture: 'arm64',
-        dolphinVersion: '2603',
+        dolphinVersion: '2606',
         features: ['launch-dolphin'],
         operatingSystem: 'macos',
         runnerVersion: '0.1.0',

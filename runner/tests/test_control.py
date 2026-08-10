@@ -64,7 +64,7 @@ def test_registration_uses_versioned_json_and_keeps_credential_in_header() -> No
             "runnerVersion": "0.1.0",
             "adapterIds": ["sluggers-rmbe01"],
             "features": ["launch-dolphin"],
-            "dolphinVersion": "2603",
+            "dolphinVersion": "2606",
         },
     )
 

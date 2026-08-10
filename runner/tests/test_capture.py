@@ -12,6 +12,7 @@ from starworks_runner.capture import (
     CaptureSource,
     CapturingAttemptExecutor,
     FfmpegCaptureController,
+    resolve_local_secret,
 )
 from starworks_runner.orchestrator import ExecutionOutcome
 
@@ -97,6 +98,20 @@ def test_capture_profile_reads_rtmp_only_from_the_runner_environment(
     )
     assert request.rtmp_url == "rtmp://localhost/live/key"
     assert "rtmp://" not in repr(profile)
+
+
+def test_runner_secret_can_be_mounted_as_a_file(tmp_path: Path) -> None:
+    secret_file = tmp_path / "rtmp-url"
+    secret_file.write_text(
+        "rtmps://publisher.example/live/private-key\n", encoding="utf-8"
+    )
+
+    assert (
+        resolve_local_secret(
+            "STARWORKS_RTMP_URL", {"STARWORKS_RTMP_URL_FILE": str(secret_file)}
+        )
+        == "rtmps://publisher.example/live/private-key"
+    )
 
 
 class TelemetryExecutor:

@@ -5,7 +5,7 @@ from starworks_runner.desktop import native_capabilities
 
 
 def test_native_capabilities_are_safe_declarative_metadata() -> None:
-    capabilities = native_capabilities(dolphin_version="2603")
+    capabilities = native_capabilities(dolphin_version="2606")
 
     validate_contract(
         "runner-control",
@@ -21,6 +21,6 @@ def test_native_capabilities_are_safe_declarative_metadata() -> None:
     assert capabilities["operatingSystem"] in ("linux", "macos", "windows")
     assert capabilities["adapterIds"] == ["sluggers-rmbe01"]
     assert "launch-dolphin" in capabilities["features"]
-    assert capabilities["dolphinVersion"] == "2603"
+    assert capabilities["dolphinVersion"] == "2606"
     assert "capture-ffmpeg" in capabilities["features"]
     assert "broadcast-rtmp" in capabilities["features"]

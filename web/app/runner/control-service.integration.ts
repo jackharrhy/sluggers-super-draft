@@ -362,7 +362,7 @@ function registration(stationName: string): RunnerRegistrationRequest {
     capabilities: {
       adapterIds: ['sluggers-rmbe01'],
       architecture: 'arm64' as const,
-      dolphinVersion: '2603',
+      dolphinVersion: '2606',
       features: ['build-sluggers', 'launch-dolphin', 'runtime-bridge-v1'],
       operatingSystem: 'macos' as const,
       runnerVersion: '0.1.0',
