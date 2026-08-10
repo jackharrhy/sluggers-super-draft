@@ -1,6 +1,7 @@
-import { HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, HeadBucketCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 
 export interface ContentAssetStore {
+  get(objectKey: string): Promise<Uint8Array>
   ready(): Promise<void>
   put(objectKey: string, bytes: Uint8Array, mediaType: string, sha256: string): Promise<void>
 }
@@ -13,6 +14,15 @@ export class S3ContentAssetStore implements ContentAssetStore {
 
   async ready(): Promise<void> {
     await this.client.send(new HeadBucketCommand({ Bucket: this.bucket }))
+  }
+
+  async get(objectKey: string): Promise<Uint8Array> {
+    let response = await this.client.send(new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: objectKey,
+    }))
+    if (!response.Body) throw new Error('Garage returned an empty object body')
+    return response.Body.transformToByteArray()
   }
 
   async put(objectKey: string, bytes: Uint8Array, mediaType: string, sha256: string): Promise<void> {

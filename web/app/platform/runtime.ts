@@ -79,6 +79,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     }),
     platform: new PlatformService(repository),
     runnerControl: new RunnerControlService(connection.database, {
+      assetStore: assets,
       minimumRunnerVersion: process.env.RUNNER_MINIMUM_VERSION,
       recommendedRunnerVersion: process.env.RUNNER_RECOMMENDED_VERSION,
     }),

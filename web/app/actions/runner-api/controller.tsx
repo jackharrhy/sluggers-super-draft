@@ -58,6 +58,24 @@ export default createController(routes.runnerApi, {
         return json(response)
       })
     },
+    async asset(context) {
+      return handle(async () => {
+        let response = await context.get(RunnerControl).asset(
+          readBearerCredential(context.request),
+          context.params.attemptId,
+          context.params.sha256,
+        )
+        context.get(RequestLog)?.bind({ matchAttemptId: context.params.attemptId })
+        return new Response(Uint8Array.from(response.bytes).buffer, {
+          headers: {
+            'cache-control': 'no-store',
+            'content-length': String(response.bytes.byteLength),
+            'content-type': response.mediaType,
+            etag: `"${response.sha256}"`,
+          },
+        })
+      })
+    },
     async updateLease(context) {
       return handle(async () => {
         let body = await readJson(context.request)

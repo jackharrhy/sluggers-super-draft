@@ -1,0 +1,2 @@
+ALTER TABLE "match_attempts" ADD COLUMN "content_pack_revision_id" uuid;--> statement-breakpoint
+ALTER TABLE "match_attempts" ADD CONSTRAINT "match_attempts_content_pack_fk" FOREIGN KEY ("league_id","content_pack_revision_id") REFERENCES "public"."content_pack_revisions"("league_id","id") ON DELETE no action ON UPDATE no action;

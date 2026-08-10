@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -149,6 +150,31 @@ def test_configuration_download_is_scoped_to_an_attempt() -> None:
     assert transport.requests[0]["url"].endswith(
         f"/attempts/{configuration['attemptId']}/configuration"
     )
+
+
+def test_content_asset_download_is_attempt_scoped_and_hash_checked() -> None:
+    value = b"user-authored-icon"
+    asset = {
+        "sha256": hashlib.sha256(value).hexdigest(),
+        "sizeBytes": len(value),
+        "mediaType": "image/png",
+    }
+    transport = FakeTransport()
+    transport.response = HttpResponse(status=200, body=value)
+    client = RunnerControlClient(
+        "https://starworks.example", "credential", transport=transport
+    )
+
+    assert client.asset("33333333-3333-4333-8333-333333333333", asset) == value
+    assert transport.requests[0]["method"] == "GET"
+    assert transport.requests[0]["body"] is None
+    assert transport.requests[0]["url"].endswith(
+        f"/attempts/33333333-3333-4333-8333-333333333333/assets/{asset['sha256']}"
+    )
+
+    transport.response = HttpResponse(status=200, body=b"tampered")
+    with pytest.raises(RunnerApiError, match="integrity"):
+        client.asset("33333333-3333-4333-8333-333333333333", asset)
 
 
 def test_telemetry_upload_uses_the_shared_batch_contract() -> None:

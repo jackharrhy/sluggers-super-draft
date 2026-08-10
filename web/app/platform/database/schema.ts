@@ -1379,6 +1379,7 @@ export const matchAttempts = pgTable(
     correlationId: uuid('correlation_id').notNull(),
     attemptNonce: text('attempt_nonce').notNull(),
     requiredGameBuildSha256: text('required_game_build_sha256').notNull(),
+    contentPackRevisionId: uuid('content_pack_revision_id'),
     statProfileRevisionId: uuid('stat_profile_revision_id').notNull(),
     rulesetRevisionId: uuid('ruleset_revision_id').notNull(),
     homeRosterRevisionId: uuid('home_roster_revision_id').notNull(),
@@ -1429,6 +1430,11 @@ export const matchAttempts = pgTable(
       columns: [table.leagueId, table.awayLineupRevisionId],
       foreignColumns: [lineupRevisions.leagueId, lineupRevisions.id],
       name: 'match_attempts_away_lineup_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.contentPackRevisionId],
+      foreignColumns: [contentPackRevisions.leagueId, contentPackRevisions.id],
+      name: 'match_attempts_content_pack_fk',
     }),
     foreignKey({
       columns: [table.leagueId, table.statProfileRevisionId],

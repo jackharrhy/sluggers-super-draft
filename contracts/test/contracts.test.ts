@@ -57,4 +57,21 @@ describe("Starworks v1 contracts", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("binds an optional content pack to the match adapter and revisions", () => {
+    const configuration = readFixture("match-configuration-package") as Record<string, any>;
+    const contentPack = readFixture("content-pack-manifest") as Record<string, any>;
+    contentPack.adapterVersion = configuration.adapterVersion;
+    contentPack.statProfileRevisionId = configuration.statProfile.revisionId;
+    contentPack.rulesetRevisionId = configuration.ruleset.revisionId;
+
+    expect(contractSchemas["match-configuration-package"].safeParse({
+      ...configuration,
+      contentPack,
+    }).success).toBe(true);
+    expect(contractSchemas["match-configuration-package"].safeParse({
+      ...configuration,
+      contentPack: { ...contentPack, rulesetRevisionId: "ffffffff-ffff-4fff-8fff-ffffffffffff" },
+    }).success).toBe(false);
+  });
 });

@@ -3,8 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal, Protocol
 
+from starworks_runner.content_sync import ContentPackDownloader
 from starworks_runner.control import RunnerControlClient
 from starworks_runner.state import ActiveRun, RunnerStateStore, StationRegistration
 
@@ -53,6 +55,7 @@ class RunnerStation:
         capabilities: dict[str, Any],
         clock: Callable[[], datetime] | None = None,
         component_health: Callable[[], dict[str, str]] | None = None,
+        content_cache: Path | None = None,
     ) -> None:
         self.client = client
         self.state = state
@@ -60,6 +63,7 @@ class RunnerStation:
         self.capabilities = capabilities
         self.clock = clock or (lambda: datetime.now(UTC))
         self.component_health = component_health
+        self.content_cache = content_cache
 
     def register(self) -> StationRegistration:
         response = self.client.register(self.station_name, self.capabilities)
@@ -119,6 +123,11 @@ class RunnerStation:
             active = self.state.load_active_run()
             if active is None or active.configuration is None:
                 raise RuntimeError("Match configuration was not persisted")
+
+        if self.content_cache is not None:
+            ContentPackDownloader(self.client, self.content_cache).resolve(
+                active.envelope, active.configuration
+            )
 
         self.flush_pending_telemetry(active, registration.runner_id)
 

@@ -165,6 +165,7 @@ describe('critical Starworks browser workflows', () => {
     await page.getByText('#1 · queued').waitFor()
     assert.deepEqual(queued, {
       awayLineupRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      contentPackRevisionId: null,
       dynamicRuleOverrides: {},
       homeLineupRevisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       requiredGameBuildSha256: 'a'.repeat(64),
@@ -381,6 +382,7 @@ function configurationApplication(
 function operationsDashboard(): RunnerOperationsDashboard {
   return {
     audit: [],
+    contentPacks: [],
     matches: [{
       attempts: [],
       awayTeamId: AWAY_TEAM_ID,
