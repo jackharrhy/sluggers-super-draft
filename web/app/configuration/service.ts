@@ -51,6 +51,26 @@ export interface RevisionSummary {
   publishedAt: Date | null
 }
 
+export interface StatProfileRevisionDetail {
+  basedOnRevision: StatProfileRevision | null
+  history: RevisionSummary[]
+  issues: ReturnType<typeof validateStatProfileRevision>
+  revision: StatProfileRevision
+}
+
+export interface RulesetRevisionDetail {
+  basedOnRevision: RulesetRevision | null
+  history: RevisionSummary[]
+  revision: RulesetRevision
+}
+
+export interface TeamLineupRevisionDetail {
+  basedOnRevision: TeamLineupRevision | null
+  history: RevisionSummary[]
+  issues: ReturnType<typeof validateTeamLineupRevision>
+  revision: TeamLineupRevision
+}
+
 export type ConfigurationApplication = Pick<
   ConfigurationService,
   | 'cloneRulesetRevision'
@@ -166,7 +186,7 @@ export class ConfigurationService {
     identity: SessionIdentity | null,
     leagueId: string,
     revisionId: string,
-  ): Promise<{ revision: StatProfileRevision; history: RevisionSummary[]; issues: ReturnType<typeof validateStatProfileRevision> }> {
+  ): Promise<StatProfileRevisionDetail> {
     this.#requireLeagueAdmin(identity, leagueId)
     let revision = await this.#loadStatRevision(leagueId, revisionId)
     if (!revision) throw new PlatformError('Stat profile revision was not found', 'not_found')
@@ -175,7 +195,10 @@ export class ConfigurationService {
       .from(statProfileRevisions)
       .where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.profileId, revision.profileId)))
       .orderBy(desc(statProfileRevisions.revisionNumber))
-    return { revision, history: history.map(summary), issues: validateStatProfileRevision(revision) }
+    let basedOnRevision = revision.basedOnRevisionId
+      ? await this.#loadStatRevision(leagueId, revision.basedOnRevisionId)
+      : null
+    return { basedOnRevision, revision, history: history.map(summary), issues: validateStatProfileRevision(revision) }
   }
 
   async updateStatProfileDraft(
@@ -301,12 +324,15 @@ export class ConfigurationService {
     return revision
   }
 
-  async getRulesetRevision(identity: SessionIdentity | null, leagueId: string, revisionId: string): Promise<{ revision: RulesetRevision; history: RevisionSummary[] }> {
+  async getRulesetRevision(identity: SessionIdentity | null, leagueId: string, revisionId: string): Promise<RulesetRevisionDetail> {
     this.#requireLeagueAdmin(identity, leagueId)
     let revision = await this.#loadRulesetRevision(leagueId, revisionId)
     if (!revision) throw new PlatformError('Ruleset revision was not found', 'not_found')
     let history = await this.database.select().from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.rulesetId, revision.rulesetId))).orderBy(desc(rulesetRevisions.revisionNumber))
-    return { revision, history: history.map(summary) }
+    let basedOnRevision = revision.basedOnRevisionId
+      ? await this.#loadRulesetRevision(leagueId, revision.basedOnRevisionId)
+      : null
+    return { basedOnRevision, revision, history: history.map(summary) }
   }
 
   async updateRulesetDraft(identity: SessionIdentity | null, leagueId: string, revisionId: string, input: Pick<RulesetRevision, 'name' | 'settings'>): Promise<RulesetRevision> {
@@ -428,12 +454,15 @@ export class ConfigurationService {
     return revision
   }
 
-  async getTeamLineupRevision(identity: SessionIdentity | null, leagueId: string, teamId: string, revisionId: string): Promise<{ revision: TeamLineupRevision; history: RevisionSummary[]; issues: ReturnType<typeof validateTeamLineupRevision> }> {
+  async getTeamLineupRevision(identity: SessionIdentity | null, leagueId: string, teamId: string, revisionId: string): Promise<TeamLineupRevisionDetail> {
     await this.#requireTeamAdmin(identity, leagueId, teamId)
     let revision = await this.#loadLineupRevision(leagueId, teamId, revisionId)
     if (!revision) throw new PlatformError('Lineup revision was not found', 'not_found')
     let history = await this.database.select().from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.teamId, teamId))).orderBy(desc(lineupRevisions.revisionNumber))
-    return { revision, history: history.map(summary), issues: validateTeamLineupRevision(revision) }
+    let basedOnRevision = revision.basedOnLineupRevisionId
+      ? await this.#loadLineupRevision(leagueId, teamId, revision.basedOnLineupRevisionId)
+      : null
+    return { basedOnRevision, revision, history: history.map(summary), issues: validateTeamLineupRevision(revision) }
   }
 
   async updateTeamLineupDraft(

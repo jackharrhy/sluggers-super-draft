@@ -3,6 +3,7 @@ import { createCookie } from 'remix/cookie'
 import { describe, it } from 'remix/test'
 
 import type { DiscordOAuthClient } from '../platform/discord-oauth.ts'
+import type { ConfigurationApplication } from '../configuration/service.ts'
 import { IdentityService } from '../platform/identity-service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import type { PlatformRepository } from '../platform/repository.ts'
@@ -167,6 +168,7 @@ function createTestRuntime(
     secrets: ['controller-test-cookie-secret'],
   }
   return {
+    configuration: {} as ConfigurationApplication,
     identity: new IdentityService(repository, discord),
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository, { createToken: () => options.token ?? 'test-token' }),

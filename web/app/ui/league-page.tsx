@@ -23,6 +23,14 @@ export function LeaguePage(
           </p>
         </section>
         {mayAdminister ? (
+          <>
+          <section mix={[cardStyle, settingsStyle]} aria-labelledby="configuration-heading">
+            <div>
+              <h2 id="configuration-heading" mix={subheadingStyle}>League configuration</h2>
+              <p mix={mutedStyle}>Build versioned stat profiles, rulesets, rosters, and game-ready lineups.</p>
+            </div>
+            <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>Open configuration workspace</a>
+          </section>
           <section mix={[cardStyle, settingsStyle]} aria-labelledby="publication-heading">
             <div>
               <h2 id="publication-heading" mix={subheadingStyle}>Publication policy</h2>
@@ -36,6 +44,7 @@ export function LeaguePage(
               <button type="submit" mix={buttonStyle}>Save publication policy</button>
             </form>
           </section>
+          </>
         ) : null}
       </AppShell>
     )
