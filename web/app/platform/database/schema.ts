@@ -45,6 +45,32 @@ export const matchAttemptStatus = pgEnum('match_attempt_status', ['queued', 'lea
 export const runnerLeaseStatus = pgEnum('runner_lease_status', ['active', 'released', 'expired', 'revoked'])
 export const runnerFailureKind = pgEnum('runner_failure_kind', ['game-crash', 'runner-crash', 'bridge-failure', 'build-failure'])
 export const attemptLifecycleEventType = pgEnum('attempt_lifecycle_event_type', ['queued', 'claimed', 'renewed', 'started', 'completed', 'cancelled', 'failed', 'lease-expired', 'station-revoked'])
+export const chemistryRelationship = pgEnum('chemistry_relationship', ['positive', 'negative'])
+export const draftStatus = pgEnum('draft_status', [
+  'setup',
+  'active',
+  'paused',
+  'completed',
+  'cancelled',
+])
+export const draftOrderMode = pgEnum('draft_order_mode', ['snake', 'linear'])
+export const draftPickSource = pgEnum('draft_pick_source', [
+  'manager',
+  'commissioner',
+  'automatic',
+])
+export const draftPickStatus = pgEnum('draft_pick_status', ['active', 'reversed'])
+export const draftEventType = pgEnum('draft_event_type', [
+  'created',
+  'started',
+  'paused',
+  'resumed',
+  'pick-made',
+  'pick-reversed',
+  'clock-expired',
+  'completed',
+  'cancelled',
+])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -266,6 +292,51 @@ export const leagueTeams = pgTable(
   ],
 )
 
+export const gameCharacters = pgTable(
+  'game_characters',
+  {
+    gameId: text('game_id').notNull(),
+    characterId: text('character_id').notNull(),
+    displayName: text('display_name').notNull(),
+    isCaptain: boolean('is_captain').notNull().default(false),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.gameId, table.characterId] }),
+    index('game_characters_game_display_name_index').on(table.gameId, table.displayName),
+  ],
+)
+
+export const gameCharacterChemistry = pgTable(
+  'game_character_chemistry',
+  {
+    gameId: text('game_id').notNull(),
+    characterAId: text('character_a_id').notNull(),
+    characterBId: text('character_b_id').notNull(),
+    relationship: chemistryRelationship('relationship').notNull(),
+    source: text('source').notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.gameId, table.characterAId, table.characterBId] }),
+    check(
+      'game_character_chemistry_canonical_pair_check',
+      sql`${table.characterAId} < ${table.characterBId}`,
+    ),
+    foreignKey({
+      columns: [table.gameId, table.characterAId],
+      foreignColumns: [gameCharacters.gameId, gameCharacters.characterId],
+      name: 'game_character_chemistry_character_a_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.gameId, table.characterBId],
+      foreignColumns: [gameCharacters.gameId, gameCharacters.characterId],
+      name: 'game_character_chemistry_character_b_fk',
+    }).onDelete('cascade'),
+  ],
+)
+
 export const invitations = pgTable(
   'invitations',
   {
@@ -483,6 +554,213 @@ export const statProfileRevisions = pgTable(
       foreignColumns: [table.leagueId, table.id],
       name: 'stat_profile_revisions_based_on_fk',
     }),
+  ],
+)
+
+export const drafts = pgTable(
+  'drafts',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    seasonId: uuid('season_id').notNull(),
+    statProfileRevisionId: uuid('stat_profile_revision_id').notNull(),
+    gameId: text('game_id').notNull().default('RMBE01'),
+    name: text('name').notNull(),
+    status: draftStatus('status').notNull().default('setup'),
+    orderMode: draftOrderMode('order_mode').notNull().default('snake'),
+    rounds: integer('rounds').notNull(),
+    pickSeconds: integer('pick_seconds').notNull().default(120),
+    currentPickNumber: integer('current_pick_number').notNull().default(1),
+    turnStartedAt: timestamp('turn_started_at', { withTimezone: true }),
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
+    version: integer('version').notNull().default(0),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    startedAt: timestamp('started_at', { withTimezone: true }),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    unique('drafts_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('drafts_league_season_name_unique').on(
+      table.leagueId,
+      table.seasonId,
+      table.name,
+    ),
+    check('drafts_rounds_check', sql`${table.rounds} between 1 and 18`),
+    check('drafts_pick_seconds_check', sql`${table.pickSeconds} between 15 and 86400`),
+    check('drafts_current_pick_check', sql`${table.currentPickNumber} > 0`),
+    foreignKey({
+      columns: [table.leagueId, table.seasonId],
+      foreignColumns: [seasons.leagueId, seasons.id],
+      name: 'drafts_season_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.statProfileRevisionId],
+      foreignColumns: [statProfileRevisions.leagueId, statProfileRevisions.id],
+      name: 'drafts_stat_profile_revision_fk',
+    }),
+  ],
+)
+
+export const draftSlots = pgTable(
+  'draft_slots',
+  {
+    leagueId: uuid('league_id').notNull(),
+    draftId: uuid('draft_id').notNull(),
+    position: integer('position').notNull(),
+    teamId: uuid('team_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.draftId, table.position] }),
+    uniqueIndex('draft_slots_draft_team_unique').on(
+      table.leagueId,
+      table.draftId,
+      table.teamId,
+    ),
+    check('draft_slots_position_check', sql`${table.position} > 0`),
+    foreignKey({
+      columns: [table.leagueId, table.draftId],
+      foreignColumns: [drafts.leagueId, drafts.id],
+      name: 'draft_slots_draft_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'draft_slots_team_fk',
+    }),
+  ],
+)
+
+export const draftPicks = pgTable(
+  'draft_picks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    draftId: uuid('draft_id').notNull(),
+    pickNumber: integer('pick_number').notNull(),
+    roundNumber: integer('round_number').notNull(),
+    slotPosition: integer('slot_position').notNull(),
+    teamId: uuid('team_id').notNull(),
+    characterId: text('character_id').notNull(),
+    pickedByPersonId: uuid('picked_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    source: draftPickSource('source').notNull(),
+    status: draftPickStatus('status').notNull().default('active'),
+    reason: text('reason'),
+    selectedAt: timestamp('selected_at', { withTimezone: true }).notNull(),
+    reversedAt: timestamp('reversed_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('draft_picks_league_id_id_unique').on(table.leagueId, table.id),
+    check('draft_picks_number_check', sql`${table.pickNumber} > 0`),
+    check('draft_picks_round_check', sql`${table.roundNumber} > 0`),
+    check('draft_picks_slot_check', sql`${table.slotPosition} > 0`),
+    uniqueIndex('draft_picks_active_number_unique')
+      .on(table.leagueId, table.draftId, table.pickNumber)
+      .where(sql`${table.status} = 'active'`),
+    uniqueIndex('draft_picks_active_character_unique')
+      .on(table.leagueId, table.draftId, table.characterId)
+      .where(sql`${table.status} = 'active'`),
+    foreignKey({
+      columns: [table.leagueId, table.draftId],
+      foreignColumns: [drafts.leagueId, drafts.id],
+      name: 'draft_picks_draft_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.draftId, table.slotPosition],
+      foreignColumns: [draftSlots.leagueId, draftSlots.draftId, draftSlots.position],
+      name: 'draft_picks_slot_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'draft_picks_team_fk',
+    }),
+  ],
+)
+
+export const draftQueues = pgTable(
+  'draft_queues',
+  {
+    leagueId: uuid('league_id').notNull(),
+    draftId: uuid('draft_id').notNull(),
+    teamId: uuid('team_id').notNull(),
+    characterId: text('character_id').notNull(),
+    rank: integer('rank').notNull(),
+    updatedByPersonId: uuid('updated_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    ...timestamps,
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.draftId, table.teamId, table.characterId] }),
+    uniqueIndex('draft_queues_team_rank_unique').on(
+      table.leagueId,
+      table.draftId,
+      table.teamId,
+      table.rank,
+    ),
+    check('draft_queues_rank_check', sql`${table.rank} > 0`),
+    foreignKey({
+      columns: [table.leagueId, table.draftId],
+      foreignColumns: [drafts.leagueId, drafts.id],
+      name: 'draft_queues_draft_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'draft_queues_team_fk',
+    }).onDelete('cascade'),
+  ],
+)
+
+export const draftEvents = pgTable(
+  'draft_events',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    draftId: uuid('draft_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    eventType: draftEventType('event_type').notNull(),
+    actorPersonId: uuid('actor_person_id')
+      .notNull()
+      .references(() => people.id),
+    teamId: uuid('team_id'),
+    pickId: uuid('pick_id'),
+    metadata: jsonb('metadata').$type<Record<string, unknown>>().notNull().default({}),
+    occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex('draft_events_draft_sequence_unique').on(
+      table.leagueId,
+      table.draftId,
+      table.sequence,
+    ),
+    foreignKey({
+      columns: [table.leagueId, table.draftId],
+      foreignColumns: [drafts.leagueId, drafts.id],
+      name: 'draft_events_draft_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.pickId],
+      foreignColumns: [draftPicks.leagueId, draftPicks.id],
+      name: 'draft_events_pick_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.teamId],
+      foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
+      name: 'draft_events_team_fk',
+    }),
+    index('draft_events_draft_occurred_index').on(
+      table.leagueId,
+      table.draftId,
+      table.occurredAt,
+    ),
   ],
 )
 
