@@ -23,10 +23,16 @@ class ExecutionOutcome:
 
 
 class AttemptExecutor(Protocol):
-    def prepare(self, envelope: dict[str, Any]) -> None: ...
+    def prepare(
+        self, envelope: dict[str, Any], configuration: dict[str, Any]
+    ) -> None: ...
 
     def execute(
-        self, envelope: dict[str, Any], *, recovering: bool
+        self,
+        envelope: dict[str, Any],
+        configuration: dict[str, Any],
+        *,
+        recovering: bool,
     ) -> ExecutionOutcome: ...
 
 
@@ -95,13 +101,22 @@ class RunnerStation:
                 self._lease_message(active, registration.runner_id, "renew")
             )
 
+        if active.configuration is None:
+            configuration = self.client.configuration(
+                attempt_id=active.envelope["attemptId"]
+            )
+            self.state.save_configuration(active.envelope["attemptId"], configuration)
+            active = self.state.load_active_run()
+            if active is None or active.configuration is None:
+                raise RuntimeError("Match configuration was not persisted")
+
         attempt_id = active.envelope["attemptId"]
         recovering = active.stage == "running"
         self.heartbeat("recovering" if active.stage == "running" else "preparing")
         if active.stage != "running":
             try:
                 self.state.update_stage(attempt_id, "preparing")
-                executor.prepare(active.envelope)
+                executor.prepare(active.envelope, active.configuration)
             except AttemptExecutionError as error:
                 self._report_failure(active, registration.runner_id, error.failure_kind)
                 return RunOnceResult(status="failed", attempt_id=attempt_id)
@@ -117,7 +132,11 @@ class RunnerStation:
                 )
 
         try:
-            outcome = executor.execute(active.envelope, recovering=recovering)
+            outcome = executor.execute(
+                active.envelope,
+                active.configuration,
+                recovering=recovering,
+            )
         except AttemptExecutionError as error:
             self._report_failure(active, registration.runner_id, error.failure_kind)
             return RunOnceResult(status="failed", attempt_id=attempt_id)

@@ -20,9 +20,44 @@ def load_run_envelope() -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_match_configuration() -> dict[str, object]:
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "contracts/fixtures/valid/match-configuration-package.json"
+    )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def execution_fixtures() -> tuple[dict[str, object], dict[str, object]]:
+    envelope = load_run_envelope()
+    configuration = load_match_configuration()
+    envelope.update(
+        {
+            "leagueId": configuration["leagueId"],
+            "matchId": configuration["matchId"],
+            "attemptId": configuration["attemptId"],
+            "attemptNonce": configuration["attemptNonce"],
+            "statProfileRevisionId": configuration["statProfile"]["revisionId"],  # type: ignore[index]
+            "rulesetRevisionId": configuration["ruleset"]["revisionId"],  # type: ignore[index]
+        }
+    )
+    teams = configuration["teams"]
+    assert isinstance(teams, list)
+    envelope["teams"] = [
+        {
+            "side": team["side"],
+            "teamId": team["lineup"]["teamId"],
+            "rosterRevisionId": team["lineup"]["rosterRevisionId"],
+            "lineupRevisionId": team["lineup"]["lineupRevisionId"],
+        }
+        for team in teams
+    ]
+    return envelope, configuration
+
+
 def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) -> None:
     database_path = tmp_path / "runner.sqlite3"
-    envelope = load_run_envelope()
+    envelope, configuration = execution_fixtures()
     registration = StationRegistration(
         runner_id="eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
         heartbeat_seconds=15,
@@ -42,6 +77,7 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         state.save_registration(registration)
         accepted = state.accept_run(envelope)
         state.accept_run(envelope)
+        state.save_configuration(envelope["attemptId"], configuration)
         state.update_stage(envelope["attemptId"], "running")
         state.queue_update(f"{envelope['attemptId']}:complete", update)
         assert accepted.stage == "claimed"
@@ -49,6 +85,7 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
     with RunnerStateStore(database_path) as recovered:
         assert recovered.load_registration() == registration
         assert recovered.load_active_run().stage == "running"  # type: ignore[union-attr]
+        assert recovered.load_active_run().configuration == configuration  # type: ignore[union-attr]
         pending = recovered.list_pending_updates()
         assert pending[0].message == update
         recovered.acknowledge_update(pending[0].event_id)

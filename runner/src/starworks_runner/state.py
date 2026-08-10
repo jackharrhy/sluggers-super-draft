@@ -26,6 +26,7 @@ class StationRegistration:
 @dataclass(frozen=True)
 class ActiveRun:
     envelope: dict[str, Any]
+    configuration: dict[str, Any] | None
     stage: RunStage
     last_captured_sequence: int | None
 
@@ -122,7 +123,10 @@ class RunnerStateStore:
     def load_active_run(self) -> ActiveRun | None:
         with self._lock:
             row = self._connection.execute(
-                "select envelope_json, stage, last_captured_sequence from active_run where singleton = 1"
+                """
+                select envelope_json, configuration_json, stage, last_captured_sequence
+                from active_run where singleton = 1
+                """
             ).fetchone()
         if not row:
             return None
@@ -130,9 +134,46 @@ class RunnerStateStore:
         validate_contract("run-envelope", envelope)
         return ActiveRun(
             envelope=cast(dict[str, Any], envelope),
+            configuration=(
+                cast(dict[str, Any], json.loads(row["configuration_json"]))
+                if row["configuration_json"]
+                else None
+            ),
             stage=cast(RunStage, row["stage"]),
             last_captured_sequence=row["last_captured_sequence"],
         )
+
+    def save_configuration(
+        self, attempt_id: str, configuration: dict[str, Any]
+    ) -> None:
+        validate_contract("match-configuration-package", configuration)
+        if configuration["attemptId"] != attempt_id:
+            raise ActiveRunConflict("Configuration belongs to a different attempt")
+        encoded = json.dumps(configuration, separators=(",", ":"), sort_keys=True)
+        with self._lock, self._connection:
+            row = self._connection.execute(
+                "select envelope_json from active_run where singleton = 1 and attempt_id = ?",
+                (attempt_id,),
+            ).fetchone()
+            if not row:
+                raise ActiveRunConflict("Attempt is no longer active")
+            envelope = json.loads(row["envelope_json"])
+            for field in ("attemptNonce", "leagueId", "matchId"):
+                if configuration[field] != envelope[field]:
+                    raise ActiveRunConflict(
+                        f"Configuration {field} does not match the active attempt"
+                    )
+            updated = self._connection.execute(
+                """
+                update active_run set configuration_json = ?
+                where singleton = 1 and attempt_id = ? and attempt_nonce = ?
+                """,
+                (encoded, attempt_id, configuration["attemptNonce"]),
+            )
+            if updated.rowcount != 1:
+                raise ActiveRunConflict(
+                    "Configuration nonce does not match the active attempt"
+                )
 
     def update_stage(
         self,
@@ -233,6 +274,7 @@ class RunnerStateStore:
                   attempt_nonce text not null,
                   lease_id text not null,
                   envelope_json text not null,
+                  configuration_json text,
                   stage text not null check (stage in ('claimed', 'preparing', 'running')),
                   last_captured_sequence integer
                 );
@@ -251,3 +293,11 @@ class RunnerStateStore:
                 );
                 """
             )
+            columns = {
+                row[1]
+                for row in self._connection.execute("pragma table_info(active_run)")
+            }
+            if "configuration_json" not in columns:
+                self._connection.execute(
+                    "alter table active_run add column configuration_json text"
+                )

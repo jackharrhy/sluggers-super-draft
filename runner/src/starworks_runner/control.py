@@ -137,6 +137,15 @@ class RunnerControlClient:
             expected_kind="runner-lease-update-response",
         )
 
+    def configuration(self, attempt_id: str) -> dict[str, Any]:
+        return self._request(
+            "GET",
+            f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/configuration",
+            None,
+            response_contract="match-configuration-package",
+            expected_kind="match-configuration-package",
+        )
+
     def _send(
         self,
         path: str,
@@ -145,15 +154,36 @@ class RunnerControlClient:
         expected_kind: str,
     ) -> dict[str, Any]:
         validate_contract("runner-control", message)
-        response = self.transport.request(
+        return self._request(
             "POST",
+            path,
+            message,
+            response_contract="runner-control",
+            expected_kind=expected_kind,
+        )
+
+    def _request(
+        self,
+        method: str,
+        path: str,
+        message: dict[str, Any] | None,
+        *,
+        response_contract: str,
+        expected_kind: str,
+    ) -> dict[str, Any]:
+        response = self.transport.request(
+            method,
             self.base_url + path,
             {
                 "accept": "application/json",
                 "authorization": f"Bearer {self._credential}",
                 "content-type": "application/json",
             },
-            json.dumps(message, separators=(",", ":"), sort_keys=True).encode(),
+            (
+                json.dumps(message, separators=(",", ":"), sort_keys=True).encode()
+                if message is not None
+                else b""
+            ),
             self.timeout_seconds,
         )
         try:
@@ -176,7 +206,7 @@ class RunnerControlClient:
         if not isinstance(document, dict):
             raise RunnerApiError("Starworks runner API returned a non-object response")
         try:
-            validate_contract("runner-control", document)
+            validate_contract(response_contract, document)  # type: ignore[arg-type]
         except Exception as error:
             raise RunnerApiError(
                 "Starworks runner API returned an invalid control message"
