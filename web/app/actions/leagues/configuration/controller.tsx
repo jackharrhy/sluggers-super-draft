@@ -9,6 +9,8 @@ import type { RemixNode } from 'remix/ui'
 import { ZodError } from 'zod'
 
 import { Configuration, Identity, Platform } from '../../../middleware/platform.ts'
+import { importAutoTeamSnapshot } from '../../../import/auto-team.ts'
+import { importStatEditorV4 } from '../../../import/stat-editor-v4.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import { routes } from '../../../routes.ts'
 import { ConfigurationDashboardPage, OperationPreviewPage } from '../../../ui/configuration-dashboard-page.tsx'
@@ -43,6 +45,28 @@ export default createController(routes.leagues.configuration, {
           characterValues: readJson(data, 'characterValues', StatProfileRevisionSchema.shape.characterValues),
           definitions: readJson(data, 'definitions', StatProfileRevisionSchema.shape.definitions),
           name: readString(data, 'name'),
+          slug: readString(data, 'slug'),
+        })
+        return redirect(routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId: revision.revisionId }), 303)
+      } catch (error) {
+        return renderConfigurationError(context, error)
+      }
+    },
+    async importStatEditor(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        let imported = importStatEditorV4({
+          profileName: readString(data, 'name'),
+          rawText: readString(data, 'rawText'),
+          sourceVersion: 'v4',
+        })
+        let revision = await context.get(Configuration).createStatProfileDraft(identity, league.id, {
+          characterValues: imported.characterValues,
+          definitions: imported.definitions,
+          name: imported.name,
           slug: readString(data, 'slug'),
         })
         return redirect(routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId: revision.revisionId }), 303)
@@ -178,6 +202,27 @@ export default createController(routes.leagues.configuration, {
         return renderConfigurationError(context, error)
       }
     },
+    async importAutoTeam(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        let imported = importAutoTeamSnapshot(
+          readJsonValue(data, 'snapshot'),
+          readString(data, 'teamName'),
+        )
+        let revision = await context.get(Configuration).createTeamLineupDraft(
+          identity,
+          league.id,
+          context.params.teamId,
+          { lineup: imported.lineup, rosterCharacterIds: imported.rosterCharacterIds },
+        )
+        return redirect(routes.leagues.configuration.showLineup.href({ leagueSlug: league.slug, revisionId: revision.lineupRevisionId, teamId: revision.teamId }), 303)
+      } catch (error) {
+        return renderConfigurationError(context, error)
+      }
+    },
     async showLineup(context) {
       let identity = context.get(Identity)
       let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
@@ -272,6 +317,15 @@ function readJson<T>(
       throw new PlatformError(`${name} must be valid configuration JSON`, 'invalid_input')
     }
     throw error
+  }
+}
+
+function readJsonValue(data: globalThis.FormData, name: string): unknown {
+  let raw = readString(data, name)
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw new PlatformError(`${name} must be valid JSON`, 'invalid_input')
   }
 }
 

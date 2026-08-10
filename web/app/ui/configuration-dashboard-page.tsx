@@ -72,6 +72,19 @@ export function ConfigurationDashboardPage(
               <JsonField label="Character values" name="characterValues" value={starterCharacterValues} />
               <button type="submit" mix={buttonStyle}>Create draft</button>
             </form>
+            <details mix={[cardStyle, importStyle]}>
+              <summary>Import Sluggers Stat Editor v4</summary>
+              <form action={routes.leagues.configuration.importStatEditor.href({ leagueSlug: league.slug })} method="post" mix={nestedFormStyle}>
+                <p mix={emptyStyle}>Paste a 507-line v4 save. Starworks imports character-shaped data and reports the unsupported relational/global sections in its migration boundary.</p>
+                <Field label="Profile name" name="name" defaultValue="Imported Stat Editor profile" />
+                <Field label="Slug" name="slug" defaultValue="imported-stat-editor" />
+                <label mix={fieldStyle}>
+                  <span>Stat Editor v4 snapshot</span>
+                  <textarea required name="rawText" rows={12} mix={[inputStyle, textareaStyle]} />
+                </label>
+                <button type="submit" mix={buttonStyle}>Import into draft</button>
+              </form>
+            </details>
           </div>
         </section>
 
@@ -128,6 +141,17 @@ export function ConfigurationDashboardPage(
                     <JsonField label="Roster character IDs" name="rosterCharacterIds" value={starterRoster} />
                     <JsonField label="Lineup" name="lineup" value={starterLineup} />
                     <button type="submit" mix={buttonStyle}>Create lineup</button>
+                  </form>
+                </details>
+                <details>
+                  <summary>Import MSS-AutoTeam</summary>
+                  <form action={routes.leagues.configuration.importAutoTeam.href({ leagueSlug: league.slug, teamId: team.id })} method="post" mix={nestedFormStyle}>
+                    <Field label="Source team name" name="teamName" defaultValue={team.name} />
+                    <label mix={fieldStyle}>
+                      <span>AutoTeam teams.json</span>
+                      <textarea required name="snapshot" rows={10} mix={[inputStyle, textareaStyle]} />
+                    </label>
+                    <button type="submit" mix={buttonStyle}>Import lineup draft</button>
                   </form>
                 </details>
               </article>
@@ -280,6 +304,7 @@ const sectionHeadingStyle = css({ alignItems: 'end', display: 'flex', justifyCon
 const countStyle = css({ color: '#9faec8', fontSize: '14px' })
 const gridStyle = css({ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 330px), 1fr))' })
 const formStyle = css({ alignContent: 'start', display: 'grid', gap: '16px' })
+const importStyle = css({ alignSelf: 'start' })
 const nestedFormStyle = css({ display: 'grid', gap: '14px', marginTop: '16px' })
 const previewFormStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' })
 const fieldStyle = css({ display: 'grid', fontSize: '14px', fontWeight: 700, gap: '7px' })
