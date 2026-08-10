@@ -19,8 +19,11 @@ import { getSeasonState } from "./utils/admin.server";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Lil Slug Crew" },
-    { name: "description", content: "Lil Slug Crew: Mario Sluggers League" },
+    { title: "Starworks" },
+    {
+      name: "description",
+      content: "Starworks: Mario Super Sluggers league operations",
+    },
   ];
 }
 
