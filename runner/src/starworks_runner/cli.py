@@ -10,6 +10,11 @@ import tempfile
 import time
 from pathlib import Path, PurePosixPath
 
+from starworks_runner.capture import (
+    CaptureRequest,
+    CaptureSource,
+    FfmpegCaptureController,
+)
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
 from starworks_runner.desktop import default_state_path
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
@@ -123,6 +128,30 @@ def create_parser() -> argparse.ArgumentParser:
     )
     patcher_parser.add_argument("--size-mib", type=int, default=8)
     patcher_parser.add_argument("--iterations", type=int, default=5)
+
+    capture_parser = subparsers.add_parser(
+        "capture",
+        help="record and/or publish an FFmpeg capture using runner-local settings",
+    )
+    capture_parser.add_argument("--ffmpeg", default="ffmpeg")
+    capture_parser.add_argument(
+        "--video-backend",
+        choices=("avfoundation", "gdigrab", "x11grab", "lavfi"),
+        required=True,
+    )
+    capture_parser.add_argument("--video-input", required=True)
+    capture_parser.add_argument(
+        "--audio-backend", choices=("avfoundation", "dshow", "pulse", "lavfi")
+    )
+    capture_parser.add_argument("--audio-input")
+    capture_parser.add_argument("--frame-rate", type=int, default=60)
+    capture_parser.add_argument("--video-size", default="1920x1080")
+    capture_parser.add_argument("--record", type=Path)
+    capture_parser.add_argument(
+        "--rtmp-url-environment",
+        help="environment variable containing the RTMP URL and stream key",
+    )
+    capture_parser.add_argument("--duration-seconds", type=float, default=10.0)
 
     desktop_parser = subparsers.add_parser(
         "desktop", help="open the native Starworks runner station"
@@ -365,6 +394,53 @@ def run(arguments: argparse.Namespace) -> int:
         }
         print(json.dumps(report, indent=2, sort_keys=True))
         return 0
+    if arguments.command == "capture":
+        if arguments.duration_seconds <= 0:
+            raise SluggersAdapterError("duration-seconds must be positive")
+        if arguments.record is None and arguments.rtmp_url_environment is None:
+            raise SluggersAdapterError(
+                "capture requires --record and/or --rtmp-url-environment"
+            )
+        source = CaptureSource(
+            video_backend=arguments.video_backend,
+            video_input=arguments.video_input,
+            audio_backend=arguments.audio_backend,
+            audio_input=arguments.audio_input,
+            frame_rate=arguments.frame_rate,
+            video_size=arguments.video_size,
+        )
+        rtmp_url = (
+            os.environ.get(arguments.rtmp_url_environment)
+            if arguments.rtmp_url_environment
+            else None
+        )
+        controller = FfmpegCaptureController(arguments.ffmpeg)
+        started = controller.start(
+            CaptureRequest(
+                source=source,
+                recording_path=arguments.record,
+                rtmp_url=rtmp_url,
+                publish_configured=arguments.rtmp_url_environment is not None,
+            )
+        )
+        deadline = time.monotonic() + arguments.duration_seconds
+        try:
+            while time.monotonic() < deadline and controller.health().state in (
+                "running",
+                "degraded",
+            ):
+                time.sleep(min(0.25, deadline - time.monotonic()))
+        except KeyboardInterrupt:
+            pass
+        stopped = controller.stop()
+        print(
+            json.dumps(
+                {"started": started.report_value(), "stopped": stopped.report_value()},
+                indent=2,
+                sort_keys=True,
+            )
+        )
+        return 0 if started.state == "running" else 1
     if arguments.command == "desktop":
         from starworks_runner.desktop import DesktopDefaults, launch_desktop
 
