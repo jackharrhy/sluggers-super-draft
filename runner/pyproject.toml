@@ -30,6 +30,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/starworks_runner"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"../contracts/fixtures" = "starworks_runner/contract_schemas/fixtures"
+"../contracts/generated" = "starworks_runner/contract_schemas/generated"
+
 [tool.pytest.ini_options]
 addopts = "--strict-config --strict-markers"
 testpaths = ["tests"]

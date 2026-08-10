@@ -1,0 +1,49 @@
+name: Release runner
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  runner-wheel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: astral-sh/setup-uv@v9
+
+      - name: Build runner wheel
+        run: |
+          uv build --project runner --wheel --out-dir dist/runner
+          version="${GITHUB_REF_NAME#v}"
+          test -f "dist/runner/starworks_runner-${version}-py3-none-any.whl"
+          cd dist/runner
+          sha256sum *.whl > SHA256SUMS
+
+      - name: Smoke-test packaged contracts
+        run: |
+          tool_dir="$(mktemp -d)"
+          bin_dir="$(mktemp -d)"
+          UV_TOOL_DIR="$tool_dir" UV_TOOL_BIN_DIR="$bin_dir" \
+            uv tool install --python 3.12 dist/runner/*.whl
+          "$bin_dir/starworks-runner" validate-contracts
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          dist/runner/*.whl
+          dist/runner/SHA256SUMS
+          --generate-notes
+          --title "Starworks $GITHUB_REF_NAME"

@@ -21,6 +21,10 @@ lifecycle acknowledgements are journaled there so restarting the runner cannot
 silently claim or execute a second attempt. The same server-side lease remains
 authoritative; local recovery does not extend an expired lease by itself.
 
+Tagged releases include a wheel with bundled contract schemas and checksums.
+See the [runner installation, update, support, and recovery policy](../docs/runner-support.md)
+before installing a station outside a source checkout.
+
 Validate the shared contract fixtures directly:
 
 ```shell

@@ -43,6 +43,9 @@ def default_contracts_directory() -> Path:
     configured = os.environ.get("STARWORKS_CONTRACTS_DIR")
     if configured:
         return Path(configured).expanduser().resolve()
+    packaged = Path(__file__).resolve().parent / "contract_schemas"
+    if packaged.is_dir():
+        return packaged
     return Path(__file__).resolve().parents[3] / "contracts"
 
 

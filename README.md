@@ -38,6 +38,9 @@ art keep their own licenses; absence from the codebase does not mean absence
 from the community map.
 
 See the [architecture and product plan](PLAN.md), the [phased delivery plan](docs/plans/2026-08-10-starworks-platform.md), and the [prior-art/community map](PRIOR_ART.md).
+Production operation is covered by the [production runbook](docs/operations/production-runbook.md),
+with separate [runner support](docs/runner-support.md) and [compatibility](docs/compatibility-policy.md)
+policies.
 
 ## Workspace
 
@@ -82,3 +85,7 @@ npm run dev
 ```
 
 Visit `http://localhost:3000`.
+
+Process health is available at `/healthz`; `/readyz` checks PostgreSQL and
+Garage. Local aggregate metrics use `/internal/metrics` with the bearer token
+from `METRICS_BEARER_TOKEN`.
