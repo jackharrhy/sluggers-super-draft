@@ -14,6 +14,11 @@ services:
     tmpfs:
       - /run
       - /var/lib/haproxy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:2375/_ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -23,7 +28,8 @@ services:
     image: traefik:v3.7@sha256:9c3b91d5fb7770853ca5c1124a23c34bf2d9b47ffaebeab2614cbaf410dcb2ac
     restart: unless-stopped
     depends_on:
-      - docker-socket-proxy
+      docker-socket-proxy:
+        condition: service_healthy
     read_only: true
     security_opt:
       - no-new-privileges:true

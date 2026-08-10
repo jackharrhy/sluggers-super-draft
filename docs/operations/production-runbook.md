@@ -135,7 +135,7 @@ Recommended first alerts:
 | Bridge mismatch or transport failure | increase with `failure_kind="bridge-failure"` |
 | Missing/overflowed telemetry | increase in `starworks_telemetry_derivations_total{status="review"}` |
 | Runner disappeared | `starworks_runner_stations_stale > 0` |
-| Recording or RTMP unhealthy | `starworks_runner_components{component="recording|publishing",state="degraded|failed"} > 0` |
+| Recording or RTMP unhealthy | `starworks_runner_components{component=~"recording|publishing",state=~"degraded|failed"} > 0` |
 | Garage unavailable | `cluster_available == 0` from Garage's metrics |
 
 Request logs are structured JSON and include correlation, actor, league,
