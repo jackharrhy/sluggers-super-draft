@@ -262,13 +262,13 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
     ).build(BuildRequest(image_path=image, cache_root=tmp_path / "cache"))
     dolphin = tmp_path / "Dolphin"
     dolphin.write_text(
-        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo \'Dolphin 2603\'; fi\n',
+        '#!/bin/sh\nif [ "$1" = "--version" ]; then echo \'Dolphin 2606\'; fi\n',
         encoding="utf-8",
     )
     dolphin.chmod(0o755)
     launcher = DolphinLauncher(dolphin)
 
-    assert "2603" in launcher.verify()
+    assert "2606" in launcher.verify()
     command = launcher.command_for(result.build_directory, tmp_path / "profile")
     assert command[-2:] == (
         "--exec",
