@@ -3,19 +3,27 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --import remix/node-tsx scripts/migrate.ts",
+    "db:bootstrap-admin": "node --import remix/node-tsx scripts/bootstrap-site-admin.ts",
     "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",
     "test": "remix test",
+    "test:db": "node --import remix/node-tsx --test app/platform/database/schema.integration.ts",
     "typecheck": "tsc --noEmit"
   },
   "engines": {
     "node": ">=24.3.0"
   },
   "dependencies": {
-    "remix": "^3.0.0-beta.5"
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3.4.9",
+    "remix": "^3.0.0-beta.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "latest",
+    "drizzle-kit": "^0.31.10",
     "playwright": "^1.62.1",
     "typescript": "latest"
   }
