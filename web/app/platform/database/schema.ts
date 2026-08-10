@@ -16,6 +16,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import type {
+  ContentPackManifest,
   RunnerCapabilities,
   RulesetRevision,
   StatProfileRevision,
@@ -839,6 +840,132 @@ export const rulesetRevisions = pgTable(
       columns: [table.leagueId, table.basedOnRevisionId],
       foreignColumns: [table.leagueId, table.id],
       name: 'ruleset_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const contentPacks = pgTable(
+  'content_packs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    slug: text('slug').notNull(),
+    name: text('name').notNull(),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    ...timestamps,
+  },
+  (table) => [
+    unique('content_packs_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('content_packs_league_slug_unique').on(table.leagueId, table.slug),
+  ],
+)
+
+export const contentAssets = pgTable(
+  'content_assets',
+  {
+    leagueId: uuid('league_id')
+      .notNull()
+      .references(() => leagues.id, { onDelete: 'cascade' }),
+    sha256: text('sha256').notNull(),
+    objectKey: text('object_key').notNull(),
+    mediaType: text('media_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    displayName: text('display_name').notNull(),
+    uploadedByPersonId: uuid('uploaded_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.sha256] }),
+    uniqueIndex('content_assets_object_key_unique').on(table.objectKey),
+    check('content_assets_sha256_check', sql`${table.sha256} ~ '^[a-f0-9]{64}$'`),
+    check('content_assets_size_check', sql`${table.sizeBytes} > 0`),
+  ],
+)
+
+export const contentPackRevisions = pgTable(
+  'content_pack_revisions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    contentPackId: uuid('content_pack_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    status: revisionStatus('status').notNull().default('draft'),
+    statProfileRevisionId: uuid('stat_profile_revision_id').notNull(),
+    rulesetRevisionId: uuid('ruleset_revision_id').notNull(),
+    adapterVersion: text('adapter_version').notNull(),
+    mainDolSha256: text('main_dol_sha256').notNull(),
+    statCharacterIds: jsonb('stat_character_ids').$type<string[]>().notNull().default([]),
+    manifest: jsonb('manifest').$type<ContentPackManifest>(),
+    manifestSha256: text('manifest_sha256'),
+    basedOnRevisionId: uuid('based_on_revision_id'),
+    createdByPersonId: uuid('created_by_person_id')
+      .notNull()
+      .references(() => people.id),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+  },
+  (table) => [
+    unique('content_pack_revisions_league_id_id_unique').on(table.leagueId, table.id),
+    uniqueIndex('content_pack_revisions_number_unique').on(
+      table.leagueId,
+      table.contentPackId,
+      table.revisionNumber,
+    ),
+    check('content_pack_revisions_number_check', sql`${table.revisionNumber} > 0`),
+    check('content_pack_revisions_dol_hash_check', sql`${table.mainDolSha256} ~ '^[a-f0-9]{64}$'`),
+    foreignKey({
+      columns: [table.leagueId, table.contentPackId],
+      foreignColumns: [contentPacks.leagueId, contentPacks.id],
+      name: 'content_pack_revisions_pack_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.statProfileRevisionId],
+      foreignColumns: [statProfileRevisions.leagueId, statProfileRevisions.id],
+      name: 'content_pack_revisions_stat_profile_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.rulesetRevisionId],
+      foreignColumns: [rulesetRevisions.leagueId, rulesetRevisions.id],
+      name: 'content_pack_revisions_ruleset_fk',
+    }),
+    foreignKey({
+      columns: [table.leagueId, table.basedOnRevisionId],
+      foreignColumns: [table.leagueId, table.id],
+      name: 'content_pack_revisions_based_on_fk',
+    }),
+  ],
+)
+
+export const contentPackAssetAssignments = pgTable(
+  'content_pack_asset_assignments',
+  {
+    leagueId: uuid('league_id').notNull(),
+    contentPackRevisionId: uuid('content_pack_revision_id').notNull(),
+    characterId: text('character_id').notNull(),
+    slot: text('slot').notNull(),
+    assetSha256: text('asset_sha256').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.leagueId, table.contentPackRevisionId, table.characterId, table.slot],
+    }),
+    check('content_pack_asset_assignments_slot_check', sql`${table.slot} in ('icon', 'portrait', 'model', 'texture')`),
+    foreignKey({
+      columns: [table.leagueId, table.contentPackRevisionId],
+      foreignColumns: [contentPackRevisions.leagueId, contentPackRevisions.id],
+      name: 'content_pack_asset_assignments_revision_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.assetSha256],
+      foreignColumns: [contentAssets.leagueId, contentAssets.sha256],
+      name: 'content_pack_asset_assignments_asset_fk',
     }),
   ],
 )
