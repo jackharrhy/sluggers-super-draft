@@ -2,7 +2,6 @@ import { z } from "zod";
 import {
   RelativeBuildPathSchema,
   Sha256Schema,
-  TimestampSchema,
   VersionSchema,
 } from "./common";
 
@@ -44,7 +43,6 @@ export const GameBuildManifestSchema = z
         message: z.string().min(1).max(1_024),
       }),
     ),
-    createdAt: TimestampSchema,
   })
   .meta({
     title: "GameBuildManifest v1",
