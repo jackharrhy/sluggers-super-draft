@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 from datetime import UTC, datetime
@@ -27,6 +28,11 @@ from starworks_runner.games.sluggers.fingerprints import (
     fingerprint_extraction,
 )
 from starworks_runner.games.sluggers.hashing import sha256_file
+from starworks_runner.games.sluggers.patching import (
+    GuardedWrite,
+    PrecompiledPatchPlan,
+    PrecompiledPatchSetApplier,
+)
 from starworks_runner.games.sluggers.tools import (
     DtkDiscTool,
     DtkRelease,
@@ -370,6 +376,58 @@ def test_published_stat_content_build_is_deterministic_and_removable(
         clean_result.game_directory / "files/dt_na.dat"
     ).read_bytes() == b"clean dat"
     assert image.read_bytes() == original_image
+
+
+def test_trusted_static_hook_is_preflighted_and_recorded_in_the_build(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    source = (clean / "sys/main.dol").read_bytes()
+    replacement = b"STAR"
+    output = replacement + source[len(replacement) :]
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "bridge.bin").write_bytes(replacement)
+    plan = PrecompiledPatchPlan(
+        patch_id="synthetic-static-hook",
+        target_path=PurePosixPath("sys/main.dol"),
+        expected_input_sha256=hashlib.sha256(source).hexdigest(),
+        expected_output_sha256=hashlib.sha256(output).hexdigest(),
+        artifact_path=PurePosixPath("bridge.bin"),
+        artifact_sha256=hashlib.sha256(replacement).hexdigest(),
+        artifact_size_bytes=len(replacement),
+        writes=(
+            GuardedWrite(
+                target_offset=0,
+                artifact_offset=0,
+                size_bytes=len(replacement),
+                expected_bytes=source[: len(replacement)],
+            ),
+        ),
+    )
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+        trusted_patch_set=PrecompiledPatchSetApplier(artifacts, (plan,)),
+    )
+
+    result = service.build(
+        BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+    )
+
+    assert (result.game_directory / "sys/main.dol").read_bytes() == output
+    assert result.manifest["patchReceipts"] == [plan.receipt()]
+    assert result.manifest["warnings"] == []
 
 
 def content_documents(clean: Path) -> tuple[dict[str, object], dict[str, object]]:
