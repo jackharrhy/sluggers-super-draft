@@ -24,7 +24,7 @@ import {
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
-import { administrativeRoles } from '../platform/repository.ts'
+import { runnerOperationRoles } from '../platform/repository.ts'
 import { createOpaqueToken } from '../platform/security.ts'
 
 const ScheduleMatchSchema = z.strictObject({
@@ -407,8 +407,8 @@ export class RunnerAdminService {
   #requireAdmin(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {
     if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
     let membership = identity.memberships.find((candidate) => candidate.leagueId === leagueId)
-    if (!identity.isSiteAdmin && !membership?.roles.some((role) => administrativeRoles.has(role))) {
-      throw new PlatformError('League administrator access is required', 'forbidden')
+    if (!identity.isSiteAdmin && !membership?.roles.some((role) => runnerOperationRoles.has(role))) {
+      throw new PlatformError('Runner operator access is required', 'forbidden')
     }
   }
 }

@@ -11,7 +11,11 @@ import type {
   SessionIdentity,
   RunnerCredentialScope,
 } from './model.ts'
-import { administrativeRoles, type PlatformRepository } from './repository.ts'
+import {
+  administrativeRoles,
+  runnerOperationRoles,
+  type PlatformRepository,
+} from './repository.ts'
 import { createOpaqueToken, hashSecret } from './security.ts'
 
 const provisionLeagueSchema = z.object({
@@ -123,8 +127,8 @@ export class PlatformService {
     input: { name: string; scopes: RunnerCredentialScope[] },
   ): Promise<IssuedRunnerCredential> {
     if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
-    if (!mayAdministerLeague(identity, leagueId)) {
-      throw new PlatformError('League administrator access is required', 'forbidden')
+    if (!mayOperateRunners(identity, leagueId)) {
+      throw new PlatformError('Runner operator access is required', 'forbidden')
     }
     let parsed = runnerCredentialSchema.safeParse(input)
     if (!parsed.success) throw new PlatformError('Runner credential is invalid', 'invalid_input')
@@ -152,8 +156,8 @@ export class PlatformService {
     credentialId: string,
   ): Promise<void> {
     if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
-    if (!mayAdministerLeague(identity, leagueId)) {
-      throw new PlatformError('League administrator access is required', 'forbidden')
+    if (!mayOperateRunners(identity, leagueId)) {
+      throw new PlatformError('Runner operator access is required', 'forbidden')
     }
     let revoked = await this.repository.revokeRunnerCredential({
       actorPersonId: identity.personId,
@@ -170,5 +174,13 @@ function mayAdministerLeague(identity: SessionIdentity, leagueId: string): boole
   return (
     identity.isSiteAdmin ||
     membership?.roles.some((role) => administrativeRoles.has(role)) === true
+  )
+}
+
+function mayOperateRunners(identity: SessionIdentity, leagueId: string): boolean {
+  let membership = identity.memberships.find((candidate) => candidate.leagueId === leagueId)
+  return (
+    identity.isSiteAdmin ||
+    membership?.roles.some((role) => runnerOperationRoles.has(role)) === true
   )
 }

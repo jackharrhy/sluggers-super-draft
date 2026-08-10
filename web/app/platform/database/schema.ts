@@ -35,6 +35,9 @@ export const leagueRole = pgEnum('league_role', [
   'administrator',
   'commissioner',
   'manager',
+  'league_admin',
+  'scorekeeper',
+  'runner_operator',
   'member',
 ])
 export const seasonStatus = pgEnum('season_status', ['draft', 'active', 'complete', 'archived'])

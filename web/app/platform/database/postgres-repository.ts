@@ -399,14 +399,14 @@ export class PostgresPlatformRepository implements PlatformRepository {
         createdByPersonId: input.actorPersonId,
         expiresAt: input.invitationExpiresAt,
         leagueId: league.id,
-        role: 'administrator',
+        role: 'league_admin',
         tokenHash: input.invitationTokenHash,
       })
       await transaction.insert(auditRecords).values({
         action: 'league.provisioned',
         actorPersonId: input.actorPersonId,
         leagueId: league.id,
-        metadata: { initialInvitationRole: 'administrator' },
+        metadata: { initialInvitationRole: 'league_admin' },
         targetId: league.id,
         targetType: 'league',
       })

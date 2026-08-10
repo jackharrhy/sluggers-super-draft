@@ -212,6 +212,7 @@ test(
       })
       memberPersonId = firstCompleted.identity.personId
       assert.equal(firstCompleted.identity.memberships.length, 1)
+      assert.deepEqual(firstCompleted.identity.memberships[0]?.roles, ['league_admin'])
 
       let secondLogin = identityServiceWithTokens(repository, profile, [
         `state-two-${discriminator}`,

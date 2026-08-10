@@ -2,7 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
-import { administrativeRoles } from '../platform/repository.ts'
+import { administrativeRoles, runnerOperationRoles, scoringRoles } from '../platform/repository.ts'
 import type { LeagueOperationsDashboard } from '../league-operations/service.ts'
 import type { RunnerOperationsDashboard } from '../runner/admin-service.ts'
 import type { SeasonStatistics, TelemetryAttemptSummary } from '../telemetry/service.ts'
@@ -25,6 +25,8 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
     let { dashboard, error, identity, league, leagueOperations, oneTimeCredential, seasonStatistics, telemetry } = handle.props
     let teams = dashboard.seasons.flatMap((season) => season.teams)
     let mayAdminister = identity.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
+    let mayOperateRunner = identity.isSiteAdmin || league.roles.some((role) => runnerOperationRoles.has(role))
+    let mayScore = identity.isSiteAdmin || league.roles.some((role) => scoringRoles.has(role))
     return (
       <AppShell identity={identity} title={`${league.name} operations · Starworks`}>
         <header mix={heroStyle}>
@@ -45,7 +47,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
         <TelemetryOperations
           attempts={telemetry}
           league={league}
-          mayAdminister={mayAdminister}
+          mayAdminister={mayScore}
           seasonStatistics={seasonStatistics}
         />
         {oneTimeCredential ? (
@@ -56,7 +58,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
           </section>
         ) : null}
 
-        {mayAdminister ? <>
+        {mayOperateRunner ? <>
         <div mix={twoColumnStyle}>
           <section mix={cardStyle} aria-labelledby="schedule-heading">
             <h2 id="schedule-heading">Schedule a match</h2>

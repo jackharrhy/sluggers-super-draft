@@ -6,7 +6,7 @@ import { Identity, LeagueOperations, Platform, RunnerAdmin, Telemetry } from '..
 import type { LeagueOperationsApplication } from '../../../league-operations/service.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
-import { administrativeRoles } from '../../../platform/repository.ts'
+import { runnerOperationRoles } from '../../../platform/repository.ts'
 import type { RunnerAdminApplication } from '../../../runner/admin-service.ts'
 import type { TelemetryApplication } from '../../../telemetry/service.ts'
 import { routes } from '../../../routes.ts'
@@ -280,10 +280,10 @@ async function loadDashboards(
   leagueOperations: LeagueOperationsApplication,
   telemetry: TelemetryApplication,
 ) {
-  let mayAdminister = Boolean(identity?.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role)))
+  let mayOperateRunner = Boolean(identity?.isSiteAdmin || league.roles.some((role) => runnerOperationRoles.has(role)))
   let [leagueOperationsDashboard, runnerDashboard, telemetryDashboard] = await Promise.all([
     leagueOperations.dashboard(identity, league.id),
-    mayAdminister ? runnerAdmin.dashboard(identity, league.id) : Promise.resolve(emptyRunnerDashboard()),
+    mayOperateRunner ? runnerAdmin.dashboard(identity, league.id) : Promise.resolve(emptyRunnerDashboard()),
     telemetry.dashboard(identity, league.id),
   ])
   let seasonStatistics = await Promise.all(leagueOperationsDashboard.seasons.map(async (season) => ({
