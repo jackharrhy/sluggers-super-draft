@@ -10,6 +10,7 @@ import { LeagueOperationsService, type LeagueOperationsApplication } from '../le
 import { RunnerControlService, type RunnerControlApplication } from '../runner/control-service.ts'
 import { RunnerAdminService, type RunnerAdminApplication } from '../runner/admin-service.ts'
 import { TelemetryService, type TelemetryApplication } from '../telemetry/service.ts'
+import { OperationsService, type OperationsApplication } from '../operations/service.ts'
 import { createDatabase } from './database/connection.ts'
 import { PostgresPlatformRepository } from './database/postgres-repository.ts'
 import {
@@ -28,6 +29,7 @@ export interface AppRuntime {
   identity: IdentityService
   leagueOperations: LeagueOperationsApplication
   oauthCookie: Cookie
+  operations: OperationsApplication
   platform: PlatformService
   runnerControl: RunnerControlApplication
   runnerAdmin: RunnerAdminApplication
@@ -43,6 +45,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
   if (!databaseUrl) throw new Error('DATABASE_URL is required')
 
   let connection = createDatabase(databaseUrl)
+  let assets = createContentAssetStore(process.env)
   let repository = new PostgresPlatformRepository(connection.database)
   let cookieOptions = createCookieOptions(process.env)
   let discord: DiscordOAuthClient
@@ -59,11 +62,14 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     },
     broadcast: new BroadcastService(connection.database),
     configuration: new ConfigurationService(connection.database),
-    content: new ContentService(connection.database, createContentAssetStore(process.env)),
+    content: new ContentService(connection.database, assets),
     draft: new DraftService(connection.database),
     identity: new IdentityService(repository, discord),
     leagueOperations: new LeagueOperationsService(connection.database),
     oauthCookie: createCookie('starworks_oauth', { ...cookieOptions, maxAge: 10 * 60 }),
+    operations: new OperationsService(connection.database, assets, {
+      metricsToken: process.env.METRICS_BEARER_TOKEN,
+    }),
     platform: new PlatformService(repository),
     runnerControl: new RunnerControlService(connection.database),
     runnerAdmin: new RunnerAdminService(connection.database),

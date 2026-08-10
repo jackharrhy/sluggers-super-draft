@@ -11,6 +11,7 @@ services:
       DISCORD_REDIRECT_URI: "${DISCORD_REDIRECT_URI:-http://127.0.0.1:3000/auth/discord/callback}"
       NODE_ENV: "production"
       PORT: "3000"
+      METRICS_BEARER_TOKEN: "${METRICS_BEARER_TOKEN:-starworks-local-metrics-token-change-me}"
       SESSION_COOKIE_SECRETS: "${SESSION_COOKIE_SECRETS:-starworks-local-compose-cookie-secret-change-me}"
       S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-GK00000000000000000000000000000000}"
       S3_BUCKET: "${S3_BUCKET:-starworks}"

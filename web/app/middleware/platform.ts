@@ -6,6 +6,7 @@ import type { BroadcastApplication } from '../broadcast/service.ts'
 import type { ContentApplication } from '../content/service.ts'
 import type { DraftApplication } from '../draft/service.ts'
 import type { LeagueOperationsApplication } from '../league-operations/service.ts'
+import type { OperationsApplication } from '../operations/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
 import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { TelemetryApplication } from '../telemetry/service.ts'
@@ -23,6 +24,7 @@ export const Draft = createContextKey<DraftApplication>()
 export const IdentityServiceContext = createContextKey<IdentityService>()
 export const LeagueOperations = createContextKey<LeagueOperationsApplication>()
 export const OAuthCookie = createContextKey<Cookie>()
+export const Operations = createContextKey<OperationsApplication>()
 export const Platform = createContextKey<PlatformService>()
 export const RunnerControl = createContextKey<RunnerControlApplication>()
 export const RunnerAdmin = createContextKey<RunnerAdminApplication>()
@@ -41,6 +43,7 @@ export function platform(
     { key: typeof IdentityServiceContext; value: IdentityService },
     { key: typeof LeagueOperations; value: LeagueOperationsApplication },
     { key: typeof OAuthCookie; value: Cookie },
+    { key: typeof Operations; value: OperationsApplication },
     { key: typeof Platform; value: PlatformService },
     { key: typeof RunnerControl; value: RunnerControlApplication },
     { key: typeof RunnerAdmin; value: RunnerAdminApplication },
@@ -61,6 +64,7 @@ export function platform(
     context.set(IdentityServiceContext, runtime.identity)
     context.set(LeagueOperations, runtime.leagueOperations)
     context.set(OAuthCookie, runtime.oauthCookie)
+    context.set(Operations, runtime.operations)
     context.set(Platform, runtime.platform)
     context.set(RunnerControl, runtime.runnerControl)
     context.set(RunnerAdmin, runtime.runnerAdmin)

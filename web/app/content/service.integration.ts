@@ -29,6 +29,7 @@ test(
           let fixture = await createFixture(transaction as unknown as StarworksDatabase)
           let objects = new Map<string, Uint8Array>()
           let store: ContentAssetStore = {
+            async ready() {},
             async put(key, bytes) { objects.set(key, bytes) },
           }
           let ids = [randomUUID(), randomUUID(), randomUUID()]
