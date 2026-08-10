@@ -11,6 +11,24 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      DATABASE_URL: postgres://starworks:starworks@127.0.0.1:5432/starworks_test
+      STARWORKS_TEST_DATABASE_URL: postgres://starworks:starworks@127.0.0.1:5432/starworks_test
+
+    services:
+      postgres:
+        image: postgres:17@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+        env:
+          POSTGRES_DB: starworks_test
+          POSTGRES_PASSWORD: starworks
+          POSTGRES_USER: starworks
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U starworks -d starworks_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@v7
@@ -40,6 +58,11 @@ jobs:
       - name: Install runner dependencies
         run: uv sync --project runner --locked --group test
 
+      - name: Lint runner
+        run: |
+          uvx ruff==0.16.2 format --check runner
+          uvx ruff==0.16.2 check runner
+
       - name: Typecheck
         run: npm run typecheck
 
@@ -49,14 +72,52 @@ jobs:
       - name: Test Remix
         run: npm --prefix web test
 
+      - name: Test PostgreSQL integrations
+        run: |
+          npm --prefix web run db:migrate
+          npm --prefix web run test:db
+
+      - name: Audit production JavaScript dependencies
+        run: npm --prefix web audit --omit=dev --audit-level=high
+
+      - name: Build and smoke-test runner wheel
+        run: |
+          uv build --project runner --wheel --out-dir dist/runner
+          tool_dir="$(mktemp -d)"
+          bin_dir="$(mktemp -d)"
+          UV_TOOL_DIR="$tool_dir" UV_TOOL_BIN_DIR="$bin_dir" \
+            uv tool install --python 3.12 dist/runner/*.whl
+          "$bin_dir/starworks-runner" validate-contracts
+
       - name: Validate Compose topologies
         run: |
           docker compose config --quiet
           docker compose --profile email config --quiet
+          docker compose --profile operations config --quiet
           docker compose \
             --env-file deploy/prod/.env.example \
             -f deploy/prod/compose.yml \
             config --quiet
+          docker compose \
+            --env-file deploy/prod/.env.example \
+            -f deploy/prod/compose.yml \
+            --profile operations \
+            config --quiet
+          STARWORKS_RESTORE_DIR=/tmp docker compose \
+            -f deploy/prod/restore-drill.compose.yml \
+            config --quiet
+          docker compose \
+            --env-file deploy/runner/.env.example \
+            -f deploy/runner/compose.yml \
+            config --quiet
+
+      - name: Validate runner image definition
+        run: docker build --check --platform linux/amd64 -f deploy/runner/Dockerfile .
 
       - name: Build web image
         run: docker build --tag starworks-web:ci .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: starworks-runner-wheel
+          path: dist/runner/*.whl

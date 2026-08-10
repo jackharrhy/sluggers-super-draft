@@ -16,7 +16,11 @@ from starworks_runner.capture import (
     FfmpegCaptureController,
     resolve_local_secret,
 )
-from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
+from starworks_runner.contracts import (
+    CONTRACT_NAMES,
+    default_contracts_directory,
+    validate_contract,
+)
 from starworks_runner.desktop import default_state_path
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
 from starworks_runner.games.sluggers.bridge.layout import BridgeLayout
@@ -65,7 +69,7 @@ def create_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument(
         "--contracts-directory",
         type=Path,
-        default=Path(__file__).resolve().parents[3] / "contracts",
+        default=default_contracts_directory(),
     )
 
     install_parser = subparsers.add_parser(
