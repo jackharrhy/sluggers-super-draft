@@ -279,6 +279,7 @@ def launch_desktop(
                 state,
                 station_name=self.station_name.text().strip(),
                 capabilities=native_capabilities(),
+                content_cache=defaults.state_path.parent / "cache",
             )
             return station, state
 

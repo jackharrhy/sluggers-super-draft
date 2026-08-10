@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import test from 'node:test'
 
 import {
   RulesetRevisionSchema,
+  ContentPackManifestSchema,
   StatProfileRevisionSchema,
   TeamLineupRevisionSchema,
   type RunnerRegistrationRequest,
@@ -16,6 +17,10 @@ import statProfileFixture from '../../../contracts/fixtures/valid/stat-profile-r
 import { createDatabase, type StarworksDatabase } from '../platform/database/connection.ts'
 import {
   attemptLifecycleEvents,
+  contentAssets,
+  contentPackAssetAssignments,
+  contentPackRevisions,
+  contentPacks,
   leagueTeams,
   leagues,
   lineupRevisions,
@@ -49,8 +54,13 @@ test(
           let database = transaction as unknown as StarworksDatabase
           let fixture = await createRunnerFixture(database)
           let now = new Date('2026-08-10T12:00:00Z')
+          let content = await createContentPackFixture(database, fixture, now)
           let admin = new RunnerAdminService(database, { clock: () => now })
           let control = new RunnerControlService(database, {
+            assetStore: { async get(objectKey) {
+              assert.equal(objectKey, content.objectKey)
+              return content.bytes
+            } },
             clock: () => now,
             heartbeatSeconds: 10,
             leaseSeconds: 60,
@@ -63,6 +73,7 @@ test(
           })
           let firstAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
             awayLineupRevisionId: fixture.away.lineupRevisionId,
+            contentPackRevisionId: content.revisionId,
             dynamicRuleOverrides: { 'game.innings': 7 },
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'a'.repeat(64),
@@ -79,6 +90,7 @@ test(
           let firstClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.ok(firstClaim.run)
           assert.equal(firstClaim.run.attemptId, firstAttempt.attemptId)
+          assert.equal(firstClaim.run.contentPackRevisionId, content.revisionId)
           assert.equal(firstClaim.run.teams[0].teamId, fixture.home.teamId)
           assert.equal(firstClaim.run.dynamicRuleOverrides['game.innings'], 7)
           assert.equal(firstClaim.run.statProfileRevisionId, fixture.statProfileRevisionId)
@@ -90,9 +102,18 @@ test(
           assert.equal(configuration.attemptNonce, firstClaim.run.attemptNonce)
           assert.equal(configuration.statProfile.revisionId, fixture.statProfileRevisionId)
           assert.equal(configuration.ruleset.revisionId, fixture.rulesetRevisionId)
+          assert.equal(configuration.contentPack?.revisionId, content.revisionId)
           assert.deepEqual(
             configuration.teams.map((team) => [team.side, team.lineup.teamId]),
             [['home', fixture.home.teamId], ['away', fixture.away.teamId]],
+          )
+          assert.deepEqual(
+            await control.asset(fixture.credentials.first.raw, firstAttempt.attemptId, content.sha256),
+            { bytes: content.bytes, mediaType: 'image/png', sha256: content.sha256 },
+          )
+          await assert.rejects(
+            control.asset(fixture.credentials.second.raw, firstAttempt.attemptId, content.sha256),
+            (error: unknown) => error instanceof PlatformError && error.code === 'not_found',
           )
           let operations = await admin.dashboard(fixture.identity, fixture.leagueId)
           assert.equal(operations.matches[0]?.attempts[0]?.status, 'leased')
@@ -282,7 +303,7 @@ async function createRunnerFixture(database: StarworksDatabase) {
       id: firstCredentialId,
       leagueId,
       name: 'First runner',
-      scopes: ['heartbeat:write', 'runs:claim', 'runs:read'],
+      scopes: ['artifacts:read', 'heartbeat:write', 'runs:claim', 'runs:read'],
       secretHash: hashSecret(firstSecret),
     },
     {
@@ -290,7 +311,7 @@ async function createRunnerFixture(database: StarworksDatabase) {
       id: secondCredentialId,
       leagueId,
       name: 'Second runner',
-      scopes: ['heartbeat:write', 'runs:claim', 'runs:read'],
+      scopes: ['artifacts:read', 'heartbeat:write', 'runs:claim', 'runs:read'],
       secretHash: hashSecret(secondSecret),
     },
   ])
@@ -314,6 +335,73 @@ async function createRunnerFixture(database: StarworksDatabase) {
     seasonId,
     statProfileRevisionId,
   }
+}
+
+async function createContentPackFixture(
+  database: StarworksDatabase,
+  fixture: Awaited<ReturnType<typeof createRunnerFixture>>,
+  now: Date,
+) {
+  let bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+  let sha256 = createHash('sha256').update(bytes).digest('hex')
+  let contentPackId = randomUUID()
+  let revisionId = randomUUID()
+  let objectKey = `leagues/${fixture.leagueId}/content-assets/${sha256}`
+  let manifest = ContentPackManifestSchema.parse({
+    adapterVersion: '0.1.0',
+    assets: [{ displayName: 'Runner icon', mediaType: 'image/png', sha256, sizeBytes: bytes.byteLength }],
+    assignments: [{ assignmentType: 'character-asset', assetSha256: sha256, characterId: 'mario', slot: 'icon' }],
+    contentPackId,
+    createdAt: now.toISOString(),
+    kind: 'content-pack-manifest',
+    revisionId,
+    rulesetRevisionId: fixture.rulesetRevisionId,
+    schemaVersion: 1,
+    statProfileRevisionId: fixture.statProfileRevisionId,
+    targetGame: { gameId: 'RMBE01', supportedRevisions: [{ mainDolSha256: 'f'.repeat(64), region: 'NTSC-U', revision: 0 }] },
+  })
+  await database.insert(contentPacks).values({
+    createdByPersonId: fixture.identity.personId,
+    id: contentPackId,
+    leagueId: fixture.leagueId,
+    name: 'Runner pack',
+    slug: 'runner-pack',
+  })
+  await database.insert(contentAssets).values({
+    displayName: 'Runner icon',
+    leagueId: fixture.leagueId,
+    mediaType: 'image/png',
+    objectKey,
+    sha256,
+    sizeBytes: bytes.byteLength,
+    uploadedByPersonId: fixture.identity.personId,
+  })
+  await database.insert(contentPackRevisions).values({
+    adapterVersion: '0.1.0',
+    contentPackId,
+    createdByPersonId: fixture.identity.personId,
+    id: revisionId,
+    leagueId: fixture.leagueId,
+    mainDolSha256: 'f'.repeat(64),
+    revisionNumber: 1,
+    rulesetRevisionId: fixture.rulesetRevisionId,
+    statCharacterIds: [],
+    statProfileRevisionId: fixture.statProfileRevisionId,
+  })
+  await database.insert(contentPackAssetAssignments).values({
+    assetSha256: sha256,
+    characterId: 'mario',
+    contentPackRevisionId: revisionId,
+    leagueId: fixture.leagueId,
+    slot: 'icon',
+  })
+  await database.update(contentPackRevisions).set({
+    manifest,
+    manifestSha256: createHash('sha256').update(JSON.stringify(manifest)).digest('hex'),
+    publishedAt: now,
+    status: 'published',
+  }).where(eq(contentPackRevisions.id, revisionId))
+  return { bytes, objectKey, revisionId, sha256 }
 }
 
 async function createTeamConfiguration(

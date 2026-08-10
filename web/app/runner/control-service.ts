@@ -1,4 +1,4 @@
-import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 
 import { and, asc, eq, lte } from 'drizzle-orm'
 
@@ -29,8 +29,12 @@ import {
 } from '@starworks/contracts'
 
 import type { StarworksDatabase } from '../platform/database/connection.ts'
+import type { ContentAssetStore } from '../content/object-store.ts'
 import {
   attemptLifecycleEvents,
+  contentAssets,
+  contentPackAssetAssignments,
+  contentPackRevisions,
   lineupRevisions,
   matches,
   matchAttempts,
@@ -55,6 +59,7 @@ interface AuthenticatedRunnerCredential {
 }
 
 export interface RunnerControlApplication {
+  asset(bearerCredential: string, attemptId: string, sha256: string): Promise<ContentAssetDownload>
   register(bearerCredential: string, input: unknown): Promise<RunnerRegistrationResponse>
   heartbeat(bearerCredential: string, input: unknown): Promise<RunnerHeartbeatResponse>
   claim(bearerCredential: string, input: unknown): Promise<RunnerClaimResponse>
@@ -62,7 +67,14 @@ export interface RunnerControlApplication {
   configuration(bearerCredential: string, attemptId: string): Promise<MatchConfigurationPackage>
 }
 
+export interface ContentAssetDownload {
+  bytes: Uint8Array
+  mediaType: string
+  sha256: string
+}
+
 export interface RunnerControlServiceOptions {
+  assetStore?: Pick<ContentAssetStore, 'get'>
   clock?: () => Date
   createId?: () => string
   heartbeatSeconds?: number
@@ -74,6 +86,7 @@ export interface RunnerControlServiceOptions {
 
 export class RunnerControlService {
   readonly #clock: () => Date
+  readonly #assetStore: Pick<ContentAssetStore, 'get'> | undefined
   readonly #createId: () => string
   readonly #heartbeatSeconds: number
   readonly #leaseSeconds: number
@@ -86,6 +99,7 @@ export class RunnerControlService {
     options: RunnerControlServiceOptions = {},
   ) {
     this.#clock = options.clock ?? (() => new Date())
+    this.#assetStore = options.assetStore
     this.#createId = options.createId ?? randomUUID
     this.#heartbeatSeconds = options.heartbeatSeconds ?? 15
     this.#leaseSeconds = options.leaseSeconds ?? 60
@@ -493,7 +507,7 @@ export class RunnerControlService {
     if (!execution || execution.lease.expiresAt <= this.#clock() || !execution.attempt.issuedAt) {
       throw new PlatformError('Active attempt configuration was not found', 'not_found')
     }
-    let [[profile], [ruleset], home, away] = await Promise.all([
+    let [[profile], [ruleset], contentPackRows, home, away] = await Promise.all([
       this.database
         .select()
         .from(statProfileRevisions)
@@ -512,10 +526,22 @@ export class RunnerControlService {
           eq(rulesetRevisions.status, 'published'),
         ))
         .limit(1),
+      execution.attempt.contentPackRevisionId
+        ? this.database
+          .select({ manifest: contentPackRevisions.manifest })
+          .from(contentPackRevisions)
+          .where(and(
+            eq(contentPackRevisions.leagueId, authenticated.leagueId),
+            eq(contentPackRevisions.id, execution.attempt.contentPackRevisionId),
+            eq(contentPackRevisions.status, 'published'),
+          ))
+          .limit(1)
+        : Promise.resolve([]),
       this.#loadPublishedLineup(authenticated.leagueId, execution.attempt.homeLineupRevisionId),
       this.#loadPublishedLineup(authenticated.leagueId, execution.attempt.awayLineupRevisionId),
     ])
-    if (!profile || !ruleset || !home || !away) {
+    let contentPack = contentPackRows[0]
+    if (!profile || !ruleset || !home || !away || (execution.attempt.contentPackRevisionId && !contentPack?.manifest)) {
       throw new PlatformError('Published attempt configuration is incomplete', 'conflict')
     }
     return MatchConfigurationPackageSchema.parse({
@@ -523,6 +549,7 @@ export class RunnerControlService {
       adapterVersion: this.#adapterVersion,
       attemptId: execution.attempt.id,
       attemptNonce: execution.attempt.attemptNonce,
+      contentPack: contentPack?.manifest ?? null,
       dynamicRuleOverrides: execution.attempt.dynamicRuleOverrides,
       generatedAt: execution.attempt.issuedAt.toISOString(),
       kind: 'match-configuration-package',
@@ -560,6 +587,58 @@ export class RunnerControlService {
       }),
       teams: [{ side: 'home', lineup: home }, { side: 'away', lineup: away }],
     })
+  }
+
+  async asset(
+    bearerCredential: string,
+    attemptId: string,
+    sha256: string,
+  ): Promise<ContentAssetDownload> {
+    if (!/^[a-f0-9]{64}$/.test(sha256)) {
+      throw new PlatformError('Content asset SHA-256 is invalid', 'invalid_input')
+    }
+    let authenticated = await this.#authenticate(bearerCredential, 'artifacts:read')
+    let stationId = this.#requireBoundStation(authenticated, authenticated.stationId ?? '')
+    let [record] = await this.database
+      .select({ asset: contentAssets, leaseExpiresAt: runnerLeases.expiresAt })
+      .from(matchAttempts)
+      .innerJoin(runnerLeases, and(
+        eq(runnerLeases.leagueId, matchAttempts.leagueId),
+        eq(runnerLeases.matchAttemptId, matchAttempts.id),
+      ))
+      .innerJoin(contentPackAssetAssignments, and(
+        eq(contentPackAssetAssignments.leagueId, matchAttempts.leagueId),
+        eq(contentPackAssetAssignments.contentPackRevisionId, matchAttempts.contentPackRevisionId),
+        eq(contentPackAssetAssignments.assetSha256, sha256),
+      ))
+      .innerJoin(contentAssets, and(
+        eq(contentAssets.leagueId, contentPackAssetAssignments.leagueId),
+        eq(contentAssets.sha256, contentPackAssetAssignments.assetSha256),
+      ))
+      .where(and(
+        eq(matchAttempts.leagueId, authenticated.leagueId),
+        eq(matchAttempts.id, attemptId),
+        eq(runnerLeases.runnerStationId, stationId),
+        eq(runnerLeases.status, 'active'),
+      ))
+      .limit(1)
+    if (!record || record.leaseExpiresAt <= this.#clock()) {
+      throw new PlatformError('Active attempt content asset was not found', 'not_found')
+    }
+    if (!this.#assetStore) {
+      throw new PlatformError('Content asset storage is unavailable', 'external_service')
+    }
+    let bytes: Uint8Array
+    try {
+      bytes = await this.#assetStore.get(record.asset.objectKey)
+    } catch {
+      throw new PlatformError('Content asset storage is unavailable', 'external_service')
+    }
+    let digest = createHash('sha256').update(bytes).digest('hex')
+    if (bytes.byteLength !== record.asset.sizeBytes || digest !== record.asset.sha256) {
+      throw new PlatformError('Stored content asset failed integrity verification', 'external_service')
+    }
+    return { bytes, mediaType: record.asset.mediaType, sha256: record.asset.sha256 }
   }
 
   async #authenticate(
@@ -624,6 +703,7 @@ export class RunnerControlService {
       attemptNonce: row.attempt.attemptNonce,
       correlationId: row.attempt.correlationId,
       createdByActorId: row.attempt.createdByPersonId,
+      contentPackRevisionId: row.attempt.contentPackRevisionId,
       dynamicRuleOverrides: row.attempt.dynamicRuleOverrides,
       issuedAt: row.attempt.issuedAt.toISOString(),
       kind: 'run-envelope',

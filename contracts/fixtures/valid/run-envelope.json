@@ -8,6 +8,7 @@
   "matchId": "55555555-5555-4555-8555-555555555555",
   "attemptId": "66666666-6666-4666-8666-666666666666",
   "attemptNonce": "test_attempt_nonce_0123456789abcdef",
+  "contentPackRevisionId": null,
   "requiredGameBuildSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "statProfileRevisionId": "33333333-3333-4333-8333-333333333333",
   "rulesetRevisionId": "88888888-8888-4888-8888-888888888888",

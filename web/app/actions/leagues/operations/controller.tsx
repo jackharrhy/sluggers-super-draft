@@ -175,6 +175,7 @@ export default createController(routes.leagues.operations, {
         let data = context.get(FormData)
         let queued = await context.get(RunnerAdmin).queueAttempt(identity, league.id, context.params.matchId, {
           awayLineupRevisionId: readString(data, 'awayLineupRevisionId'),
+          contentPackRevisionId: readString(data, 'contentPackRevisionId', false) || null,
           dynamicRuleOverrides: readJsonObject(data, 'dynamicRuleOverrides'),
           homeLineupRevisionId: readString(data, 'homeLineupRevisionId'),
           requiredGameBuildSha256: readString(data, 'requiredGameBuildSha256'),
@@ -357,7 +358,7 @@ async function loadDashboards(
 }
 
 function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
-  return { audit: [], matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
+  return { audit: [], contentPacks: [], matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
 }
 
 function operationsError(context: { render(node: RemixNode, init?: ResponseInit): Response }, error: unknown) {

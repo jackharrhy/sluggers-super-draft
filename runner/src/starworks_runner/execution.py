@@ -29,6 +29,11 @@ def bind_match_execution(
         raise ValueError("Match configuration stat profile does not match its lease")
     if envelope["rulesetRevisionId"] != configuration["ruleset"]["revisionId"]:
         raise ValueError("Match configuration ruleset does not match its lease")
+    content_pack = configuration["contentPack"]
+    if envelope["contentPackRevisionId"] != (
+        content_pack["revisionId"] if content_pack else None
+    ):
+        raise ValueError("Match configuration content pack does not match its lease")
 
     selections = {team["side"]: team for team in envelope["teams"]}
     for team in configuration["teams"]:

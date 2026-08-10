@@ -170,6 +170,31 @@ describe('runner API controller', () => {
     })
   })
 
+  it('streams an attempt-scoped user asset without a JSON wrapper', async () => {
+    let bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
+    let received: unknown
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createRuntime(createRunnerControl({
+        async asset(credential, attemptId, sha256) {
+          received = { attemptId, credential, sha256 }
+          return { bytes, mediaType: 'image/png', sha256 }
+        },
+      })),
+    })
+    let sha256 = 'a'.repeat(64)
+    let response = await router.fetch(new Request(
+      'http://localhost' + routes.runnerApi.asset.href({ attemptId: ATTEMPT_ID, sha256 }),
+      { headers: { authorization: 'Bearer runner-secret' } },
+    ))
+
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-type'), 'image/png')
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes)
+    assert.deepEqual(received, { attemptId: ATTEMPT_ID, credential: 'runner-secret', sha256 })
+  })
+
   it('binds telemetry uploads to the attempt URL and bearer credential', async () => {
     let received: unknown
     let telemetry: AppRuntime['telemetry'] = {
@@ -215,6 +240,7 @@ function createRunnerControl(
   overrides: Partial<RunnerControlApplication> = {},
 ): RunnerControlApplication {
   return {
+    async asset() { throw new Error('Unexpected asset request') },
     async claim() { return { kind: 'runner-claim-response', run: null, schemaVersion: 1 } },
     async heartbeat() {
       return {

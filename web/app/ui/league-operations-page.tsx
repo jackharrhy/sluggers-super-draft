@@ -144,6 +144,10 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
                   <label>Ruleset<select name="rulesetRevisionId" required mix={inputStyle}>
                     {dashboard.rulesets.map((ruleset) => <option value={ruleset.id}>{ruleset.name} · revision {ruleset.revisionNumber}</option>)}
                   </select></label>
+                  <label>Content pack<select name="contentPackRevisionId" mix={inputStyle}>
+                    <option value="">Runtime-only / stock assets</option>
+                    {dashboard.contentPacks.map((pack) => <option value={pack.id}>{pack.name} · revision {pack.revisionNumber}</option>)}
+                  </select></label>
                   <label mix={wideStyle}>Required game-build SHA-256<input name="requiredGameBuildSha256" required pattern="[a-f0-9]{64}" placeholder="64 lowercase hexadecimal characters" mix={inputStyle} /></label>
                   <label mix={wideStyle}>Dynamic rule overrides<textarea name="dynamicRuleOverrides" rows={3} defaultValue="{}" mix={inputStyle} /></label>
                   <button type="submit" mix={buttonStyle}>Queue immutable attempt</button>

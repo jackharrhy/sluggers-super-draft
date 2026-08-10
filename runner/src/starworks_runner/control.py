@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import urllib.error
 import urllib.request
@@ -149,6 +150,53 @@ class RunnerControlClient:
             response_contract="match-configuration-package",
             expected_kind="match-configuration-package",
         )
+
+    def asset(self, attempt_id: str, asset: dict[str, Any]) -> bytes:
+        sha256 = asset.get("sha256")
+        size_bytes = asset.get("sizeBytes")
+        if (
+            not isinstance(sha256, str)
+            or len(sha256) != 64
+            or any(character not in "0123456789abcdef" for character in sha256)
+            or not isinstance(size_bytes, int)
+            or isinstance(size_bytes, bool)
+            or size_bytes < 0
+        ):
+            raise TypeError("Content asset reference is invalid")
+        response = self.transport.request(
+            "GET",
+            self.base_url
+            + f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/assets/{sha256}",
+            {
+                "accept": "application/octet-stream",
+                "authorization": f"Bearer {self._credential}",
+            },
+            b"",
+            self.timeout_seconds,
+        )
+        if not 200 <= response.status < 300:
+            try:
+                document = json.loads(response.body)
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                document = None
+            error_document = (
+                document.get("error") if isinstance(document, dict) else None
+            )
+            message = (
+                error_document.get("message")
+                if isinstance(error_document, dict)
+                and isinstance(error_document.get("message"), str)
+                else f"Starworks runner API returned HTTP {response.status}"
+            )
+            raise RunnerApiError(message, status=response.status)
+        if (
+            len(response.body) != size_bytes
+            or hashlib.sha256(response.body).hexdigest() != sha256
+        ):
+            raise RunnerApiError(
+                "Downloaded content asset failed integrity verification"
+            )
+        return response.body
 
     def upload_telemetry(self, message: dict[str, Any]) -> dict[str, Any]:
         validate_contract("telemetry-upload", message)

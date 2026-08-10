@@ -32,6 +32,7 @@ export const RunEnvelopeSchema = z
     matchId: UuidSchema,
     attemptId: UuidSchema,
     attemptNonce: AttemptNonceSchema,
+    contentPackRevisionId: UuidSchema.nullable(),
     requiredGameBuildSha256: Sha256Schema,
     statProfileRevisionId: UuidSchema,
     rulesetRevisionId: UuidSchema,

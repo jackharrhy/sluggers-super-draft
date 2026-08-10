@@ -9,6 +9,7 @@ import {
 import { RulesetRevisionSchema } from "./ruleset-revision.ts";
 import { StatProfileRevisionSchema } from "./stat-profile-revision.ts";
 import { TeamLineupRevisionSchema } from "./team-lineup-revision.ts";
+import { ContentPackManifestSchema } from "./content-pack-manifest.ts";
 
 const HomeConfigurationSchema = z.strictObject({
   side: z.literal("home"),
@@ -30,6 +31,7 @@ export const MatchConfigurationPackageSchema = z
     matchId: UuidSchema,
     attemptId: UuidSchema,
     attemptNonce: AttemptNonceSchema,
+    contentPack: ContentPackManifestSchema.nullable(),
     statProfile: StatProfileRevisionSchema,
     ruleset: RulesetRevisionSchema,
     teams: z.union([
@@ -57,6 +59,17 @@ export const MatchConfigurationPackageSchema = z
     }
     if (configuration.ruleset.status !== "published") {
       context.addIssue({ code: "custom", message: "Ruleset must be published" });
+    }
+    if (configuration.contentPack) {
+      if (configuration.contentPack.adapterVersion !== configuration.adapterVersion) {
+        context.addIssue({ code: "custom", message: "Content pack must use the match adapter version" });
+      }
+      if (configuration.contentPack.statProfileRevisionId !== configuration.statProfile.revisionId) {
+        context.addIssue({ code: "custom", message: "Content pack must use the match stat profile" });
+      }
+      if (configuration.contentPack.rulesetRevisionId !== configuration.ruleset.revisionId) {
+        context.addIssue({ code: "custom", message: "Content pack must use the match ruleset" });
+      }
     }
     for (let team of configuration.teams) {
       if (team.lineup.status !== "published") {

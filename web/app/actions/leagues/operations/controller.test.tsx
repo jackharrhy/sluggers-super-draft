@@ -43,6 +43,7 @@ const dashboard: RunnerOperationsDashboard = {
     targetId: '33333333-3333-4333-8333-333333333333',
     targetType: 'runner_station',
   }],
+  contentPacks: [],
   matches: [],
   rulesets: [],
   seasons: [],
