@@ -7,6 +7,7 @@ import adminController from './actions/admin/controller.tsx'
 import authController from './actions/auth/controller.tsx'
 import leaguesController from './actions/leagues/controller.tsx'
 import leagueConfigurationController from './actions/leagues/configuration/controller.tsx'
+import runnerController from './actions/runner-api/controller.tsx'
 import { platform, sameOrigin } from './middleware/platform.ts'
 import { render } from './middleware/render.tsx'
 import {
@@ -54,6 +55,7 @@ export function createAppRouter(options: AppRouterOptions = {}) {
   router.map(routes.auth, authController)
   router.map(routes.leagues, leaguesController)
   router.map(routes.leagues.configuration, leagueConfigurationController)
+  router.map(routes.runnerApi, runnerController)
   return router
 }
 

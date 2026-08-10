@@ -113,6 +113,7 @@ export type RunnerControlMessage = z.infer<typeof RunnerControlMessageSchema>;
 export type RunnerRegistrationRequest = z.infer<typeof RunnerRegistrationRequestSchema>;
 export type RunnerRegistrationResponse = z.infer<typeof RunnerRegistrationResponseSchema>;
 export type RunnerHeartbeatRequest = z.infer<typeof RunnerHeartbeatRequestSchema>;
+export type RunnerHeartbeatResponse = z.infer<typeof RunnerHeartbeatResponseSchema>;
 export type RunnerClaimRequest = z.infer<typeof RunnerClaimRequestSchema>;
 export type RunnerClaimResponse = z.infer<typeof RunnerClaimResponseSchema>;
 export type RunnerLeaseUpdateRequest = z.infer<typeof RunnerLeaseUpdateRequestSchema>;

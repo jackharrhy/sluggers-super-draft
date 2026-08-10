@@ -12,6 +12,12 @@ export const routes = route({
     newLeague: get('leagues/new'),
     createLeague: post('leagues/new'),
   }),
+  runnerApi: route('api/v1/runner', {
+    register: post('register'),
+    heartbeat: post('heartbeat'),
+    claim: post('claim'),
+    updateLease: post('leases/:leaseId'),
+  }),
   leagues: route('leagues', {
     show: get(':leagueSlug'),
     updatePublication: post(':leagueSlug/publication'),
