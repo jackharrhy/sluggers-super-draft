@@ -8,8 +8,15 @@ services:
       DATABASE_URL: "postgres://starworks:starworks@db:5432/starworks"
       NODE_ENV: "production"
       PORT: "3000"
+      S3_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-GK00000000000000000000000000000000}"
+      S3_BUCKET: "${S3_BUCKET:-starworks}"
+      S3_ENDPOINT: "http://garage:3900"
+      S3_REGION: "${S3_REGION:-garage}"
+      S3_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-0000000000000000000000000000000000000000000000000000000000000000}"
     depends_on:
       db:
+        condition: service_healthy
+      garage:
         condition: service_healthy
 
   db:
@@ -28,5 +35,40 @@ services:
       timeout: 5s
       retries: 10
 
+  garage:
+    image: dxflrs/garage:v2.3.0
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    ports:
+      - "127.0.0.1:3900:3900"
+      - "127.0.0.1:3903:3903"
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: "${S3_ACCESS_KEY_ID:-GK00000000000000000000000000000000}"
+      GARAGE_DEFAULT_BUCKET: "${S3_BUCKET:-starworks}"
+      GARAGE_DEFAULT_SECRET_KEY: "${S3_SECRET_ACCESS_KEY:-0000000000000000000000000000000000000000000000000000000000000000}"
+    volumes:
+      - ./deploy/local/garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    profiles: ["email"]
+    ports:
+      - "127.0.0.1:8025:8025"
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "5000"
+    volumes:
+      - mailpit:/data
+
 volumes:
   db:
+  garage_data:
+  garage_meta:
+  mailpit:

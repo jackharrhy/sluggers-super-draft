@@ -19,3 +19,5 @@ public/images
 *.context.md
 
 backups
+deploy/prod/.env
+deploy/prod/garage.toml
