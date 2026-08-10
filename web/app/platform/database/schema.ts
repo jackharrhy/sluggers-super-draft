@@ -83,6 +83,19 @@ export const rosterTransactionKind = pgEnum('roster_transaction_kind', [
   'trade',
   'commissioner',
 ])
+export const telemetryObservationSource = pgEnum('telemetry_observation_source', [
+  'bridge-hook',
+  'memory-observation',
+  'synthetic',
+])
+export const telemetryDerivationStatus = pgEnum('telemetry_derivation_status', [
+  'ready',
+  'review',
+])
+export const telemetryCorrectionEntity = pgEnum('telemetry_correction_entity', [
+  'team',
+  'character',
+])
 
 export const people = pgTable('people', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -1210,6 +1223,8 @@ export const matchAttempts = pgTable(
     completedAt: timestamp('completed_at', { withTimezone: true }),
     cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
     failedAt: timestamp('failed_at', { withTimezone: true }),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+    confirmedByPersonId: uuid('confirmed_by_person_id').references(() => people.id),
     issuedAt: timestamp('issued_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -1316,5 +1331,128 @@ export const attemptLifecycleEvents = pgTable(
       name: 'attempt_lifecycle_events_station_fk',
     }),
     index('attempt_lifecycle_events_attempt_recorded_index').on(table.leagueId, table.matchAttemptId, table.recordedAt),
+  ],
+)
+
+export const telemetryEvents = pgTable(
+  'telemetry_events',
+  {
+    leagueId: uuid('league_id').notNull(),
+    matchId: uuid('match_id').notNull(),
+    matchAttemptId: uuid('match_attempt_id').notNull(),
+    sequence: integer('sequence').notNull(),
+    frame: integer('frame').notNull(),
+    protocolVersion: integer('protocol_version').notNull(),
+    correlationId: uuid('correlation_id').notNull(),
+    eventType: text('event_type').notNull(),
+    observationSource: telemetryObservationSource('observation_source').notNull(),
+    payload: jsonb('payload').$type<Record<string, unknown>>().notNull(),
+    adapterVersion: text('adapter_version').notNull(),
+    gameBuildSha256: text('game_build_sha256').notNull(),
+    stateFingerprint: text('state_fingerprint'),
+    receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.leagueId, table.matchAttemptId, table.sequence] }),
+    check('telemetry_events_positive_sequence_check', sql`${table.sequence} > 0`),
+    check('telemetry_events_nonnegative_frame_check', sql`${table.frame} >= 0`),
+    check('telemetry_events_protocol_version_check', sql`${table.protocolVersion} > 0`),
+    check('telemetry_events_build_hash_check', sql`${table.gameBuildSha256} ~ '^[a-f0-9]{64}$'`),
+    foreignKey({
+      columns: [table.leagueId, table.matchId],
+      foreignColumns: [matches.leagueId, matches.id],
+      name: 'telemetry_events_match_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.matchAttemptId],
+      foreignColumns: [matchAttempts.leagueId, matchAttempts.id],
+      name: 'telemetry_events_attempt_fk',
+    }).onDelete('cascade'),
+    index('telemetry_events_attempt_frame_index').on(
+      table.leagueId,
+      table.matchAttemptId,
+      table.frame,
+    ),
+  ],
+)
+
+export const telemetryCorrections = pgTable(
+  'telemetry_corrections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchAttemptId: uuid('match_attempt_id').notNull(),
+    entityType: telemetryCorrectionEntity('entity_type').notNull(),
+    entityId: text('entity_id').notNull(),
+    statPath: text('stat_path').notNull(),
+    beforeValue: integer('before_value').notNull(),
+    afterValue: integer('after_value').notNull(),
+    actorPersonId: uuid('actor_person_id')
+      .notNull()
+      .references(() => people.id),
+    reason: text('reason').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    check('telemetry_corrections_reason_check', sql`length(trim(${table.reason})) >= 3`),
+    check('telemetry_corrections_path_check', sql`${table.statPath} ~ '^[a-z][a-zA-Z0-9.]{1,99}$'`),
+    foreignKey({
+      columns: [table.leagueId, table.matchAttemptId],
+      foreignColumns: [matchAttempts.leagueId, matchAttempts.id],
+      name: 'telemetry_corrections_attempt_fk',
+    }).onDelete('cascade'),
+    index('telemetry_corrections_attempt_created_index').on(
+      table.leagueId,
+      table.matchAttemptId,
+      table.createdAt,
+      table.id,
+    ),
+  ],
+)
+
+export const telemetryDerivations = pgTable(
+  'telemetry_derivations',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    leagueId: uuid('league_id').notNull(),
+    matchId: uuid('match_id').notNull(),
+    matchAttemptId: uuid('match_attempt_id').notNull(),
+    derivationVersion: integer('derivation_version').notNull(),
+    inputDigest: text('input_digest').notNull(),
+    status: telemetryDerivationStatus('status').notNull(),
+    issues: jsonb('issues').$type<string[]>().notNull().default([]),
+    boxScore: jsonb('box_score').$type<Record<string, unknown>>().notNull(),
+    sourceFirstSequence: integer('source_first_sequence').notNull(),
+    sourceLastSequence: integer('source_last_sequence').notNull(),
+    eventCount: integer('event_count').notNull(),
+    correctionCount: integer('correction_count').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('telemetry_derivations_input_unique').on(
+      table.leagueId,
+      table.matchAttemptId,
+      table.derivationVersion,
+      table.inputDigest,
+    ),
+    check('telemetry_derivations_version_check', sql`${table.derivationVersion} > 0`),
+    check('telemetry_derivations_digest_check', sql`${table.inputDigest} ~ '^[a-f0-9]{64}$'`),
+    check('telemetry_derivations_sequences_check', sql`${table.sourceFirstSequence} > 0 and ${table.sourceLastSequence} >= ${table.sourceFirstSequence}`),
+    check('telemetry_derivations_counts_check', sql`${table.eventCount} > 0 and ${table.correctionCount} >= 0`),
+    foreignKey({
+      columns: [table.leagueId, table.matchId],
+      foreignColumns: [matches.leagueId, matches.id],
+      name: 'telemetry_derivations_match_fk',
+    }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.matchAttemptId],
+      foreignColumns: [matchAttempts.leagueId, matchAttempts.id],
+      name: 'telemetry_derivations_attempt_fk',
+    }).onDelete('cascade'),
+    index('telemetry_derivations_attempt_created_index').on(
+      table.leagueId,
+      table.matchAttemptId,
+      table.createdAt,
+    ),
   ],
 )
