@@ -4,10 +4,13 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
+    "setup": "npm install --prefix web && npm install --prefix contracts",
     "dev": "npm --prefix web run dev",
     "start": "npm --prefix web run start",
-    "typecheck": "npm --prefix web run typecheck",
-    "test": "npm --prefix web test"
+    "typecheck": "npm --prefix contracts run typecheck && npm --prefix web run typecheck",
+    "test": "npm --prefix contracts test && npm --prefix web test && uv run --project runner --group test pytest runner/tests",
+    "contracts:generate": "npm --prefix contracts run generate",
+    "contracts:check": "npm --prefix contracts run check && uv run --project runner --group test pytest runner/tests"
   },
   "engines": {
     "node": ">=24.3.0"
