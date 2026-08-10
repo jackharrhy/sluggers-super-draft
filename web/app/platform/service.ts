@@ -1,12 +1,15 @@
 import { z } from 'zod'
 
 import { PlatformError } from './errors.ts'
+import { runnerCredentialScopes } from './model.ts'
 import type {
   LeagueDetail,
   LeagueSummary,
+  IssuedRunnerCredential,
   ProvisionedLeague,
   PublicationPolicy,
   SessionIdentity,
+  RunnerCredentialScope,
 } from './model.ts'
 import { administrativeRoles, type PlatformRepository } from './repository.ts'
 import { createOpaqueToken, hashSecret } from './security.ts'
@@ -26,6 +29,11 @@ const publicationPolicySchema = z.object({
   standingsVisible: z.boolean(),
   statsVisible: z.boolean(),
   draftVisible: z.boolean(),
+})
+
+const runnerCredentialSchema = z.object({
+  name: z.string().trim().min(2).max(100),
+  scopes: z.array(z.enum(runnerCredentialScopes)).min(1).max(runnerCredentialScopes.length),
 })
 
 export interface PlatformServiceOptions {
@@ -95,9 +103,7 @@ export class PlatformService {
     input: PublicationPolicy,
   ): Promise<void> {
     if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
-    let membership = identity.memberships.find((candidate) => candidate.leagueId === leagueId)
-    let mayAdminister = identity.isSiteAdmin || membership?.roles.some((role) => administrativeRoles.has(role))
-    if (!mayAdminister) {
+    if (!mayAdministerLeague(identity, leagueId)) {
       throw new PlatformError('League administrator access is required', 'forbidden')
     }
 
@@ -110,4 +116,59 @@ export class PlatformService {
       policy: policy.data,
     })
   }
+
+  async issueRunnerCredential(
+    identity: SessionIdentity | null,
+    leagueId: string,
+    input: { name: string; scopes: RunnerCredentialScope[] },
+  ): Promise<IssuedRunnerCredential> {
+    if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
+    if (!mayAdministerLeague(identity, leagueId)) {
+      throw new PlatformError('League administrator access is required', 'forbidden')
+    }
+    let parsed = runnerCredentialSchema.safeParse(input)
+    if (!parsed.success) throw new PlatformError('Runner credential is invalid', 'invalid_input')
+    let scopes = [...new Set(parsed.data.scopes)].sort() as RunnerCredentialScope[]
+    let secret = this.#createToken()
+    let credentialId = await this.repository.createRunnerCredential({
+      actorPersonId: identity.personId,
+      leagueId,
+      name: parsed.data.name,
+      scopes,
+      secretHash: hashSecret(secret),
+    })
+    return {
+      credential: `starworks_runner_${credentialId}.${secret}`,
+      credentialId,
+      leagueId,
+      name: parsed.data.name,
+      scopes,
+    }
+  }
+
+  async revokeRunnerCredential(
+    identity: SessionIdentity | null,
+    leagueId: string,
+    credentialId: string,
+  ): Promise<void> {
+    if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
+    if (!mayAdministerLeague(identity, leagueId)) {
+      throw new PlatformError('League administrator access is required', 'forbidden')
+    }
+    let revoked = await this.repository.revokeRunnerCredential({
+      actorPersonId: identity.personId,
+      credentialId,
+      leagueId,
+      now: this.#clock(),
+    })
+    if (!revoked) throw new PlatformError('Runner credential was not found', 'not_found')
+  }
+}
+
+function mayAdministerLeague(identity: SessionIdentity, leagueId: string): boolean {
+  let membership = identity.memberships.find((candidate) => candidate.leagueId === leagueId)
+  return (
+    identity.isSiteAdmin ||
+    membership?.roles.some((role) => administrativeRoles.has(role)) === true
+  )
 }

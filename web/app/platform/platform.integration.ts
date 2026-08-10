@@ -7,7 +7,14 @@ import { eq } from 'drizzle-orm'
 import { PlatformError } from './errors.ts'
 import { createDatabase } from './database/connection.ts'
 import { PostgresPlatformRepository } from './database/postgres-repository.ts'
-import { auditRecords, discordIdentities, leagues, people, sessions } from './database/schema.ts'
+import {
+  auditRecords,
+  discordIdentities,
+  leagues,
+  people,
+  runnerCredentials,
+  sessions,
+} from './database/schema.ts'
 import { hashSecret } from './security.ts'
 import { PlatformService } from './service.ts'
 import { IdentityService } from './identity-service.ts'
@@ -52,6 +59,27 @@ test(
       })
       assert.deepEqual(refreshedAdmin.memberships[0]?.roles, ['owner'])
 
+      let runnerCredential = await service.issueRunnerCredential(
+        refreshedAdmin,
+        provisioned.league.id,
+        {
+          name: 'Scoreboard runner',
+          scopes: ['telemetry:write', 'runs:read', 'telemetry:write'],
+        },
+      )
+      assert.match(
+        runnerCredential.credential,
+        new RegExp(`^starworks_runner_${runnerCredential.credentialId}\\.`),
+      )
+      assert.deepEqual(runnerCredential.scopes, ['runs:read', 'telemetry:write'])
+      let [storedCredential] = await connection.database
+        .select({ revokedAt: runnerCredentials.revokedAt, secretHash: runnerCredentials.secretHash })
+        .from(runnerCredentials)
+        .where(eq(runnerCredentials.id, runnerCredential.credentialId))
+        .limit(1)
+      assert.equal(storedCredential?.secretHash, hashSecret(token))
+      assert.equal(storedCredential?.revokedAt, null)
+
       let [outsider] = await connection.database
         .insert(people)
         .values({ displayName: 'Outsider' })
@@ -80,6 +108,13 @@ test(
         }),
         (error: unknown) => error instanceof PlatformError && error.code === 'forbidden',
       )
+      await assert.rejects(
+        service.issueRunnerCredential(outsiderIdentity, provisioned.league.id, {
+          name: 'Cross-tenant runner',
+          scopes: ['runs:read'],
+        }),
+        (error: unknown) => error instanceof PlatformError && error.code === 'forbidden',
+      )
 
       await service.setPublicationPolicy(refreshedAdmin, provisioned.league.id, {
         draftVisible: false,
@@ -88,6 +123,18 @@ test(
         statsVisible: false,
       })
       assert.equal((await service.viewLeague(slug, null))?.id, provisioned.league.id)
+
+      await service.revokeRunnerCredential(
+        refreshedAdmin,
+        provisioned.league.id,
+        runnerCredential.credentialId,
+      )
+      let [revokedCredential] = await connection.database
+        .select({ revokedAt: runnerCredentials.revokedAt })
+        .from(runnerCredentials)
+        .where(eq(runnerCredentials.id, runnerCredential.credentialId))
+        .limit(1)
+      assert.ok(revokedCredential?.revokedAt)
 
       await service.revokeSession(rawSession)
       assert.equal(await service.resolveSession(rawSession), null)

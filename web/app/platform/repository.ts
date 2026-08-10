@@ -1,5 +1,6 @@
 import type {
   DiscordProfile,
+  RunnerCredentialScope,
   LeagueDetail,
   LeagueRole,
   LeagueSummary,
@@ -43,11 +44,24 @@ export interface PlatformRepository {
     transactionHash: string
   }): Promise<void>
   findPendingInvitationId(tokenHash: string, now: Date): Promise<string | null>
+  createRunnerCredential(input: {
+    actorPersonId: string
+    leagueId: string
+    name: string
+    scopes: RunnerCredentialScope[]
+    secretHash: string
+  }): Promise<string>
   findIdentityBySessionHash(tokenHash: string, now: Date): Promise<SessionIdentity | null>
   listVisibleLeagues(personId: string | null): Promise<LeagueSummary[]>
   findAccessibleLeague(slug: string, personId: string | null): Promise<LeagueDetail | null>
   provisionLeague(input: ProvisionLeagueRecord): Promise<LeagueDetail>
   revokeSession(tokenHash: string, now: Date): Promise<void>
+  revokeRunnerCredential(input: {
+    actorPersonId: string
+    credentialId: string
+    leagueId: string
+    now: Date
+  }): Promise<boolean>
   setPublicationPolicy(input: {
     actorPersonId: string
     leagueId: string

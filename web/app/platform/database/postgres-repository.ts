@@ -9,6 +9,7 @@ import type {
   OAuthAttemptRecord,
   PublicationPolicy,
   SessionIdentity,
+  RunnerCredentialScope,
 } from '../model.ts'
 import type { PlatformRepository, ProvisionLeagueRecord } from '../repository.ts'
 import type { StarworksDatabase } from './connection.ts'
@@ -22,6 +23,7 @@ import {
   oauthAttempts,
   people,
   publicationSettings,
+  runnerCredentials,
   sessions,
 } from './schema.ts'
 
@@ -249,6 +251,37 @@ export class PostgresPlatformRepository implements PlatformRepository {
     return invitation?.id ?? null
   }
 
+  async createRunnerCredential(input: {
+    actorPersonId: string
+    leagueId: string
+    name: string
+    scopes: RunnerCredentialScope[]
+    secretHash: string
+  }): Promise<string> {
+    return this.database.transaction(async (transaction) => {
+      let [credential] = await transaction
+        .insert(runnerCredentials)
+        .values({
+          createdByPersonId: input.actorPersonId,
+          leagueId: input.leagueId,
+          name: input.name,
+          scopes: input.scopes,
+          secretHash: input.secretHash,
+        })
+        .returning({ id: runnerCredentials.id })
+      if (!credential) throw new Error('Failed to create runner credential')
+      await transaction.insert(auditRecords).values({
+        action: 'runner_credential.created',
+        actorPersonId: input.actorPersonId,
+        leagueId: input.leagueId,
+        metadata: { name: input.name, scopes: input.scopes },
+        targetId: credential.id,
+        targetType: 'runner_credential',
+      })
+      return credential.id
+    })
+  }
+
   async findIdentityBySessionHash(tokenHash: string, now: Date): Promise<SessionIdentity | null> {
     let [record] = await this.database
       .select({ personId: sessions.personId })
@@ -396,6 +429,36 @@ export class PostgresPlatformRepository implements PlatformRepository {
       .update(sessions)
       .set({ revokedAt: now })
       .where(and(eq(sessions.tokenHash, tokenHash), isNull(sessions.revokedAt)))
+  }
+
+  async revokeRunnerCredential(input: {
+    actorPersonId: string
+    credentialId: string
+    leagueId: string
+    now: Date
+  }): Promise<boolean> {
+    return this.database.transaction(async (transaction) => {
+      let revoked = await transaction
+        .update(runnerCredentials)
+        .set({ revokedAt: input.now })
+        .where(
+          and(
+            eq(runnerCredentials.id, input.credentialId),
+            eq(runnerCredentials.leagueId, input.leagueId),
+            isNull(runnerCredentials.revokedAt),
+          ),
+        )
+        .returning({ id: runnerCredentials.id })
+      if (!revoked.length) return false
+      await transaction.insert(auditRecords).values({
+        action: 'runner_credential.revoked',
+        actorPersonId: input.actorPersonId,
+        leagueId: input.leagueId,
+        targetId: input.credentialId,
+        targetType: 'runner_credential',
+      })
+      return true
+    })
   }
 
   async setPublicationPolicy(input: {
