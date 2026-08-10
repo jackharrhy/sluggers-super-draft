@@ -1,0 +1,181 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+import pytest
+from starworks_runner.games.sluggers.adapter import AdapterManifest
+from starworks_runner.games.sluggers.errors import BuildIntegrityError
+from starworks_runner.games.sluggers.patching import (
+    PrecompiledPatchApplier,
+    PrecompiledPatchPlan,
+    encode_ppc_branch,
+)
+
+
+def sha256(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def create_plan(
+    root: Path,
+    *,
+    source_bytes: bytes,
+    expected_bytes: bytes,
+    artifact_bytes: bytes,
+    target_offset: int = 0x100,
+    writes: list[dict[str, object]] | None = None,
+) -> tuple[Path, Path, bytes]:
+    source = root / "main.dol"
+    artifact_directory = root / "artifacts"
+    artifact_directory.mkdir()
+    artifact = artifact_directory / "bridge-v1.bin"
+    source.write_bytes(source_bytes)
+    artifact.write_bytes(artifact_bytes)
+    output = bytearray(source_bytes)
+    output[target_offset : target_offset + len(artifact_bytes)] = artifact_bytes
+    configured_writes = writes or [
+        {
+            "targetOffset": target_offset,
+            "artifactOffset": 0,
+            "sizeBytes": len(artifact_bytes),
+            "expectedBytesHex": expected_bytes.hex(),
+        }
+    ]
+    plan_value = {
+        "schemaVersion": 1,
+        "kind": "precompiled-patch-plan",
+        "patchId": "synthetic-clean-room-hook-v1",
+        "targetPath": "sys/main.dol",
+        "expectedInputSha256": sha256(source_bytes),
+        "expectedOutputSha256": sha256(output),
+        "artifact": {
+            "path": "bridge-v1.bin",
+            "sha256": sha256(artifact_bytes),
+            "sizeBytes": len(artifact_bytes),
+        },
+        "writes": configured_writes,
+    }
+    plan_path = root / "patch-plan.json"
+    plan_path.write_text(json.dumps(plan_value), encoding="utf-8")
+    return source, plan_path, bytes(output)
+
+
+def test_guarded_precompiled_patch_is_atomic_and_source_preserving(
+    tmp_path: Path,
+) -> None:
+    original_instruction = bytes.fromhex("7c0802a6")
+    source_bytes = bytearray(2 * 1024 * 1024)
+    source_bytes[0x100:0x104] = original_instruction
+    artifact = encode_ppc_branch(0x80004100, 0x807A5000)
+    source, plan_path, expected_output = create_plan(
+        tmp_path,
+        source_bytes=bytes(source_bytes),
+        expected_bytes=original_instruction,
+        artifact_bytes=artifact,
+    )
+    destination = tmp_path / "build/main.dol"
+
+    receipt = PrecompiledPatchApplier().apply(
+        source=source,
+        destination=destination,
+        artifact_root=tmp_path / "artifacts",
+        plan=PrecompiledPatchPlan.load(plan_path),
+    )
+
+    assert source.read_bytes() == bytes(source_bytes)
+    assert destination.read_bytes() == expected_output
+    assert receipt["patchId"] == "synthetic-clean-room-hook-v1"
+    assert receipt["expectedInputSha256"] == sha256(source_bytes)
+    assert receipt["outputSha256"] == sha256(expected_output)
+    assert not list(destination.parent.glob("*.patching"))
+
+
+def test_modified_hook_site_fails_its_exact_byte_guard(tmp_path: Path) -> None:
+    modified_source = bytearray(1024)
+    modified_source[0x100:0x104] = bytes.fromhex("60000000")
+    source, plan_path, _ = create_plan(
+        tmp_path,
+        source_bytes=bytes(modified_source),
+        expected_bytes=bytes.fromhex("7c0802a6"),
+        artifact_bytes=encode_ppc_branch(0x80004100, 0x807A5000),
+    )
+
+    with pytest.raises(BuildIntegrityError, match="expected-byte guard failed"):
+        PrecompiledPatchApplier().apply(
+            source=source,
+            destination=tmp_path / "out/main.dol",
+            artifact_root=tmp_path / "artifacts",
+            plan=PrecompiledPatchPlan.load(plan_path),
+        )
+    assert not (tmp_path / "out/main.dol").exists()
+
+
+def test_modified_artifact_and_in_place_patch_fail_closed(tmp_path: Path) -> None:
+    source_bytes = bytes(1024)
+    source, plan_path, _ = create_plan(
+        tmp_path,
+        source_bytes=source_bytes,
+        expected_bytes=bytes(4),
+        artifact_bytes=b"ABCD",
+    )
+    plan = PrecompiledPatchPlan.load(plan_path)
+    (tmp_path / "artifacts/bridge-v1.bin").write_bytes(b"WXYZ")
+
+    with pytest.raises(BuildIntegrityError, match="artifact hash or size"):
+        PrecompiledPatchApplier().apply(
+            source=source,
+            destination=tmp_path / "out/main.dol",
+            artifact_root=tmp_path / "artifacts",
+            plan=plan,
+        )
+    with pytest.raises(BuildIntegrityError, match="must be different"):
+        PrecompiledPatchApplier().apply(
+            source=source,
+            destination=source,
+            artifact_root=tmp_path / "artifacts",
+            plan=plan,
+        )
+
+
+def test_overlapping_patch_writes_and_invalid_branches_are_rejected(
+    tmp_path: Path,
+) -> None:
+    writes = [
+        {
+            "targetOffset": 0x100,
+            "artifactOffset": 0,
+            "sizeBytes": 4,
+            "expectedBytesHex": "00000000",
+        },
+        {
+            "targetOffset": 0x102,
+            "artifactOffset": 4,
+            "sizeBytes": 4,
+            "expectedBytesHex": "00000000",
+        },
+    ]
+    _, plan_path, _ = create_plan(
+        tmp_path,
+        source_bytes=bytes(1024),
+        expected_bytes=bytes(4),
+        artifact_bytes=bytes(8),
+        writes=writes,
+    )
+    with pytest.raises(BuildIntegrityError, match="overlap in the target"):
+        PrecompiledPatchPlan.load(plan_path)
+    with pytest.raises(BuildIntegrityError, match="word aligned"):
+        encode_ppc_branch(0x80000001, 0x80001000)
+    with pytest.raises(BuildIntegrityError, match="outside the relative branch range"):
+        encode_ppc_branch(0x80000000, 0x84000000)
+
+
+def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> None:
+    manifest = AdapterManifest.load()
+    assert manifest.adapter_version == "0.1.0"
+    assert manifest.protocol_version == 1
+    assert manifest.bridge_source.name == "bridge_v1.c"
+    assert manifest.artifacts == ()
+    assert manifest.patch_plans == ()
+    assert len(manifest.release_gates) == 5

@@ -65,3 +65,16 @@ build IDs, negotiate a one-attempt nonce, and consume only events attributed to
 that attempt. Version 1.3.1 provides wheels for Windows x86-64, Linux x86-64,
 macOS Intel, and macOS Apple Silicon. Each supported platform still requires a
 real Dolphin integration test before release.
+
+The patch-toolchain spike can be reproduced locally:
+
+```shell
+uv run --project runner starworks-runner evaluate-patch-toolchains \
+  --size-mib 8 --iterations 5
+```
+
+It benchmarks the hash- and byte-guarded precompiled-artifact path and reports
+whether the Kamek development prerequisites are present. The selected approach
+keeps Kamek and CodeWarrior in a trusted release environment; they are never
+runner or operator dependencies. See
+`docs/game-adapter/patch-toolchain-spike.md` for the evidence and release gates.

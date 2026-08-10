@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import shutil
 import sys
 import tempfile
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from starworks_runner.contracts import CONTRACT_NAMES, validate_contract
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
@@ -21,6 +23,12 @@ from starworks_runner.games.sluggers.errors import SluggersAdapterError
 from starworks_runner.games.sluggers.fingerprints import (
     SupportedBaseRegistry,
     fingerprint_extraction,
+)
+from starworks_runner.games.sluggers.patching import (
+    GuardedWrite,
+    PrecompiledPatchApplier,
+    PrecompiledPatchPlan,
+    encode_ppc_branch,
 )
 from starworks_runner.games.sluggers.tools import (
     DtkDiscTool,
@@ -101,6 +109,13 @@ def create_parser() -> argparse.ArgumentParser:
         "benchmark-bridge", help="measure the synthetic bridge polling path"
     )
     benchmark_parser.add_argument("--iterations", type=int, default=10_000)
+
+    patcher_parser = subparsers.add_parser(
+        "evaluate-patch-toolchains",
+        help="benchmark precompiled patch application and report Kamek prerequisites",
+    )
+    patcher_parser.add_argument("--size-mib", type=int, default=8)
+    patcher_parser.add_argument("--iterations", type=int, default=5)
     return parser
 
 
@@ -246,6 +261,70 @@ def run(arguments: argparse.Namespace) -> int:
         for _ in range(arguments.iterations):
             client.poll_events()
         print(json.dumps(client.metrics.report_value(), indent=2, sort_keys=True))
+        return 0
+    if arguments.command == "evaluate-patch-toolchains":
+        if arguments.size_mib <= 0 or arguments.iterations <= 0:
+            raise SluggersAdapterError("size-mib and iterations must be positive")
+        source_bytes = bytearray(arguments.size_mib * 1024 * 1024)
+        target_offset = 0x100
+        expected_bytes = bytes.fromhex("7c0802a6")
+        source_bytes[target_offset : target_offset + 4] = expected_bytes
+        artifact_bytes = encode_ppc_branch(0x80004100, 0x807A5000)
+        expected_output = bytearray(source_bytes)
+        expected_output[target_offset : target_offset + 4] = artifact_bytes
+        durations: list[float] = []
+        with tempfile.TemporaryDirectory(prefix="starworks-patcher-") as temporary:
+            root = Path(temporary)
+            source = root / "main.dol"
+            artifact_root = root / "artifacts"
+            artifact_root.mkdir()
+            artifact = artifact_root / "bridge.bin"
+            source.write_bytes(source_bytes)
+            artifact.write_bytes(artifact_bytes)
+            plan = PrecompiledPatchPlan(
+                patch_id="synthetic-toolchain-evaluation",
+                target_path=PurePosixPath("sys/main.dol"),
+                expected_input_sha256=hashlib.sha256(source_bytes).hexdigest(),
+                expected_output_sha256=hashlib.sha256(expected_output).hexdigest(),
+                artifact_path=PurePosixPath("bridge.bin"),
+                artifact_sha256=hashlib.sha256(artifact_bytes).hexdigest(),
+                artifact_size_bytes=len(artifact_bytes),
+                writes=(
+                    GuardedWrite(
+                        target_offset=target_offset,
+                        artifact_offset=0,
+                        size_bytes=4,
+                        expected_bytes=expected_bytes,
+                    ),
+                ),
+            )
+            plan.validate()
+            for iteration in range(arguments.iterations):
+                started = time.perf_counter()
+                PrecompiledPatchApplier().apply(
+                    source=source,
+                    destination=root / f"output-{iteration}.dol",
+                    artifact_root=artifact_root,
+                    plan=plan,
+                )
+                durations.append(time.perf_counter() - started)
+        report = {
+            "precompiledArtifact": {
+                "inputSizeBytes": len(source_bytes),
+                "iterations": len(durations),
+                "meanSeconds": sum(durations) / len(durations),
+                "maxSeconds": max(durations),
+                "endUserCompilerRequired": False,
+            },
+            "kamek": {
+                "dotnetPath": shutil.which("dotnet"),
+                "codeWarriorCompilerPath": shutil.which("mwcceppc"),
+                "trustedReleaseEnvironmentRequired": True,
+                "endUserCompilerRequired": False,
+            },
+            "selectedApproach": "trusted-kamek-build-plus-precompiled-runner-artifact",
+        }
+        print(json.dumps(report, indent=2, sort_keys=True))
         return 0
     raise AssertionError(f"Unhandled command {arguments.command}")
 
