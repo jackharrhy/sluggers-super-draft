@@ -45,12 +45,14 @@ services:
       S3_ENDPOINT: ${S3_ENDPOINT:-http://garage:3900}
       S3_REGION: ${S3_REGION:-garage}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?Set S3_SECRET_ACCESS_KEY}
-      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+      SESSION_COOKIE_SECRETS: ${SESSION_COOKIE_SECRETS:?Set SESSION_COOKIE_SECRETS}
     depends_on:
       db:
         condition: service_healthy
       garage:
         condition: service_started
+      migrate:
+        condition: service_completed_successfully
     labels:
       - traefik.enable=true
       - traefik.docker.network=starworks_edge
@@ -61,6 +63,21 @@ services:
       - traefik.http.services.starworks.loadbalancer.server.port=3000
     networks:
       - edge
+      - internal
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    command: ["npm", "run", "db:migrate"]
+    restart: "no"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      NODE_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
       - internal
 
   db:

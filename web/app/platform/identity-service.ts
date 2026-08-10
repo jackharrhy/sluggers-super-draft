@@ -47,6 +47,10 @@ export class IdentityService {
     let codeVerifier = this.#createToken()
     let transactionExpiresAt = new Date(now.getTime() + 10 * 60 * 1_000)
     let returnTo = safeReturnTo(input.returnTo)
+    let authorizationUrl = this.discord.createAuthorizationUrl({
+      codeChallenge: createPkceChallenge(codeVerifier),
+      state,
+    })
     await this.repository.createOAuthAttempt({
       codeVerifier,
       expiresAt: transactionExpiresAt,
@@ -57,10 +61,7 @@ export class IdentityService {
     })
 
     return {
-      authorizationUrl: this.discord.createAuthorizationUrl({
-        codeChallenge: createPkceChallenge(codeVerifier),
-        state,
-      }),
+      authorizationUrl,
       transactionExpiresAt,
       transactionToken,
     }

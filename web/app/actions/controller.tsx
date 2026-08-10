@@ -2,7 +2,8 @@ import { createController } from 'remix/router'
 
 import { assetServer } from '../assets.ts'
 import { routes } from '../routes.ts'
-import { HomePage } from '../ui/scaffold-home-page.tsx'
+import { Identity, Platform } from '../middleware/platform.ts'
+import { HomePage } from '../ui/home-page.tsx'
 
 export default createController(routes, {
   actions: {
@@ -11,8 +12,10 @@ export default createController(routes, {
         (await assetServer.fetch(context.request)) ?? new Response('Not Found', { status: 404 })
       )
     },
-    home(context) {
-      return context.render(<HomePage />)
+    async home(context) {
+      let identity = context.get(Identity)
+      let leagues = await context.get(Platform).listVisibleLeagues(identity)
+      return context.render(<HomePage identity={identity} leagues={leagues} />)
     },
   },
 })

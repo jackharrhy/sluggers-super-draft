@@ -1,6 +1,13 @@
 import * as assert from 'remix/assert'
+import { createCookie } from 'remix/cookie'
 import { describe, it } from 'remix/test'
 
+import type { DiscordOAuthClient } from '../platform/discord-oauth.ts'
+import { IdentityService } from '../platform/identity-service.ts'
+import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
+import type { PlatformRepository } from '../platform/repository.ts'
+import type { AppRuntime } from '../platform/runtime.ts'
+import { PlatformService } from '../platform/service.ts'
 import { createAppRouter } from '../router.ts'
 import { routes } from '../routes.ts'
 
@@ -14,6 +21,7 @@ describe('root controller', () => {
         clock: () => new Date('2026-08-10T12:00:00Z'),
         sink: (line) => lines.push(line),
       },
+      runtime: createTestRuntime(),
     })
     let response = await router.fetch(
       new Request('http://localhost' + routes.home.href(), {
@@ -44,6 +52,7 @@ describe('root controller', () => {
         createCorrelationId: () => CORRELATION_ID,
         sink: () => {},
       },
+      runtime: createTestRuntime(),
     })
     let response = await router.fetch(
       new Request('http://localhost' + routes.home.href(), {
@@ -53,4 +62,120 @@ describe('root controller', () => {
 
     assert.equal(response.headers.get('x-correlation-id'), CORRELATION_ID)
   })
+
+  it('lets a site administrator create a private league and reveals its one-time invitation', async () => {
+    let admin = siteAdminIdentity()
+    let provisioned: LeagueDetail = {
+      id: '22222222-2222-4222-8222-222222222222',
+      name: 'Shell League',
+      publication: {
+        draftVisible: false,
+        leagueVisible: false,
+        standingsVisible: false,
+        statsVisible: false,
+      },
+      roles: ['owner'],
+      slug: 'shell-league',
+      status: 'active',
+    }
+    let runtime = createTestRuntime({
+      identity: admin,
+      repository: {
+        async provisionLeague() {
+          return provisioned
+        },
+      },
+      token: 'one-time-invitation',
+    })
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+    let response = await router.fetch(
+      new Request('http://localhost' + routes.admin.createLeague.href(), {
+        body: new URLSearchParams({ name: 'Shell League', slug: 'shell-league' }),
+        headers: {
+          'content-type': 'application/x-www-form-urlencoded',
+          cookie: session,
+          origin: 'http://localhost',
+        },
+        method: 'POST',
+      }),
+    )
+
+    assert.equal(response.status, 201)
+    let html = await response.text()
+    assert.match(html, /Shell League/)
+    assert.match(html, /one-time-invitation/)
+    assert.match(html, /Private by default/)
+  })
 })
+
+function createTestRuntime(
+  options: {
+    identity?: SessionIdentity | null
+    repository?: Partial<PlatformRepository>
+    token?: string
+  } = {},
+): AppRuntime {
+  let repository: PlatformRepository = {
+    async bootstrapSiteAdmin() {
+      return siteAdminIdentity()
+    },
+    async completeDiscordLogin() {
+      if (!options.identity) throw new Error('No test identity configured')
+      return options.identity
+    },
+    async consumeOAuthAttempt() {
+      return null
+    },
+    async createOAuthAttempt() {},
+    async findAccessibleLeague() {
+      return null
+    },
+    async findIdentityBySessionHash() {
+      return options.identity ?? null
+    },
+    async findPendingInvitationId() {
+      return null
+    },
+    async listVisibleLeagues() {
+      return []
+    },
+    async provisionLeague() {
+      throw new Error('Unexpected league provisioning')
+    },
+    async revokeSession() {},
+    async setPublicationPolicy() {},
+    ...options.repository,
+  }
+  let discord: DiscordOAuthClient = {
+    createAuthorizationUrl() {
+      return new URL('https://discord.test/oauth2/authorize')
+    },
+    async exchangeCode() {
+      throw new Error('Unexpected Discord exchange')
+    },
+  }
+  let cookieOptions = {
+    httpOnly: true,
+    path: '/',
+    sameSite: 'Lax' as const,
+    secrets: ['controller-test-cookie-secret'],
+  }
+  return {
+    identity: new IdentityService(repository, discord),
+    oauthCookie: createCookie('test_oauth', cookieOptions),
+    platform: new PlatformService(repository, { createToken: () => options.token ?? 'test-token' }),
+    sessionCookie: createCookie('test_session', cookieOptions),
+  }
+}
+
+function siteAdminIdentity(): SessionIdentity {
+  return {
+    discordUserId: '123456789',
+    discordUsername: 'site-admin',
+    displayName: 'Site Admin',
+    isSiteAdmin: true,
+    memberships: [],
+    personId: '11111111-1111-4111-8111-111111111111',
+  }
+}

@@ -19,6 +19,12 @@ service publishing host ports.
    Compose file.
 6. Keep the Docker socket risk in mind. A socket proxy or another discovery
    mechanism is preferable when the hosting environment supports it.
+7. Bootstrap the first site administrator after the migration service succeeds:
+
+   ```shell
+   docker compose --env-file .env exec web npm run db:bootstrap-admin -- \
+     --discord-user-id YOUR_DISCORD_ID --discord-username YOUR_DISCORD_USERNAME
+   ```
 
 Validate interpolation without deploying:
 
