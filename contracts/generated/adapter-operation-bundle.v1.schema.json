@@ -81,6 +81,33 @@
                 "type": "string",
                 "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,126}$"
               },
+              "loadPhase": {
+                "type": "string",
+                "enum": [
+                  "build-time",
+                  "runtime"
+                ]
+              },
+              "resource": {
+                "type": "string",
+                "enum": [
+                  "dt-na-dat",
+                  "main-dol",
+                  "runtime-bridge"
+                ]
+              },
+              "codec": {
+                "type": "string",
+                "enum": [
+                  "bool",
+                  "enum",
+                  "f32-be",
+                  "s16-be",
+                  "u16-be",
+                  "u32-be",
+                  "u8"
+                ]
+              },
               "value": {
                 "anyOf": [
                   {
@@ -103,6 +130,9 @@
               "characterId",
               "statKey",
               "gameplayTarget",
+              "loadPhase",
+              "resource",
+              "codec",
               "value"
             ],
             "additionalProperties": false

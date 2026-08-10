@@ -103,3 +103,89 @@ export const StatProfileRevisionSchema = z
 
 export type StatDefinition = z.infer<typeof StatDefinitionSchema>;
 export type StatProfileRevision = z.infer<typeof StatProfileRevisionSchema>;
+
+export const statProfileIssueCodes = [
+  "duplicate-definition-id",
+  "duplicate-definition-key",
+  "invalid-definition-range",
+  "duplicate-enum-choice",
+  "duplicate-character",
+  "unknown-stat-key",
+  "missing-required-value",
+  "invalid-stat-value",
+] as const;
+
+export type StatProfileIssueCode = (typeof statProfileIssueCodes)[number];
+
+export interface StatProfileIssue {
+  code: StatProfileIssueCode;
+  path: string;
+}
+
+export function validateStatProfileRevision(
+  revision: StatProfileRevision,
+): StatProfileIssue[] {
+  let issues: StatProfileIssue[] = [];
+  let definitionIds = new Set<string>();
+  let definitions = new Map<string, StatDefinition>();
+  for (let [index, definition] of revision.definitions.entries()) {
+    if (definitionIds.has(definition.definitionId)) {
+      issues.push({ code: "duplicate-definition-id", path: `definitions.${index}.definitionId` });
+    }
+    definitionIds.add(definition.definitionId);
+    if (definitions.has(definition.key)) {
+      issues.push({ code: "duplicate-definition-key", path: `definitions.${index}.key` });
+    }
+    definitions.set(definition.key, definition);
+    if (
+      (definition.dataType === "integer" || definition.dataType === "number") &&
+      definition.minimum > definition.maximum
+    ) {
+      issues.push({ code: "invalid-definition-range", path: `definitions.${index}` });
+    }
+    if (definition.dataType === "enum") {
+      let values = definition.choices.map((choice) => choice.value);
+      if (new Set(values).size !== values.length) {
+        issues.push({ code: "duplicate-enum-choice", path: `definitions.${index}.choices` });
+      }
+    }
+  }
+
+  let characterIds = new Set<string>();
+  for (let [characterIndex, assignment] of revision.characterValues.entries()) {
+    if (characterIds.has(assignment.characterId)) {
+      issues.push({ code: "duplicate-character", path: `characterValues.${characterIndex}.characterId` });
+    }
+    characterIds.add(assignment.characterId);
+    for (let [key, value] of Object.entries(assignment.values)) {
+      let definition = definitions.get(key);
+      if (!definition) {
+        issues.push({ code: "unknown-stat-key", path: `characterValues.${characterIndex}.values.${key}` });
+      } else if (!isValidStatValue(definition, value)) {
+        issues.push({ code: "invalid-stat-value", path: `characterValues.${characterIndex}.values.${key}` });
+      }
+    }
+    for (let definition of revision.definitions) {
+      if (definition.required && !(definition.key in assignment.values)) {
+        issues.push({
+          code: "missing-required-value",
+          path: `characterValues.${characterIndex}.values.${definition.key}`,
+        });
+      }
+    }
+  }
+  return issues;
+}
+
+function isValidStatValue(definition: StatDefinition, value: unknown): boolean {
+  if (definition.dataType === "boolean") return typeof value === "boolean";
+  if (definition.dataType === "enum") {
+    return (
+      typeof value === "string" &&
+      definition.choices.some((choice) => choice.value === value)
+    );
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) return false;
+  if (definition.dataType === "integer" && !Number.isInteger(value)) return false;
+  return value >= definition.minimum && value <= definition.maximum;
+}

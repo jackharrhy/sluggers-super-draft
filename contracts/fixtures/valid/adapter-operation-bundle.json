@@ -15,6 +15,9 @@
       "characterId": "mario",
       "statKey": "batting.slap-power",
       "gameplayTarget": "character.batting.slapPower",
+      "loadPhase": "build-time",
+      "resource": "dt-na-dat",
+      "codec": "u16-be",
       "value": 96
     },
     {
