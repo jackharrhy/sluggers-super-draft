@@ -86,6 +86,20 @@ services:
     volumes:
       - mailpit:/data
 
+  s3-tools:
+    image: amazon/aws-cli:2.36.19@sha256:7e78b80fc653b9f6bdacc54709458910374da3213e3a19abdaf395680831a5da
+    profiles: ["operations"]
+    environment:
+      AWS_ACCESS_KEY_ID: "${S3_ACCESS_KEY_ID:-GK00000000000000000000000000000000}"
+      AWS_DEFAULT_REGION: "${S3_REGION:-garage}"
+      AWS_ENDPOINT_URL: "http://garage:3900"
+      AWS_SECRET_ACCESS_KEY: "${S3_SECRET_ACCESS_KEY:-0000000000000000000000000000000000000000000000000000000000000000}"
+    volumes:
+      - "${STARWORKS_BACKUP_DIR:-./tmp/backups}:/backup"
+    depends_on:
+      garage:
+        condition: service_healthy
+
 volumes:
   db:
   garage_data:

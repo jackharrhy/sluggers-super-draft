@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:17@sha256:7958605b474b3d264a969cb3a123d6aa00ad1e1fe9da8a69984dabb704d93317
+    environment:
+      POSTGRES_DB: starworks_restore
+      POSTGRES_PASSWORD: restore-drill-only
+      POSTGRES_USER: starworks_restore
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starworks_restore -d starworks_restore"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - postgres_restore:/var/lib/postgresql/data
+
+  garage:
+    image: dxflrs/garage:v2.3.0@sha256:866bd13ed2038ba7e7190e840482bc27234c4afaf77be8cfa439ae088c1e4690
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      GARAGE_DEFAULT_ACCESS_KEY: GK11111111111111111111111111111111
+      GARAGE_DEFAULT_BUCKET: starworks-restore
+      GARAGE_DEFAULT_SECRET_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+    healthcheck:
+      test: ["CMD", "/garage", "status"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./restore-drill.garage.toml:/etc/garage.toml:ro
+      - garage_restore_meta:/var/lib/garage/meta
+      - garage_restore_data:/var/lib/garage/data
+
+  s3-tools:
+    image: amazon/aws-cli:2.36.19@sha256:7e78b80fc653b9f6bdacc54709458910374da3213e3a19abdaf395680831a5da
+    environment:
+      AWS_ACCESS_KEY_ID: GK11111111111111111111111111111111
+      AWS_DEFAULT_REGION: garage
+      AWS_ENDPOINT_URL: http://garage:3900
+      AWS_SECRET_ACCESS_KEY: 1111111111111111111111111111111111111111111111111111111111111111
+    volumes:
+      - ${STARWORKS_RESTORE_DIR:?Set STARWORKS_RESTORE_DIR}:/restore:ro
+
+volumes:
+  garage_restore_data:
+  garage_restore_meta:
+  postgres_restore:

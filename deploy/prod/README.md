@@ -15,10 +15,10 @@ service publishing host ports.
    redundancy and must not be represented as highly available.
 4. Provision the Garage layout, application key, and bucket before starting the
    web application.
-5. Configure encrypted PostgreSQL/Garage backups and restore drills outside the
-   Compose file.
-6. Keep the Docker socket risk in mind. A socket proxy or another discovery
-   mechanism is preferable when the hosting environment supports it.
+5. Configure encrypted, off-host backup storage and run the included isolated
+   restore drill. See the production runbook below.
+6. Keep the Docker socket proxy isolated. It grants Traefik only the read-only
+   Docker API sections needed for discovery; it is not a general Docker client.
 7. Bootstrap the first site administrator after the migration service succeeds:
 
    ```shell
@@ -37,3 +37,11 @@ docker compose \
 
 The dashboard is intentionally not routed publicly. App-level email remains
 optional and is not part of this production topology.
+
+All third-party runtime images are pinned by tag and OCI manifest digest. Image
+updates are explicit release work: update the tag and digest together, review
+upstream changes, and rerun CI plus the restore drill.
+
+The complete deployment, league-request, backup/restore, observability, audit,
+credential-revocation, release, and incident procedures live in
+[`../../docs/operations/production-runbook.md`](../../docs/operations/production-runbook.md).
