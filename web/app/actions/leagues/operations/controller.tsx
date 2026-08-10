@@ -2,9 +2,11 @@ import { createController } from 'remix/router'
 import { redirect } from 'remix/response/redirect'
 import type { RemixNode } from 'remix/ui'
 
-import { Identity, Platform, RunnerAdmin } from '../../../middleware/platform.ts'
+import { Identity, LeagueOperations, Platform, RunnerAdmin } from '../../../middleware/platform.ts'
+import type { LeagueOperationsApplication } from '../../../league-operations/service.ts'
 import { PlatformError } from '../../../platform/errors.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
+import { administrativeRoles } from '../../../platform/repository.ts'
 import type { RunnerAdminApplication } from '../../../runner/admin-service.ts'
 import { routes } from '../../../routes.ts'
 import { LeagueOperationsPage } from '../../../ui/league-operations-page.tsx'
@@ -18,10 +20,83 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       context.structuredLog.bind({ leagueId: league.id })
       try {
-        let dashboard = await context.get(RunnerAdmin).dashboard(identity, league.id)
-        return context.render(<LeagueOperationsPage dashboard={dashboard} identity={identity!} league={league} />)
+        let dashboards = await loadDashboards(
+          identity,
+          league,
+          context.get(RunnerAdmin),
+          context.get(LeagueOperations),
+        )
+        return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} />)
       } catch (error) {
         return operationsError(context, error)
+      }
+    },
+    async setDeadline(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        let closesAt = new Date(readString(data, 'closesAt'))
+        if (Number.isNaN(closesAt.getTime())) throw new PlatformError('Deadline time is invalid', 'invalid_input')
+        let kind = readString(data, 'kind')
+        if (!['trade', 'roster', 'lineup'].includes(kind)) throw new PlatformError('Deadline kind is invalid', 'invalid_input')
+        await context.get(LeagueOperations).setDeadline(identity, league.id, {
+          closesAt,
+          kind: kind as 'trade' | 'roster' | 'lineup',
+          note: readString(data, 'note', false) || null,
+          seasonId: readString(data, 'seasonId'),
+        })
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async proposeTrade(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        await context.get(LeagueOperations).proposeTrade(identity, league.id, {
+          counterpartyCharacterIds: readCharacterList(data, 'counterpartyCharacterIds'),
+          counterpartyTeamId: readString(data, 'counterpartyTeamId'),
+          message: readString(data, 'message', false) || null,
+          proposerCharacterIds: readCharacterList(data, 'proposerCharacterIds'),
+          proposerTeamId: readString(data, 'proposerTeamId'),
+          seasonId: readString(data, 'seasonId'),
+        })
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async reviewTrade(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let data = context.get(FormData)
+        let decision = readString(data, 'decision')
+        if (decision !== 'approved' && decision !== 'rejected') throw new PlatformError('Trade decision is invalid', 'invalid_input')
+        await context.get(LeagueOperations).reviewTrade(identity, league.id, context.params.proposalId, {
+          decision,
+          reason: readString(data, 'reason', false) || null,
+        })
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
+      }
+    },
+    async cancelTrade(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        await context.get(LeagueOperations).cancelTrade(identity, league.id, context.params.proposalId)
+        return operationsRedirect(league)
+      } catch (error) {
+        return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
     async scheduleMatch(context) {
@@ -41,7 +116,7 @@ export default createController(routes.leagues.operations, {
         })
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
-        return renderDashboardError(context, identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
     async queueAttempt(context) {
@@ -60,7 +135,7 @@ export default createController(routes.leagues.operations, {
         })
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
-        return renderDashboardError(context, identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
     async issueCredential(context) {
@@ -72,13 +147,18 @@ export default createController(routes.leagues.operations, {
           name: readString(context.get(FormData), 'name'),
           scopes: ['artifacts:read', 'heartbeat:write', 'runs:claim', 'runs:read', 'telemetry:write'],
         })
-        let dashboard = await context.get(RunnerAdmin).dashboard(identity, league.id)
+        let dashboards = await loadDashboards(
+          identity,
+          league,
+          context.get(RunnerAdmin),
+          context.get(LeagueOperations),
+        )
         return context.render(
-          <LeagueOperationsPage dashboard={dashboard} identity={identity!} league={league} oneTimeCredential={issued.credential} />,
+          <LeagueOperationsPage {...dashboards} identity={identity!} league={league} oneTimeCredential={issued.credential} />,
           { status: 201 },
         )
       } catch (error) {
-        return renderDashboardError(context, identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
     async revokeStation(context) {
@@ -89,7 +169,7 @@ export default createController(routes.leagues.operations, {
         await context.get(RunnerAdmin).revokeStation(identity, league.id, context.params.stationId)
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
-        return renderDashboardError(context, identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error)
       }
     },
   },
@@ -101,10 +181,15 @@ async function renderDashboardError(
   league: LeagueDetail,
   error: unknown,
 ) {
-  let dashboard = await context.get(RunnerAdmin).dashboard(identity, league.id)
-  let message = error instanceof PlatformError ? error.message : 'The match operation could not be completed.'
+  let dashboards = await loadDashboards(
+    identity,
+    league,
+    context.runnerAdmin,
+    context.leagueOperations,
+  )
+  let message = error instanceof PlatformError ? error.message : 'The league operation could not be completed.'
   let status = error instanceof PlatformError && error.code === 'forbidden' ? 403 : 400
-  return context.render(<LeagueOperationsPage dashboard={dashboard} error={message} identity={identity!} league={league} />, { status })
+  return context.render(<LeagueOperationsPage {...dashboards} error={message} identity={identity!} league={league} />, { status })
 }
 
 function readString(data: FormData, name: string, required = true): string {
@@ -123,6 +208,35 @@ function readJsonObject(data: FormData, name: string): Record<string, string | n
   }
 }
 
+function readCharacterList(data: FormData, name: string): string[] {
+  return readString(data, name)
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+}
+
+function operationsRedirect(league: LeagueDetail) {
+  return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
+}
+
+async function loadDashboards(
+  identity: SessionIdentity | null,
+  league: LeagueDetail,
+  runnerAdmin: RunnerAdminApplication,
+  leagueOperations: LeagueOperationsApplication,
+) {
+  let mayAdminister = Boolean(identity?.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role)))
+  let [leagueOperationsDashboard, runnerDashboard] = await Promise.all([
+    leagueOperations.dashboard(identity, league.id),
+    mayAdminister ? runnerAdmin.dashboard(identity, league.id) : Promise.resolve(emptyRunnerDashboard()),
+  ])
+  return { dashboard: runnerDashboard, leagueOperations: leagueOperationsDashboard }
+}
+
+function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
+  return { matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
+}
+
 function operationsError(context: { render(node: RemixNode, init?: ResponseInit): Response }, error: unknown) {
   let message = error instanceof PlatformError ? error.message : 'League operations are unavailable.'
   let status = error instanceof PlatformError && error.code === 'forbidden' ? 403 : 400
@@ -134,6 +248,20 @@ function notFound(context: { render(node: RemixNode, init?: ResponseInit): Respo
 }
 
 interface OperationsRenderContext {
+  leagueOperations: LeagueOperationsApplication
+  runnerAdmin: RunnerAdminApplication
+  render(node: RemixNode, init?: ResponseInit): Response
+}
+
+function renderContext(context: {
   get(key: typeof RunnerAdmin): RunnerAdminApplication
   render(node: RemixNode, init?: ResponseInit): Response
+} & {
+  get(key: typeof LeagueOperations): LeagueOperationsApplication
+}): OperationsRenderContext {
+  return {
+    leagueOperations: context.get(LeagueOperations),
+    render: (node, init) => context.render(node, init),
+    runnerAdmin: context.get(RunnerAdmin),
+  }
 }

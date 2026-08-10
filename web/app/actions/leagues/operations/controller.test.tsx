@@ -3,6 +3,7 @@ import { createCookie } from 'remix/cookie'
 import { describe, it } from 'remix/test'
 
 import type { ConfigurationApplication } from '../../../configuration/service.ts'
+import type { LeagueOperationsApplication, LeagueOperationsDashboard } from '../../../league-operations/service.ts'
 import type { DiscordOAuthClient } from '../../../platform/discord-oauth.ts'
 import { IdentityService } from '../../../platform/identity-service.ts'
 import type { LeagueDetail, SessionIdentity } from '../../../platform/model.ts'
@@ -37,6 +38,12 @@ const dashboard: RunnerOperationsDashboard = {
   seasons: [],
   stations: [],
   statProfiles: [],
+}
+
+const leagueOperationsDashboard: LeagueOperationsDashboard = {
+  deadlines: [],
+  seasons: [],
+  trades: [],
 }
 
 describe('league operations controller', () => {
@@ -91,6 +98,45 @@ describe('league operations controller', () => {
       leagueId: league.id,
     })
   })
+
+  it('parses a roster trade offer into ordered character lists', async () => {
+    let received: unknown
+    let leagueOperations = createLeagueOperations({
+      async proposeTrade(_identity, leagueId, input) {
+        received = { input, leagueId }
+        return { id: 'trade' }
+      },
+    })
+    let runtime = createRuntime(createRunnerAdmin(), leagueOperations)
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+      new Request('http://localhost' + routes.leagues.operations.proposeTrade.href({ leagueSlug: league.slug }), {
+        body: new URLSearchParams({
+          counterpartyCharacterIds: 'peach\ndaisy',
+          counterpartyTeamId: '44444444-4444-4444-8444-444444444444',
+          message: 'Captain exchange',
+          proposerCharacterIds: 'mario, luigi',
+          proposerTeamId: '55555555-5555-4555-8555-555555555555',
+          seasonId: '66666666-6666-4666-8666-666666666666',
+        }),
+        headers: { cookie: session, origin: 'http://localhost' },
+        method: 'POST',
+      }),
+    )
+
+    assert.equal(response.status, 303)
+    assert.deepEqual(received, {
+      input: {
+        counterpartyCharacterIds: ['peach', 'daisy'],
+        counterpartyTeamId: '44444444-4444-4444-8444-444444444444',
+        message: 'Captain exchange',
+        proposerCharacterIds: ['mario', 'luigi'],
+        proposerTeamId: '55555555-5555-4555-8555-555555555555',
+        seasonId: '66666666-6666-4666-8666-666666666666',
+      },
+      leagueId: league.id,
+    })
+  })
 })
 
 function createRunnerAdmin(overrides: Partial<RunnerAdminApplication> = {}): RunnerAdminApplication {
@@ -103,7 +149,10 @@ function createRunnerAdmin(overrides: Partial<RunnerAdminApplication> = {}): Run
   }
 }
 
-function createRuntime(runnerAdmin: RunnerAdminApplication): AppRuntime {
+function createRuntime(
+  runnerAdmin: RunnerAdminApplication,
+  leagueOperations = createLeagueOperations(),
+): AppRuntime {
   let repository: PlatformRepository = {
     async bootstrapSiteAdmin() { return identity },
     async completeDiscordLogin() { return identity },
@@ -128,10 +177,24 @@ function createRuntime(runnerAdmin: RunnerAdminApplication): AppRuntime {
     configuration: {} as ConfigurationApplication,
     draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
+    leagueOperations,
     oauthCookie: createCookie('test_oauth', cookies),
     platform: new PlatformService(repository),
     runnerAdmin,
     runnerControl: {} as AppRuntime['runnerControl'],
     sessionCookie: createCookie('test_session', cookies),
+  }
+}
+
+function createLeagueOperations(
+  overrides: Partial<LeagueOperationsApplication> = {},
+): LeagueOperationsApplication {
+  return {
+    async cancelTrade() {},
+    async dashboard() { return leagueOperationsDashboard },
+    async proposeTrade() { return { id: 'trade' } },
+    async reviewTrade() {},
+    async setDeadline() {},
+    ...overrides,
   }
 }

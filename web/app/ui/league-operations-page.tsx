@@ -2,6 +2,8 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
+import { administrativeRoles } from '../platform/repository.ts'
+import type { LeagueOperationsDashboard } from '../league-operations/service.ts'
 import type { RunnerOperationsDashboard } from '../runner/admin-service.ts'
 import { routes } from '../routes.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
@@ -11,13 +13,15 @@ interface LeagueOperationsPageProps {
   error?: string
   identity: SessionIdentity
   league: LeagueDetail
+  leagueOperations: LeagueOperationsDashboard
   oneTimeCredential?: string
 }
 
 export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) {
   return () => {
-    let { dashboard, error, identity, league, oneTimeCredential } = handle.props
+    let { dashboard, error, identity, league, leagueOperations, oneTimeCredential } = handle.props
     let teams = dashboard.seasons.flatMap((season) => season.teams)
+    let mayAdminister = identity.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
     return (
       <AppShell identity={identity} title={`${league.name} operations · Starworks`}>
         <header mix={heroStyle}>
@@ -34,6 +38,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
         </header>
 
         {error ? <p role="alert" mix={errorStyle}>{error}</p> : null}
+        <RosterOperations identity={identity} league={league} mayAdminister={mayAdminister} operations={leagueOperations} />
         {oneTimeCredential ? (
           <section mix={[cardStyle, credentialStyle]} aria-labelledby="credential-heading">
             <h2 id="credential-heading">Copy this credential now</h2>
@@ -42,6 +47,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
           </section>
         ) : null}
 
+        {mayAdminister ? <>
         <div mix={twoColumnStyle}>
           <section mix={cardStyle} aria-labelledby="schedule-heading">
             <h2 id="schedule-heading">Schedule a match</h2>
@@ -125,8 +131,98 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
             {!dashboard.stations.length ? <p mix={emptyStyle}>No station has enrolled with an issued credential.</p> : null}
           </div>
         </section>
+        </> : null}
       </AppShell>
     )
+  }
+}
+
+function RosterOperations(handle: Handle<{
+  identity: SessionIdentity
+  league: LeagueDetail
+  mayAdminister: boolean
+  operations: LeagueOperationsDashboard
+}>) {
+  return () => {
+    let { identity, league, mayAdminister, operations } = handle.props
+    let teams = operations.seasons.flatMap((season) => season.teams)
+    let managedTeamIds = new Set(teams.filter((team) => team.managerPersonId === identity.personId).map((team) => team.id))
+    return <>
+      <section mix={sectionStyle} aria-labelledby="rosters-heading">
+        <div mix={sectionHeadingStyle}>
+          <div><p mix={eyebrowStyle}>Revisioned teams</p><h2 id="rosters-heading">Current rosters</h2></div>
+          <span mix={countStyle}>{teams.length} teams</span>
+        </div>
+        <div mix={rosterGridStyle}>
+          {teams.map((team) => <article mix={cardStyle}>
+            <div mix={rosterHeadingStyle}><h3>{team.name}</h3>{managedTeamIds.has(team.id) ? <span mix={managedStyle}>Your team</span> : null}</div>
+            {team.roster ? <><p mix={mutedStyle}>Published revision {team.roster.revisionNumber}</p><div mix={characterListStyle}>{team.roster.characterIds.map((characterId) => <code>{characterId}</code>)}</div></> : <p mix={mutedStyle}>No published roster yet.</p>}
+          </article>)}
+          {!teams.length ? <p mix={emptyStyle}>No league teams are configured.</p> : null}
+        </div>
+      </section>
+
+      <div mix={twoColumnStyle}>
+        <section mix={cardStyle} aria-labelledby="trade-offer-heading">
+          <h2 id="trade-offer-heading">Offer a trade</h2>
+          <p mix={mutedStyle}>One character ID per line. Ownership is revalidated when the other manager approves.</p>
+          <form action={routes.leagues.operations.proposeTrade.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
+            <label>Season<select name="seasonId" required mix={inputStyle}>{operations.seasons.map((season) => <option value={season.id}>{season.name}</option>)}</select></label>
+            <label>Your team<select name="proposerTeamId" required mix={inputStyle}>{teams.map((team) => <option value={team.id}>{team.name}</option>)}</select></label>
+            <label>Other team<select name="counterpartyTeamId" required defaultValue={teams[1]?.id ?? teams[0]?.id} mix={inputStyle}>{teams.map((team) => <option value={team.id}>{team.name}</option>)}</select></label>
+            <label>You send<textarea name="proposerCharacterIds" rows={4} required placeholder="rmbe01-mario" mix={inputStyle} /></label>
+            <label>You receive<textarea name="counterpartyCharacterIds" rows={4} required placeholder="rmbe01-peach" mix={inputStyle} /></label>
+            <label>Message<textarea name="message" rows={2} placeholder="Why this works for both teams" mix={inputStyle} /></label>
+            <button type="submit" mix={buttonStyle}>Send trade offer</button>
+          </form>
+        </section>
+
+        <section mix={cardStyle} aria-labelledby="deadlines-heading">
+          <h2 id="deadlines-heading">League deadlines</h2>
+          {operations.deadlines.length ? <ul mix={deadlineListStyle}>{operations.deadlines.map((deadline) => <li><strong>{deadline.seasonName} · {deadline.kind}</strong><span>{deadline.closesAt.toLocaleString()}</span>{deadline.note ? <small>{deadline.note}</small> : null}</li>)}</ul> : <p mix={mutedStyle}>No transaction deadlines are configured.</p>}
+          {mayAdminister ? <form action={routes.leagues.operations.setDeadline.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
+            <label>Season<select name="seasonId" required mix={inputStyle}>{operations.seasons.map((season) => <option value={season.id}>{season.name}</option>)}</select></label>
+            <label>Deadline type<select name="kind" defaultValue="trade" mix={inputStyle}><option value="trade">Trades</option><option value="roster">Roster changes</option><option value="lineup">Lineups</option></select></label>
+            <label>Closes at<input type="datetime-local" name="closesAt" required mix={inputStyle} /></label>
+            <label>Note<input name="note" placeholder="Postseason lock" mix={inputStyle} /></label>
+            <button type="submit" mix={buttonStyle}>Set deadline</button>
+          </form> : null}
+        </section>
+      </div>
+
+      <section mix={sectionStyle} aria-labelledby="trades-heading">
+        <div mix={sectionHeadingStyle}>
+          <div><p mix={eyebrowStyle}>Approval queue</p><h2 id="trades-heading">Trades</h2></div>
+          <span mix={countStyle}>{operations.trades.length} proposals</span>
+        </div>
+        <div mix={tradeListStyle}>
+          {operations.trades.map((trade) => {
+            let mayReview = mayAdminister || managedTeamIds.has(trade.counterpartyTeamId)
+            let mayCancel = mayAdminister || trade.proposedByPersonId === identity.personId
+            let outgoing = trade.items.filter((item) => item.fromTeamId === trade.proposerTeamId)
+            let incoming = trade.items.filter((item) => item.fromTeamId === trade.counterpartyTeamId)
+            return <article mix={[cardStyle, tradeCardStyle]}>
+              <div mix={tradeHeadingStyle}><div><span mix={statusStyle}>{trade.status}</span><h3>{trade.proposerTeamName} ↔ {trade.counterpartyTeamName}</h3></div><small>{trade.proposedAt.toLocaleString()}</small></div>
+              <div mix={tradeSidesStyle}>
+                <div><strong>{trade.proposerTeamName} sends</strong>{outgoing.map((item) => <code>{item.characterId}</code>)}</div>
+                <div><strong>{trade.counterpartyTeamName} sends</strong>{incoming.map((item) => <code>{item.characterId}</code>)}</div>
+              </div>
+              {trade.message ? <p>{trade.message}</p> : null}
+              <p mix={mutedStyle}>{trade.approvals.length} of 2 team decisions recorded</p>
+              {trade.status === 'pending' ? <div mix={tradeActionsStyle}>
+                {mayReview ? <form action={routes.leagues.operations.reviewTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post" mix={reviewFormStyle}>
+                  <input name="reason" placeholder="Optional decision note" mix={inputStyle} />
+                  <button name="decision" value="approved" mix={buttonStyle}>Approve and apply</button>
+                  <button name="decision" value="rejected" mix={dangerStyle}>Reject</button>
+                </form> : null}
+                {mayCancel ? <form action={routes.leagues.operations.cancelTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post"><button mix={secondaryButtonStyle}>Cancel offer</button></form> : null}
+              </div> : null}
+            </article>
+          })}
+          {!operations.trades.length ? <p mix={emptyStyle}>No trade proposals have been recorded.</p> : null}
+        </div>
+      </section>
+    </>
   }
 }
 
@@ -153,3 +249,15 @@ const wideStyle = css({ gridColumn: '1 / -1' })
 const stationGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' })
 const dangerStyle = css({ background: '#7d2433', border: '1px solid #c44d61', borderRadius: '9px', color: '#fff', cursor: 'pointer', font: 'inherit', fontWeight: 800, marginTop: '12px', padding: '9px 12px' })
 const emptyStyle = css({ border: '1px dashed #445171', borderRadius: '14px', color: '#9faec8', padding: '22px' })
+const rosterGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' })
+const rosterHeadingStyle = css({ alignItems: 'center', display: 'flex', gap: '12px', justifyContent: 'space-between', '& h3': { fontSize: '24px', margin: 0 } })
+const managedStyle = css({ background: '#123d32', borderRadius: '999px', color: '#8ee0bd', fontSize: '11px', fontWeight: 900, padding: '5px 8px', textTransform: 'uppercase' })
+const characterListStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '7px', marginTop: '14px', '& code': { background: '#0c1220', borderRadius: '7px', color: '#c9d4e9', fontSize: '12px', padding: '6px 8px' } })
+const deadlineListStyle = css({ display: 'grid', gap: '10px', listStyle: 'none', margin: '16px 0 24px', padding: 0, '& li': { background: '#0c1220', borderRadius: '9px', display: 'grid', gap: '4px', padding: '11px' }, '& span, & small': { color: '#9faec8' } })
+const tradeListStyle = css({ display: 'grid', gap: '18px' })
+const tradeCardStyle = css({ display: 'grid', gap: '18px' })
+const tradeHeadingStyle = css({ alignItems: 'start', display: 'flex', gap: '20px', justifyContent: 'space-between', '& h3': { fontSize: '23px', margin: '8px 0 0' }, '& small': { color: '#9faec8' } })
+const tradeSidesStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', '& div': { background: '#0c1220', borderRadius: '10px', display: 'grid', gap: '8px', padding: '14px' }, '& code': { color: '#c9d4e9' }, '@media (max-width: 600px)': { gridTemplateColumns: '1fr' } })
+const tradeActionsStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '12px' })
+const reviewFormStyle = css({ alignItems: 'center', display: 'flex', flex: '1 1 600px', flexWrap: 'wrap', gap: '8px', '& input': { flex: '1 1 220px' } })
+const secondaryButtonStyle = css({ background: '#253553', border: '1px solid #445171', borderRadius: '9px', color: '#f7f2e8', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })

@@ -156,6 +156,7 @@ function createRuntime(configuration: ConfigurationApplication): AppRuntime {
     configuration,
     draft: {} as AppRuntime['draft'],
     identity: new IdentityService(repository, discord),
+    leagueOperations: {} as AppRuntime['leagueOperations'],
     oauthCookie: createCookie('test_oauth', cookieOptions),
     platform: new PlatformService(repository),
     runnerControl: {} as AppRuntime['runnerControl'],

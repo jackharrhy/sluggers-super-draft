@@ -3,6 +3,7 @@ import { createContextKey, type Middleware } from 'remix/router'
 
 import type { ConfigurationApplication } from '../configuration/service.ts'
 import type { DraftApplication } from '../draft/service.ts'
+import type { LeagueOperationsApplication } from '../league-operations/service.ts'
 import type { RunnerControlApplication } from '../runner/control-service.ts'
 import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { IdentityService } from '../platform/identity-service.ts'
@@ -15,6 +16,7 @@ export const Identity = createContextKey<SessionIdentity | null>(null)
 export const Configuration = createContextKey<ConfigurationApplication>()
 export const Draft = createContextKey<DraftApplication>()
 export const IdentityServiceContext = createContextKey<IdentityService>()
+export const LeagueOperations = createContextKey<LeagueOperationsApplication>()
 export const OAuthCookie = createContextKey<Cookie>()
 export const Platform = createContextKey<PlatformService>()
 export const RunnerControl = createContextKey<RunnerControlApplication>()
@@ -29,6 +31,7 @@ export function platform(
     { key: typeof Draft; value: DraftApplication },
     { key: typeof Identity; value: SessionIdentity | null; property: 'identity' },
     { key: typeof IdentityServiceContext; value: IdentityService },
+    { key: typeof LeagueOperations; value: LeagueOperationsApplication },
     { key: typeof OAuthCookie; value: Cookie },
     { key: typeof Platform; value: PlatformService },
     { key: typeof RunnerControl; value: RunnerControlApplication },
@@ -45,6 +48,7 @@ export function platform(
     context.set(Draft, runtime.draft)
     context.set(Identity, identity, { property: 'identity' })
     context.set(IdentityServiceContext, runtime.identity)
+    context.set(LeagueOperations, runtime.leagueOperations)
     context.set(OAuthCookie, runtime.oauthCookie)
     context.set(Platform, runtime.platform)
     context.set(RunnerControl, runtime.runnerControl)

@@ -68,6 +68,7 @@ export interface LeagueOperationsDashboard {
     items: Array<typeof tradeItems.$inferSelect>
     message: string | null
     proposedAt: Date
+    proposedByPersonId: string
     proposerTeamId: string
     proposerTeamName: string
     status: typeof tradeProposals.$inferSelect.status
@@ -136,6 +137,7 @@ export class LeagueOperationsService {
         items: itemRows.filter((item) => item.proposalId === proposal.id),
         message: proposal.message,
         proposedAt: proposal.proposedAt,
+        proposedByPersonId: proposal.proposedByPersonId,
         proposerTeamId: proposal.proposerTeamId,
         proposerTeamName: teamNames.get(proposal.proposerTeamId) ?? 'Unknown team',
         status: proposal.status,
