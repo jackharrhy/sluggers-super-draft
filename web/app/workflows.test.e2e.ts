@@ -143,6 +143,7 @@ describe('critical Starworks browser workflows', () => {
           attemptNumber: 1,
           failureKind: null,
           id: ATTEMPT_ID,
+          requiredGameBuildSha256: 'a'.repeat(64),
           status: 'queued',
         })
       }),

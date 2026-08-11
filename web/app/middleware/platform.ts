@@ -13,6 +13,7 @@ import type { RunnerAdminApplication } from '../runner/admin-service.ts'
 import type { TelemetryApplication } from '../telemetry/service.ts'
 import type { IdentityService } from '../platform/identity-service.ts'
 import type { SessionIdentity } from '../platform/model.ts'
+import type { LocalDemoLoginConfiguration } from '../platform/local-demo-login.ts'
 import type { AppRuntime } from '../platform/runtime.ts'
 import type { PlatformService } from '../platform/service.ts'
 import { RequestLog } from './request-logging.ts'
@@ -24,6 +25,7 @@ export const Content = createContextKey<ContentApplication>()
 export const Draft = createContextKey<DraftApplication>()
 export const IdentityServiceContext = createContextKey<IdentityService>()
 export const LeagueOperations = createContextKey<LeagueOperationsApplication>()
+export const LocalDemoLogin = createContextKey<LocalDemoLoginConfiguration | null>(null)
 export const OAuthCookie = createContextKey<Cookie>()
 export const Operations = createContextKey<OperationsApplication>()
 export const Notifications = createContextKey<NotificationApplication | null>(null)
@@ -44,6 +46,7 @@ export function platform(
     { key: typeof Identity; value: SessionIdentity | null; property: 'identity' },
     { key: typeof IdentityServiceContext; value: IdentityService },
     { key: typeof LeagueOperations; value: LeagueOperationsApplication },
+    { key: typeof LocalDemoLogin; value: LocalDemoLoginConfiguration | null },
     { key: typeof OAuthCookie; value: Cookie },
     { key: typeof Operations; value: OperationsApplication },
     { key: typeof Notifications; value: NotificationApplication | null },
@@ -66,6 +69,7 @@ export function platform(
     context.set(Identity, identity, { property: 'identity' })
     context.set(IdentityServiceContext, runtime.identity)
     context.set(LeagueOperations, runtime.leagueOperations)
+    context.set(LocalDemoLogin, runtime.localDemoLogin ?? null)
     context.set(OAuthCookie, runtime.oauthCookie)
     context.set(Operations, runtime.operations)
     context.set(Notifications, runtime.notifications ?? null)

@@ -13,6 +13,7 @@ export const routes = route({
   auth: route('auth', {
     discord: get('discord'),
     discordCallback: get('discord/callback'),
+    localDemo: get('local-demo'),
     logout: post('logout'),
   }),
   admin: route('admin', {

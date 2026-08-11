@@ -33,6 +33,27 @@ DATABASE_URL=postgres://starworks:starworks@127.0.0.1:5432/starworks \
 League creation is deliberately site-admin-only. A new league starts private and produces a
 one-time Discord invitation for its first administrator. There is no public registration route.
 
+### Local interactive demo
+
+Seed a private demo league, browser session, two published teams, one queued
+CPU-vs-CPU attempt, and a runner credential without configuring Discord:
+
+```shell
+docker compose up -d db garage
+npm run demo:seed
+docker compose --env-file .starworks/demo.env up -d --build web
+```
+
+Open <http://127.0.0.1:3000/auth/local-demo>. The local login endpoint exists
+only when the ignored, mode-`0600` `.starworks/demo.env` explicitly enables it,
+and it refuses non-loopback hostnames. Production remains Discord-only.
+
+The seeded **Mushroom League** contains Mario Fireballs and Wario Muscles,
+published lineups, a ruleset, a stat profile, Mario Stadium, and a queued match
+attempt. The Operations page can schedule additional matches, issue station
+credentials, and queue attempts. The same private environment file contains
+`STARWORKS_RUNNER_CREDENTIAL` for launching the native Python runner.
+
 The preserved application's data enters through a dry-run-first, idempotent adapter documented in
 [`docs/migration/legacy-super-draft.md`](docs/migration/legacy-super-draft.md). Its old database and
 files are source material, not Starworks contracts.
