@@ -14,6 +14,7 @@ from starworks_runner.capture import (
     FfmpegCaptureController,
     resolve_local_secret,
 )
+from starworks_runner.cli import create_parser
 from starworks_runner.orchestrator import ExecutionOutcome
 
 
@@ -39,6 +40,26 @@ class FakeProcess:
     def kill(self) -> None:
         self.killed = True
         self.return_code = -9
+
+
+def test_headless_station_records_only_when_requested() -> None:
+    arguments = create_parser().parse_args(
+        [
+            "run-sluggers-station",
+            "--cache",
+            "cache",
+            "--dolphin",
+            "Dolphin",
+            "--profile",
+            "profiles",
+            "--seed-profile",
+            "seed",
+            "--checkpoint-manifest",
+            "checkpoint.json",
+        ]
+    )
+
+    assert arguments.recordings is None
 
 
 def test_recording_and_rtmp_workers_have_independent_sanitized_health(

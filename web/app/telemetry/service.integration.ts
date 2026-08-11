@@ -49,6 +49,10 @@ test(
       clock: () => new Date('2026-08-10T15:00:00Z'),
     })
     try {
+      await assert.rejects(
+        service.leagueOverview(null, fixture.leagueId),
+        (error: unknown) => error instanceof PlatformError && error.code === 'forbidden',
+      )
       let events = representativeGame(fixture)
       let first = await service.ingest(fixture.credential, upload(fixture, events.slice(0, 5)))
       assert.deepEqual(first.acceptedSequences, [1, 2, 3, 4, 5])
@@ -141,6 +145,16 @@ test(
         { losses: 1, teamId: fixture.homeTeamId, wins: 0 },
       ])
       assert.equal(totals.playerTotals['away-1']?.batting.homeRuns, 1)
+      let publicStats = await service.leagueOverview(null, fixture.leagueId)
+      assert.equal(publicStats[0]?.standings, null)
+      assert.equal(publicStats[0]?.playerTotals?.['away-1']?.batting.homeRuns, 1)
+      await connection.database.update(publicationSettings).set({
+        standingsVisible: true,
+        statsVisible: false,
+      }).where(eq(publicationSettings.leagueId, fixture.leagueId))
+      let publicStandings = await service.leagueOverview(null, fixture.leagueId)
+      assert.equal(publicStandings[0]?.playerTotals, null)
+      assert.equal(publicStandings[0]?.standings?.[0]?.teamName, 'Away Comets')
     } finally {
       await cleanupFixture(connection, fixture.leagueId, fixture.admin.personId)
       await connection.close()
@@ -232,6 +246,44 @@ test(
       )
       let [attempt] = await connection.database.select().from(matchAttempts).where(eq(matchAttempts.id, fixture.attemptId))
       assert.equal(attempt?.status, 'review')
+    } finally {
+      await cleanupFixture(connection, fixture.leagueId, fixture.admin.personId)
+      await connection.close()
+    }
+  },
+)
+
+test(
+  'provisional bridge warnings are visible and block confirmation',
+  { skip: databaseUrl ? false : 'STARWORKS_TEST_DATABASE_URL is not set' },
+  async () => {
+    let connection = createDatabase(databaseUrl!, { max: 4 })
+    let fixture = await createFixture(connection.database)
+    let service = new TelemetryService(connection.database)
+    try {
+      let events = representativeGame(fixture)
+      let warning: TelemetryEnvelope = {
+        ...events[9]!,
+        eventType: 'bridge-warning',
+        frame: 590,
+        payload: {
+          code: 'provisional-observation',
+          droppedEvents: 0,
+          message: 'Scorer attribution is unavailable',
+        },
+        sequence: 10,
+      }
+      let ended = { ...events[9]!, sequence: 11 }
+      let uploaded = await service.ingest(
+        fixture.credential,
+        upload(fixture, [...events.slice(0, 9), warning, ended]),
+      )
+      assert.equal(uploaded.requiresReview, true)
+      assert.ok(uploaded.issues.some((issue) => issue.includes('provisional')))
+      assert.equal(
+        (await service.finalizeHealthyAttempt(fixture.credential, fixture.attemptId)).status,
+        'review',
+      )
     } finally {
       await cleanupFixture(connection, fixture.leagueId, fixture.admin.personId)
       await connection.close()

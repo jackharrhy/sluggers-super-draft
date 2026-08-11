@@ -255,7 +255,7 @@ def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> 
         "Live Dolphin 2606 acceptance" in gate for gate in manifest.release_gates
     )
     assert any(
-        "Profile table and handicap instruction mappings" in gate
+        "server-published stat profile" in gate
         for gate in manifest.release_gates
     )
 

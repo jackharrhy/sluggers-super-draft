@@ -1,6 +1,6 @@
 # Stat Editor v4 mapping evidence
 
-Last verified: 2026-08-10
+Last verified: 2026-08-11
 
 The current pre-release catalog maps the complete 507-line Stat Editor v4
 profile onto the exact `RMBE01` Rev 0 `main.dol` with SHA-256
@@ -9,10 +9,36 @@ The verification command reports 16 guarded regions, 24 patterns, and 16,406
 scalar cells. Every guard checks the full region hash; every pattern checks its
 virtual-to-file mapping, bounds, overlap, codec, and byte round trip.
 
+The same verifier can parse the maintainer-authorized Sluggers Stat Editor v4.1
+source as inert Python syntax and compare its ten literal stock-data matrices
+with the exact DOL. It does not import or execute the legacy Tk application.
+All 16,406 mapped cells match the editor defaults byte-for-byte.
+
 ```shell
 uv run --project runner python runner/tools/verify_sluggers_profile_targets.py \
-  --dol /path/to/exact/RMBE01/main.dol
+  --dol /path/to/exact/RMBE01/main.dol \
+  --stat-editor-source /path/to/Sluggers-Stat-Editor/editorV3.py \
+  --exercise-compiler
 ```
+
+The compiler exercise changes one value in each of the 24 patterns, compiles
+the full profile, applies all 16,406 guarded writes to a temporary DOL copy,
+and reports the resulting hash. It never modifies the supplied DOL.
+
+On 2026-08-11 the same 24 representative mutations were composed after the
+reviewed Starworks bridge, launched in the runner-managed Dolphin 2606, and
+read back through Dolphin Memory Engine. All 24 live addresses matched their
+compiled bytes, including the six handicap instruction immediates. The managed
+build SHA-256 was
+`8ed08246ccba97b1f36f9df8eccf530c0d6ffc5051b0b3a4fe6f325ca6f0c525`;
+its `main.dol` SHA-256 was
+`95fa2cfa474f8c5492c928c320ac877f80f9bce0d2f09ab3b278c7c837762740`.
+
+The editor's Gecko generator is a research lead, not an unquestioned output
+oracle. In v4.1 it serializes the star-boost operation selector through its
+floating-point helper even though the stock DOL stores `1` or `2` as an
+unsigned 32-bit integer. Starworks follows the exact game bytes (`u32-be`) and
+the editor's intended Add/Multiply domain model.
 
 ## Handicap instruction parameters
 
@@ -38,6 +64,6 @@ An altered instruction sequence, unknown DOL, non-integer, or value outside
 `0..255` fails before the managed build is mutated.
 
 Trajectory names remain authoring metadata; trajectory table values and their
-activation mask are compiled. Product-complete status still requires a live
-representative mutation exercise in Dolphin, including one custom handicap
-parameter change.
+activation mask are compiled. Product completion still requires a
+server-published profile to travel through the normal scheduled-match path;
+the exact mapping and live-memory mutation gate itself is complete.

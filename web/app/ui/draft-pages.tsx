@@ -66,8 +66,8 @@ export function DraftDashboardPage(handle: Handle<DraftDashboardPageProps>) {
                   <label>Stat profile<select name="statProfileRevisionId" required mix={inputStyle}>
                     {dashboard.statProfiles.map((profile) => <option value={profile.id}>{profile.name} · revision {profile.revisionNumber}</option>)}
                   </select></label>
-                  <label>Order mode<select name="orderMode" defaultValue="snake" mix={inputStyle}>
-                    <option value="snake">Snake</option>
+                  <label>Order mode<select name="orderMode" mix={inputStyle}>
+                    <option value="snake" selected>Snake</option>
                     <option value="linear">Linear</option>
                   </select></label>
                   <label>Rounds<input type="number" name="rounds" min="1" max="18" defaultValue="9" required mix={inputStyle} /></label>
@@ -76,9 +76,9 @@ export function DraftDashboardPage(handle: Handle<DraftDashboardPageProps>) {
                     <legend>Ordered team slots</legend>
                     <p mix={mutedStyle}>Choose each team once. The numbered controls define round-one order.</p>
                     {season.teams.map((_, index) => (
-                      <label>Slot {index + 1}<select name="slotTeamIds" defaultValue={season.teams[index]?.id} mix={inputStyle}>
-                        <option value="">Unused</option>
-                        {season.teams.map((team) => <option value={team.id}>{team.name}</option>)}
+                      <label>Slot {index + 1}<select name="slotTeamIds" mix={inputStyle}>
+                        <option value="" selected={!season.teams[index]}>Unused</option>
+                        {season.teams.map((team) => <option value={team.id} selected={team.id === season.teams[index]?.id}>{team.name}</option>)}
                       </select></label>
                     ))}
                   </fieldset>

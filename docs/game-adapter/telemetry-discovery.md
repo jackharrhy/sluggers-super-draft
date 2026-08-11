@@ -47,10 +47,21 @@ hook is justified only for a concrete value that cannot be observed reliably.
 `memory-observation` provenance still blocks automatic finalization until the
 complete reducer and fault matrix are accepted.
 
+## Trusted tracker baseline
+
+The reducer was reconciled on 2026-08-11 with the current trusted Stat Tracker
+`origin/main` at `6791f8ee10a92fc1825e369cd70e3616e0e6c1b9`. Starworks uses its proven
+RMBE01 addresses and transition knowledge directly, while keeping the smaller
+immutable-event boundary needed by the web application. In particular, the
+reference tracker accumulates pitch state across batting, fielding, home-run,
+and load-next-batter states; it does not treat entry into
+`LOAD_NEXT_BATTER` as sufficient proof that the batter's appearance ended.
+
 ## Live DME slice
 
-The current reader takes four contiguous read-only snapshots for gameplay,
-batter, pitcher, and frame timer state. On exact `RMBE01` in Dolphin 2606 it has
+The current reader takes three bounded read-only blocks plus scalar reads for
+the frame timer, bases advanced, and home-run flag. On exact `RMBE01` in
+Dolphin 2606 it has
 live-observed:
 
 - game start and the `0x01`/`0x02`/`0x03` gameplay transitions;
@@ -77,9 +88,26 @@ Two trace findings constrain the reducer:
   score/hit deltas, and outs for the prior batter.
 
 Walk, strikeout, hit-by-pitch, home run, ordinary hit, and ordinary out can be
-researched from those fields. Error, sacrifice, RBI, and scorer attribution
-remain unavailable until the trace supplies unambiguous evidence; Starworks
-will not collapse them into a guessed result.
+resolved by the v0 reducer from the trusted fields. Until the new reads and
+reducer are live-accepted, only scoreless supported appearances are emitted.
+A scoring appearance, pitcher change within an appearance, inconsistent
+counter delta, or unknown result emits a `provisional-observation` warning and
+withholds the appearance. Error, sacrifice, RBI, and scorer attribution remain
+unavailable until a trace supplies unambiguous evidence; Starworks will not
+collapse them into a guessed result or zero-fill missing attribution.
+
+A normal-speed live run on 2026-08-11 exposed one more boundary rule: the game
+retains prior-play result bytes briefly after it installs the next batter. The
+first implementation therefore attached the previous out to the following
+single. New appearances now wait for those transient fields to clear, matching
+the trusted tracker's explicit per-batter context reset. A replacement attempt
+then emitted an out with one out recorded followed by a single with zero outs
+recorded. That run also showed the half-inning announcement preceding the final
+appearance; the reducer now finalizes the old side before announcing the new
+half. A clean follow-up run live-proved that corrected ordering, and a one-run
+play emitted a review warning without a fabricated RBI or scorer list.
+Ordinary outs, singles, the half-inning order, and scoring-warning path are live
+proven; the remaining classifications still need equivalent live examples.
 
 ## Semantic event boundary
 

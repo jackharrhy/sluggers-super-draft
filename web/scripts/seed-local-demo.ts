@@ -3,17 +3,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import {
-  RulesetRevisionSchema,
   StatProfileRevisionSchema,
   TeamLineupRevisionSchema,
 } from '@starworks/contracts'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, max, ne } from 'drizzle-orm'
 
 import lineupFixture from '../../contracts/fixtures/valid/team-lineup-revision.json' with { type: 'json' }
-import rulesetFixture from '../../contracts/fixtures/valid/ruleset-revision.json' with { type: 'json' }
 import statProfileFixture from '../../contracts/fixtures/valid/stat-profile-revision.json' with { type: 'json' }
 import demoMatchFixture from '../../demo/sluggers-match.json' with { type: 'json' }
 import { DraftService } from '../app/draft/service.ts'
+import { createStarterRulesetSettings } from '../app/configuration/sluggers-rules.ts'
 import { buildStatEditorV4Fixture } from '../app/import/stat-editor-v4.fixture.ts'
 import { importStatEditorV4 } from '../app/import/stat-editor-v4.ts'
 import { demoTeamLineup, parseLocalDemoMatch } from '../app/import/local-demo-match.ts'
@@ -36,6 +35,7 @@ import {
   sessions,
   statProfileRevisions,
   statProfiles,
+  telemetryDerivations,
   venues,
 } from '../app/platform/database/schema.ts'
 import { PostgresPlatformRepository } from '../app/platform/database/postgres-repository.ts'
@@ -43,6 +43,7 @@ import type { SessionIdentity } from '../app/platform/model.ts'
 import { createOpaqueToken, hashSecret } from '../app/platform/security.ts'
 import { PlatformService } from '../app/platform/service.ts'
 import { displayCharacterName, SLUGGERS_CHARACTER_IDS } from '../app/sluggers/characters.ts'
+import type { CharacterBoxScore, MatchBoxScore } from '../app/telemetry/model.ts'
 
 const DEMO_SLUG = 'mushroom-league'
 const DEMO_GAME_BUILD_SHA256 = '1016a24051e66c309b6399692acf1c50601d9b3c49c0ec467a55d24d62743d00'
@@ -51,14 +52,21 @@ const ids = {
   awayRoster: '10000000-0000-4000-8000-000000000502',
   awayTeam: '10000000-0000-4000-8000-000000000202',
   homeLineup: '10000000-0000-4000-8000-000000000601',
+  homeLineupDraft: '10000000-0000-4000-8000-000000000603',
   homeRoster: '10000000-0000-4000-8000-000000000501',
+  homeRosterDraft: '10000000-0000-4000-8000-000000000503',
   homeTeam: '10000000-0000-4000-8000-000000000201',
+  historicalAttempt: '10000000-0000-4000-8000-000000000902',
+  historicalCorrelation: '10000000-0000-4000-8000-000000000904',
+  historicalDerivation: '10000000-0000-4000-8000-000000000903',
+  historicalMatch: '10000000-0000-4000-8000-000000000901',
   profile: '10000000-0000-4000-8000-000000000301',
   profileRevision: '10000000-0000-4000-8000-000000000302',
   statEditorProfile: '10000000-0000-4000-8000-000000000303',
   statEditorRevision: '10000000-0000-4000-8000-000000000304',
   statEditorPublishedRevision: '10000000-0000-4000-8000-000000000305',
   ruleset: '10000000-0000-4000-8000-000000000401',
+  rulesetDraftRevision: '10000000-0000-4000-8000-000000000403',
   rulesetRevision: '10000000-0000-4000-8000-000000000402',
   runnerCredential: '10000000-0000-4000-8000-000000000801',
   season: '10000000-0000-4000-8000-000000000101',
@@ -237,7 +245,9 @@ try {
       target: statProfileRevisions.id,
     })
 
-    let rulesSource = RulesetRevisionSchema.parse(rulesetFixture)
+    let rulesSettings = createStarterRulesetSettings().map((setting) =>
+      setting.key === 'game.innings' ? { ...setting, value: demoMatch.innings } : setting,
+    )
     await database.insert(rulesets).values({
       id: ids.ruleset,
       leagueId: league.id,
@@ -253,10 +263,20 @@ try {
       publishedAt,
       revisionNumber: 1,
       rulesetId: ids.ruleset,
-      settings: rulesSource.settings.map((setting) =>
-        setting.key === 'game.innings' ? { ...setting, value: demoMatch.innings } : setting,
-      ),
+      settings: rulesSettings,
       status: 'published',
+    }).onConflictDoNothing()
+    await database.insert(rulesetRevisions).values({
+      basedOnRevisionId: ids.rulesetRevision,
+      createdByPersonId: admin.personId,
+      id: ids.rulesetDraftRevision,
+      leagueId: league.id,
+      name: 'Seven Inning CPU Rules',
+      publishedAt: null,
+      revisionNumber: 2,
+      rulesetId: ids.ruleset,
+      settings: rulesSettings,
+      status: 'draft',
     }).onConflictDoNothing()
 
     for (let team of [
@@ -284,6 +304,40 @@ try {
         status: 'published',
         teamId: team.teamId,
       }).onConflictDoNothing()
+    }
+    let [[homeRoster], [homeLineup], [homeRosterDraft], [homeLineupDraft], [homeRosterLatest], [homeLineupLatest]] = await Promise.all([
+      database.select().from(rosterRevisions).where(eq(rosterRevisions.id, ids.homeRoster)).limit(1),
+      database.select().from(lineupRevisions).where(eq(lineupRevisions.id, ids.homeLineup)).limit(1),
+      database.select({ id: rosterRevisions.id }).from(rosterRevisions).where(eq(rosterRevisions.id, ids.homeRosterDraft)).limit(1),
+      database.select({ id: lineupRevisions.id }).from(lineupRevisions).where(eq(lineupRevisions.id, ids.homeLineupDraft)).limit(1),
+      database.select({ value: max(rosterRevisions.revisionNumber) }).from(rosterRevisions).where(and(eq(rosterRevisions.leagueId, league.id), eq(rosterRevisions.teamId, ids.homeTeam))),
+      database.select({ value: max(lineupRevisions.revisionNumber) }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, league.id), eq(lineupRevisions.teamId, ids.homeTeam))),
+    ])
+    if (!homeRoster || !homeLineup) throw new Error('Seeded home lineup was not found')
+    if (!homeRosterDraft) {
+      await database.insert(rosterRevisions).values({
+        basedOnRevisionId: ids.homeRoster,
+        createdByPersonId: admin.personId,
+        id: ids.homeRosterDraft,
+        leagueId: league.id,
+        revisionNumber: (homeRosterLatest?.value ?? 0) + 1,
+        rosterCharacterIds: homeRoster.rosterCharacterIds,
+        status: 'draft',
+        teamId: ids.homeTeam,
+      })
+    }
+    if (!homeLineupDraft) {
+      await database.insert(lineupRevisions).values({
+        basedOnRevisionId: ids.homeLineup,
+        createdByPersonId: admin.personId,
+        id: ids.homeLineupDraft,
+        leagueId: league.id,
+        lineup: homeLineup.lineup,
+        revisionNumber: (homeLineupLatest?.value ?? 0) + 1,
+        rosterRevisionId: ids.homeRosterDraft,
+        status: 'draft',
+        teamId: ids.homeTeam,
+      })
     }
 
     await database.insert(sessions).values({
@@ -338,6 +392,7 @@ try {
       eq(matches.leagueId, league.id),
       eq(matches.homeTeamId, ids.homeTeam),
       eq(matches.awayTeamId, ids.awayTeam),
+      ne(matches.status, 'confirmed'),
     ))
     .limit(1)
   let runnerAdmin = new RunnerAdminService(connection.database)
@@ -387,6 +442,8 @@ try {
     })
   }
 
+  await seedHistoricalResult(connection.database, league.id, admin.personId, now)
+
   let runnerCredential = `starworks_runner_${ids.runnerCredential}.${runnerSecret}`
   await mkdir(path.dirname(environmentPath), { recursive: true })
   await writeFile(environmentPath, [
@@ -406,6 +463,7 @@ try {
     loginUrl: 'http://127.0.0.1:3000/auth/local-demo',
     draftUrl: `http://127.0.0.1:3000/leagues/${DEMO_SLUG}/drafts/${seededDraftId}`,
     operationsUrl: `http://127.0.0.1:3000/leagues/${DEMO_SLUG}/operations`,
+    resultsUrl: `http://127.0.0.1:3000/leagues/${DEMO_SLUG}/operations/results`,
     seededAttempt: true,
   }, null, 2))
 } finally {
@@ -433,6 +491,114 @@ function createTeamFixture(
     rosterRevisionNumber: 1,
     teamId,
   })
+}
+
+async function seedHistoricalResult(
+  database: ReturnType<typeof createDatabase>['database'],
+  leagueId: string,
+  personId: string,
+  now: Date,
+) {
+  let completedAt = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1_000)
+  await database.transaction(async (transaction) => {
+    await transaction.insert(matches).values({
+      awayTeamId: ids.awayTeam,
+      createdByPersonId: personId,
+      id: ids.historicalMatch,
+      leagueId,
+      homeTeamId: ids.homeTeam,
+      scheduledAt: completedAt,
+      seasonId: ids.season,
+      status: 'confirmed',
+      venueId: ids.venue,
+    }).onConflictDoNothing()
+    await transaction.insert(matchAttempts).values({
+      attemptNonce: 'starworks_demo_historical_attempt_01',
+      attemptNumber: 1,
+      awayLineupRevisionId: ids.awayLineup,
+      awayRosterRevisionId: ids.awayRoster,
+      completedAt,
+      confirmedAt: completedAt,
+      confirmationSource: 'system',
+      correlationId: ids.historicalCorrelation,
+      createdAt: completedAt,
+      createdByPersonId: personId,
+      dynamicRuleOverrides: {},
+      gameStadiumId: 'mario-stadium',
+      homeLineupRevisionId: ids.homeLineup,
+      homeRosterRevisionId: ids.homeRoster,
+      id: ids.historicalAttempt,
+      leagueId,
+      matchId: ids.historicalMatch,
+      requiredGameBuildSha256: DEMO_GAME_BUILD_SHA256,
+      rulesetRevisionId: ids.rulesetRevision,
+      statProfileRevisionId: ids.profileRevision,
+      status: 'confirmed',
+    }).onConflictDoNothing()
+    await transaction.insert(telemetryDerivations).values({
+      boxScore: historicalBoxScore() as unknown as Record<string, unknown>,
+      correctionCount: 0,
+      createdAt: completedAt,
+      derivationVersion: 1,
+      eventCount: 42,
+      id: ids.historicalDerivation,
+      inputDigest: '2'.repeat(64),
+      issues: [],
+      leagueId,
+      matchAttemptId: ids.historicalAttempt,
+      matchId: ids.historicalMatch,
+      sourceFirstSequence: 1,
+      sourceLastSequence: 42,
+      status: 'ready',
+    }).onConflictDoNothing()
+  })
+}
+
+function historicalBoxScore(): MatchBoxScore {
+  return {
+    characters: {
+      mario: characterResult(ids.homeTeam, { hits: 3, homeRuns: 1, runs: 2, runsBattedIn: 3 }),
+      luigi: characterResult(ids.homeTeam, { hits: 2, runs: 1, runsBattedIn: 1 }),
+      wario: characterResult(ids.awayTeam, { hits: 2, homeRuns: 1, runs: 1, runsBattedIn: 2 }),
+      waluigi: characterResult(ids.awayTeam, { hits: 1, runs: 1 }),
+    },
+    derivationVersion: 1,
+    endedReason: 'completed',
+    innings: 7,
+    teams: {
+      away: { errors: 1, hits: 6, lineScore: { '1': 1, '2': 0, '3': 0, '4': 1, '5': 0, '6': 0, '7': 0 }, runs: 2, teamId: ids.awayTeam },
+      home: { errors: 0, hits: 9, lineScore: { '1': 0, '2': 2, '3': 0, '4': 1, '5': 0, '6': 2, '7': 0 }, runs: 5, teamId: ids.homeTeam },
+    },
+  }
+}
+
+function characterResult(
+  teamId: string,
+  values: { hits: number; homeRuns?: number; runs?: number; runsBattedIn?: number },
+): CharacterBoxScore {
+  let homeRuns = values.homeRuns ?? 0
+  return {
+    batting: {
+      atBats: 4,
+      doubles: 0,
+      hitByPitch: 0,
+      hits: values.hits,
+      homeRuns,
+      plateAppearances: 4,
+      runsBattedIn: values.runsBattedIn ?? 0,
+      sacrifices: 0,
+      singles: values.hits - homeRuns,
+      strikeouts: 0,
+      totalBases: values.hits + homeRuns * 3,
+      triples: 0,
+      walks: 0,
+    },
+    fielding: { errors: 0 },
+    pitching: { battersFaced: 0, hitsAllowed: 0, outsPitched: 0, runsAllowed: 0, strikeouts: 0, walks: 0 },
+    positions: [],
+    running: { runs: values.runs ?? 0 },
+    teamId,
+  }
 }
 
 async function readEnvironment(filePath: string): Promise<Record<string, string>> {

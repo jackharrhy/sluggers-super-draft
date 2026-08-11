@@ -193,6 +193,8 @@ describe('runner API controller', () => {
         return { leagueId: RUNNER_ID, matchId: LEASE_ID, status: 'confirmed' }
       },
       async ingest() { throw new Error('Unexpected telemetry upload') },
+      async leagueOverview() { return [] },
+      async leagueStatistics() { return [] },
       async rebuildSeason() { return { playerTotals: {}, standings: [] } },
     }
     let router = createAppRouter({
@@ -295,6 +297,8 @@ describe('runner API controller', () => {
       async correct() { throw new Error('Unexpected correction') },
       async confirm() { throw new Error('Unexpected confirmation') },
       async finalizeHealthyAttempt() { throw new Error('Unexpected automatic finalization') },
+      async leagueOverview() { return [] },
+      async leagueStatistics() { return [] },
       async rebuildSeason() { return { playerTotals: {}, standings: [] } },
     }
     let router = createAppRouter({
