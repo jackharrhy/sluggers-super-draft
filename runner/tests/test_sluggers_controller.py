@@ -34,6 +34,7 @@ def test_controller_prepares_a_private_fifo_and_deterministic_wiimote_mapping(
     assert "PermissionAsked = True" in dolphin
     assert "UsePanicHandlers = False" in dolphin
     assert "ConfirmStop = False" in dolphin
+    assert "EmulationSpeed = 1.0" in dolphin
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Dolphin FIFO backend is POSIX-only")
@@ -154,7 +155,8 @@ def test_controller_preserves_existing_dolphin_profile_settings(tmp_path: Path) 
     configuration = tmp_path / "Config/Dolphin.ini"
     configuration.parent.mkdir(parents=True)
     configuration.write_text(
-        "[General]\nWirelessMac = 00:17:ab:00:00:01\n\n[Analytics]\nID = existing-id\n",
+        "[General]\nWirelessMac = 00:17:ab:00:00:01\n\n"
+        "[Analytics]\nID = existing-id\n\n[Core]\nEmulationSpeed = 0.0\n",
         encoding="utf-8",
     )
 
@@ -167,3 +169,5 @@ def test_controller_preserves_existing_dolphin_profile_settings(tmp_path: Path) 
     assert "PermissionAsked = True" in contents
     assert "UsePanicHandlers = False" in contents
     assert "ConfirmStop = False" in contents
+    assert "EmulationSpeed = 1.0" in contents
+    assert "EmulationSpeed = 0.0" not in contents

@@ -59,11 +59,12 @@ const leagueOperationsDashboard: LeagueOperationsDashboard = {
 }
 
 describe('league operations controller', () => {
-  it('renders the tenant-scoped match and station workspace', async () => {
+  it('renders focused match, team, and admin pages', async () => {
     let runnerAdmin = createRunnerAdmin()
     let runtime = createRuntime(runnerAdmin)
     let session = await runtime.sessionCookie.serialize('test-session')
-    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+    let response = await router.fetch(
       new Request('http://localhost' + routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), {
         headers: { cookie: session },
       }),
@@ -71,13 +72,29 @@ describe('league operations controller', () => {
 
     assert.equal(response.status, 200)
     let html = await response.text()
-    assert.match(html, /Shell League operations/)
+    assert.match(html, />Matches</)
     assert.match(html, /Schedule a match/)
-    assert.match(html, /Enroll a runner station/)
     assert.match(html, /Game telemetry/)
-    assert.match(html, /Audit history/)
-    assert.match(html, /runner_station\.revoked/)
-    assert.match(html, /Commissioner Mario/)
+    assert.doesNotMatch(html, /Discord delivery/)
+    assert.doesNotMatch(html, /Current rosters/)
+
+    let teams = await router.fetch(new Request('http://localhost' + routes.leagues.operations.teams.href({ leagueSlug: league.slug }), { headers: { cookie: session } }))
+    let teamsHtml = await teams.text()
+    assert.match(teamsHtml, /Current rosters/)
+    assert.match(teamsHtml, /Offer a trade/)
+    assert.doesNotMatch(teamsHtml, /Discord delivery/)
+    assert.doesNotMatch(teamsHtml, /Game telemetry/)
+
+    let admin = await router.fetch(new Request('http://localhost' + routes.leagues.operations.admin.href({ leagueSlug: league.slug }), { headers: { cookie: session } }))
+    let adminHtml = await admin.text()
+    assert.match(adminHtml, /Discord delivery/)
+    assert.match(adminHtml, /Enroll a runner station/)
+    assert.match(adminHtml, /Stations/)
+    assert.match(adminHtml, /Audit history/)
+    assert.doesNotMatch(adminHtml, /Current rosters/)
+    assert.doesNotMatch(adminHtml, /Schedule a match/)
+    assert.match(adminHtml, /runner_station\.revoked/)
+    assert.match(adminHtml, /Commissioner Mario/)
   })
 
   it('parses a scheduled match form through Remix FormData middleware', async () => {
@@ -126,16 +143,19 @@ describe('league operations controller', () => {
     })
     let runtime = createRuntime(createRunnerAdmin(), leagueOperations)
     let session = await runtime.sessionCookie.serialize('test-session')
+    let form = new URLSearchParams({
+      counterpartyTeamId: '44444444-4444-4444-8444-444444444444',
+      message: 'Captain exchange',
+      proposerTeamId: '55555555-5555-4555-8555-555555555555',
+      seasonId: '66666666-6666-4666-8666-666666666666',
+    })
+    form.append('counterpartyCharacterIds', 'peach')
+    form.append('counterpartyCharacterIds', 'daisy')
+    form.append('proposerCharacterIds', 'mario')
+    form.append('proposerCharacterIds', 'luigi')
     let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
       new Request('http://localhost' + routes.leagues.operations.proposeTrade.href({ leagueSlug: league.slug }), {
-        body: new URLSearchParams({
-          counterpartyCharacterIds: 'peach\ndaisy',
-          counterpartyTeamId: '44444444-4444-4444-8444-444444444444',
-          message: 'Captain exchange',
-          proposerCharacterIds: 'mario, luigi',
-          proposerTeamId: '55555555-5555-4555-8555-555555555555',
-          seasonId: '66666666-6666-4666-8666-666666666666',
-        }),
+        body: form,
         headers: { cookie: session, origin: 'http://localhost' },
         method: 'POST',
       }),

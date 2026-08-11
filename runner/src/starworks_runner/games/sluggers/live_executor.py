@@ -605,6 +605,7 @@ class LiveSluggersExecutor:
         self.session.tap_button("A")
         self._wait_for_lineup_receipt()
         self.session.wait_for_bridge_frames(120, timeout_seconds=self.timeout_seconds)
+        self.session.apply_final_formation(self.runtime_configuration)
         self.live_stage = "lineups-applied"
 
     def _start_game(self) -> None:
@@ -641,7 +642,8 @@ class LiveSluggersExecutor:
         for side in ("away", "home"):
             if actual_orders[side] != expected_orders[side]:
                 raise AttemptExecutionError(
-                    f"Dolphin {side} batting order does not match the scheduled lineup",
+                    f"Dolphin {side} batting order does not match the scheduled lineup: "
+                    f"expected {expected_orders[side]}, observed {actual_orders[side]}",
                     "bridge-failure",
                 )
         team = (
@@ -655,7 +657,8 @@ class LiveSluggersExecutor:
         if observation.defense_by_position != tuple(expected_defense):
             raise AttemptExecutionError(
                 f"Dolphin {observation.defense_side} fielding positions do not "
-                "match the scheduled lineup",
+                f"match the scheduled lineup: expected {tuple(expected_defense)}, "
+                f"observed {observation.defense_by_position}",
                 "bridge-failure",
             )
 

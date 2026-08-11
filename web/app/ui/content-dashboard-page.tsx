@@ -17,7 +17,7 @@ export function ContentDashboardPage(
   return () => {
     let { dashboard, identity, league } = handle.props
     let canCreate = dashboard.publishedStatProfiles.length && dashboard.publishedRulesets.length
-    return <AppShell identity={identity} title={`Content packs · ${league.name} · Starworks`}>
+    return <AppShell identity={identity} league={league} title={`Content packs · ${league.name} · Starworks`}>
       <header mix={heroStyle}>
         <div><p mix={eyebrowStyle}>Local build inputs</p><h1 mix={headingStyle}>{league.name} content</h1></div>
         <p mix={ledeStyle}>Publish hash-only manifests and user-created source images. Patched game builds remain private to each runner.</p>

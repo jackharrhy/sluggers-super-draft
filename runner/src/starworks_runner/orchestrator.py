@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal, Protocol
 
 from starworks_runner.content_sync import ContentPackDownloader
-from starworks_runner.control import RunnerControlClient
+from starworks_runner.control import RunnerApiError, RunnerControlClient
 from starworks_runner.state import ActiveRun, RunnerStateStore, StationRegistration
 
 FailureKind = Literal["game-crash", "runner-crash", "bridge-failure", "build-failure"]
@@ -43,6 +43,7 @@ class AttemptExecutor(Protocol):
 class RunOnceResult:
     status: Literal["no-work", "running", "completed", "cancelled", "failed"]
     attempt_id: str | None
+    detail: str | None = None
 
 
 class RunnerStation:
@@ -111,9 +112,19 @@ class RunnerStation:
                 return RunOnceResult(status="no-work", attempt_id=None)
             active = self.state.accept_run(envelope)
         else:
-            self.client.update_lease(
-                self._lease_message(active, registration.runner_id, "renew")
-            )
+            try:
+                self.client.update_lease(
+                    self._lease_message(active, registration.runner_id, "renew")
+                )
+            except RunnerApiError as error:
+                if error.status != 409:
+                    raise
+                self.state.archive_lost_lease(active.envelope["attemptId"])
+                return RunOnceResult(
+                    status="failed",
+                    attempt_id=active.envelope["attemptId"],
+                    detail=str(error),
+                )
 
         if active.configuration is None:
             configuration = self.client.configuration(
@@ -153,7 +164,9 @@ class RunnerStation:
                 executor.prepare(active.envelope, active.configuration)
             except AttemptExecutionError as error:
                 self._report_failure(active, registration.runner_id, error.failure_kind)
-                return RunOnceResult(status="failed", attempt_id=attempt_id)
+                return RunOnceResult(
+                    status="failed", attempt_id=attempt_id, detail=str(error)
+                )
             except Exception:
                 self._report_failure(active, registration.runner_id, "runner-crash")
                 raise
@@ -181,7 +194,9 @@ class RunnerStation:
                 self.state.save_runtime_metadata(attempt_id, runtime_metadata())
         except AttemptExecutionError as error:
             self._report_failure(active, registration.runner_id, error.failure_kind)
-            return RunOnceResult(status="failed", attempt_id=attempt_id)
+            return RunOnceResult(
+                status="failed", attempt_id=attempt_id, detail=str(error)
+            )
         except Exception:
             self._report_failure(active, registration.runner_id, "runner-crash")
             raise

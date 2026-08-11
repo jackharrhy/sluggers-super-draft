@@ -11,6 +11,8 @@ import type { AppRuntime } from '../../../platform/runtime.ts'
 import { PlatformService } from '../../../platform/service.ts'
 import { createAppRouter } from '../../../router.ts'
 import { routes } from '../../../routes.ts'
+import { buildStatEditorV4Fixture } from '../../../import/stat-editor-v4.fixture.ts'
+import { importStatEditorV4 } from '../../../import/stat-editor-v4.ts'
 
 const identity: SessionIdentity = {
   discordUserId: '123456789012345678',
@@ -56,10 +58,10 @@ describe('league configuration controller', () => {
 
     assert.equal(response.status, 200)
     let html = await response.text()
-    assert.match(html, /League configuration/)
-    assert.match(html, /Competitive stats/)
-    assert.match(html, /League rules/)
-    assert.match(html, /Mario Fireballs/)
+    assert.match(html, />Admin</)
+    assert.match(html, /Compile preview/)
+    assert.match(html, />Stats</)
+    assert.match(html, />Teams</)
     assert.doesNotMatch(html, /Lil Slug Crew/)
   })
 
@@ -123,6 +125,105 @@ describe('league configuration controller', () => {
       },
       leagueId: league.id,
     })
+  })
+
+  it('renders and updates one character without exposing profile JSON', async () => {
+    let received: unknown
+    let revision = {
+      basedOnRevisionId: null,
+      characterValues: [{ characterId: 'mario', values: { 'batting.power': 75 } }],
+      createdAt: '2026-08-11T12:00:00.000Z',
+      definitions: [{
+        dataType: 'integer' as const,
+        definitionId: '55555555-5555-4555-8555-555555555555',
+        display: { group: 'Batting', label: 'Power', order: 1 },
+        key: 'batting.power',
+        maximum: 100,
+        minimum: 0,
+        required: true,
+        step: 1,
+      }],
+      kind: 'stat-profile-revision' as const,
+      leagueId: league.id,
+      name: 'Competitive stats',
+      profileId: '66666666-6666-4666-8666-666666666666',
+      publishedAt: null,
+      revisionId: '44444444-4444-4444-8444-444444444444',
+      revisionNumber: 1,
+      schemaVersion: 1 as const,
+      status: 'draft' as const,
+    }
+    let configuration = {
+      async getStatProfileRevision() {
+        return { basedOnRevision: null, history: [], issues: [], revision }
+      },
+      async updateStatProfileDraft(_identity: unknown, leagueId: string, revisionId: string, input: unknown) {
+        received = { input, leagueId, revisionId }
+        return revision
+      },
+    } as unknown as ConfigurationApplication
+    let runtime = createRuntime(configuration)
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let href = routes.leagues.configuration.editStatProfileCharacter.href({
+      characterId: 'mario',
+      leagueSlug: league.slug,
+      revisionId: revision.revisionId,
+    })
+
+    let page = await router.fetch(new Request('http://localhost' + href, { headers: { cookie: session } }))
+    assert.equal(page.status, 200)
+    let html = await page.text()
+    assert.match(html, /Mario/)
+    assert.match(html, /Power/)
+    assert.doesNotMatch(html, /characterValues/)
+
+    let form = new FormData()
+    form.set('stat.batting.power', '88')
+    let response = await router.fetch(new Request('http://localhost' + href, {
+      body: form,
+      headers: { cookie: session, origin: 'http://localhost' },
+      method: 'POST',
+    }))
+    assert.equal(response.status, 303)
+    assert.equal(response.headers.get('location'), href)
+    assert.deepEqual(received, {
+      input: {
+        characterValues: [{ characterId: 'mario', values: { 'batting.power': 88 } }],
+        definitions: revision.definitions,
+        name: revision.name,
+        sluggersTuning: undefined,
+      },
+      leagueId: league.id,
+      revisionId: revision.revisionId,
+    })
+  })
+
+  it('exports a lossless Stat Editor v4 text file', async () => {
+    let source = buildStatEditorV4Fixture()
+    let imported = importStatEditorV4({ profileName: 'Export me', rawText: source, sourceVersion: 'v4' })
+    let configuration = {
+      async getStatProfileRevision() {
+        return {
+          revision: {
+            ...imported,
+            revisionId: '44444444-4444-4444-8444-444444444444',
+            revisionNumber: 3,
+          },
+        }
+      },
+    } as unknown as ConfigurationApplication
+    let runtime = createRuntime(configuration)
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let response = await router.fetch(new Request('http://localhost' + routes.leagues.configuration.exportStatProfile.href({
+      leagueSlug: league.slug,
+      revisionId: '44444444-4444-4444-8444-444444444444',
+    }), { headers: { cookie: session } }))
+
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('content-disposition'), 'attachment; filename="stat-profile-r3.txt"')
+    assert.equal(await response.text(), source)
   })
 })
 

@@ -564,6 +564,7 @@ def run(arguments: argparse.Namespace) -> int:
                         json.dumps(
                             {
                                 "attemptId": result.attempt_id,
+                                "detail": result.detail,
                                 "status": result.status,
                                 "tick": ticks,
                             },

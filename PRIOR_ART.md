@@ -1,6 +1,6 @@
 # Starworks Prior Art and Community Map
 
-**Last reviewed:** 2026-08-10
+**Last reviewed:** 2026-08-11
 
 Starworks exists because the Mario baseball, Sluggers, Dolphin, reverse-engineering, and league communities have already built a remarkable collection of tools and knowledge. This document records that lineage before implementation begins.
 
@@ -11,6 +11,15 @@ The list is intentionally broader than a dependency manifest:
 - A project with no declared license remains important prior art and a potential collaboration source. It is not silently copied; we preserve the link, discuss provenance with its maintainers, and seek an explicit license or contribution grant when code should move into Starworks.
 - Game data, screenshots, models, audio, and other Nintendo-originated material require separate consideration from the license on the surrounding tool.
 
+The Starworks owner is an active contributor to Sluggers Stat Tracker, Sluggers
+Stat Editor, and MSS AutoTeam and is coordinating directly with their
+maintainers. Those three repositories are therefore trusted implementation
+references for Starworks: agents may inspect their code, reuse proven behavior
+and implementation patterns, and adapt suitable pieces with explicit source
+attribution. This is not a blanket relicense of unrelated contributors' work or
+of bundled Nintendo material; provenance is still recorded at the copied or
+adapted boundary.
+
 License labels below describe repository metadata and visible license files at the review date. They are an engineering inventory, not a legal conclusion.
 
 ## The projects being brought together
@@ -18,9 +27,9 @@ License labels below describe repository metadata and visible license files at t
 | Project | Relevance to Starworks | License/status observed |
 | --- | --- | --- |
 | [Sluggers Super Draft](https://github.com/jackharrhy/sluggers-super-draft) | Original league website, draft, teams, lineups, trades, matches, standings, Discord integration, and the starting repository for Starworks. | The prior implementation had no declared license when reviewed. New Starworks code is MIT; preserved legacy provenance is not silently relicensed. |
-| [Sluggers Stat Tracker](https://github.com/isThatC2/Sluggers-Stat-Tracker) | Python/Dolphin stat observation, game-state knowledge, event detection, and operator workflow. A local fork also exists at [jackharrhy/Sluggers-Stat-Tracker](https://github.com/jackharrhy/Sluggers-Stat-Tracker). | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |
-| [Sluggers Stat Editor](https://github.com/Philenarion/Sluggers-Stat-Editor) | Character stat layout, validation ranges, chemistry, Gecko generation, and established Python UI behavior. | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |
-| [MSS AutoTeam](https://github.com/STGtheOG/MSS-AutoTeam) | Dolphin process control, team/lineup loading, Mii handling, and match setup automation. | No license declared. Treat as a central collaboration/reference candidate and retain provenance. |
+| [Sluggers Stat Tracker](https://github.com/isThatC2/Sluggers-Stat-Tracker) | Python/Dolphin stat observation, game-state knowledge, event detection, and operator workflow. A local fork also exists at [jackharrhy/Sluggers-Stat-Tracker](https://github.com/jackharrhy/Sluggers-Stat-Tracker). | No license declared in repository metadata. Trusted direct implementation reference with maintainer collaboration; retain source-level provenance. |
+| [Sluggers Stat Editor](https://github.com/Philenarion/Sluggers-Stat-Editor) | Character stat layout, validation ranges, chemistry, Gecko generation, and established Python UI behavior. | No license declared in repository metadata. Trusted direct implementation reference with contributor collaboration; retain source-level provenance. |
+| [MSS AutoTeam](https://github.com/STGtheOG/MSS-AutoTeam) | Dolphin process control, team/lineup loading, Mii handling, and match setup automation. | No license declared in repository metadata. Trusted direct implementation reference with maintainer collaboration; retain source-level provenance. |
 | [mii-lib](https://github.com/jackharrhy/mii-lib) | Python parsing and discovery for Wii/Dolphin Mii databases. | GPL-3.0; originally based on GPL-3.0 [PyMii](https://github.com/PuccamiteTech/PyMii). Keep the license boundary or obtain permission/perform a clean implementation before inclusion in an MIT package. |
 
 The Starworks architecture does not preserve these projects' current file formats or application boundaries automatically. It preserves their behavior, discoveries, provenance, and contributor knowledge.
@@ -165,7 +174,8 @@ Every imported implementation must carry enough history to answer:
 4. Does the material include or derive from copyrighted game assets?
 5. Which game revision and binary fingerprint was used to validate the discovery?
 
-For unlicensed community projects, the default path is collaboration:
+For unlicensed community projects without an existing contributor relationship,
+the default path is collaboration:
 
 - Keep the project and maintainer visible in this map.
 - Open a licensing/contribution conversation before moving code.

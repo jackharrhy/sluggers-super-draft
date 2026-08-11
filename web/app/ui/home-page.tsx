@@ -12,20 +12,10 @@ export function HomePage(
     let { identity, leagues } = handle.props
     return (
       <AppShell identity={identity}>
-        <section mix={heroStyle}>
-          <p mix={eyebrowStyle}>Mario Super Sluggers league operations</p>
-          <h1 mix={headingStyle}>One home for every Sluggers league.</h1>
-          <p mix={ledeStyle}>
-            Draft teams, publish custom stats and rules, run Dolphin matches, collect telemetry, and
-            produce broadcasts without making yesterday&apos;s file formats tomorrow&apos;s platform.
-          </p>
-        </section>
+        <header mix={heroStyle}><h1 mix={headingStyle}>Starworks</h1></header>
 
         <section aria-labelledby="leagues-heading" mix={sectionStyle}>
-          <div>
-            <p mix={eyebrowStyle}>League directory</p>
-            <h2 id="leagues-heading" mix={subheadingStyle}>Your leagues and public leagues</h2>
-          </div>
+          <h2 id="leagues-heading" mix={subheadingStyle}>Leagues</h2>
           {leagues.length ? (
             <div mix={gridStyle}>
               {leagues.map((league) => (
@@ -54,18 +44,9 @@ export function HomePage(
   }
 }
 
-const heroStyle = css({ maxWidth: '880px', padding: '28px 0 12px' })
-const eyebrowStyle = css({
-  color: 'var(--text-soft)',
-  fontFamily: 'var(--font-aurea)',
-  fontSize: '15px',
-  letterSpacing: '0.08em',
-  margin: '0 0 12px',
-  textTransform: 'uppercase',
-})
+const heroStyle = css({ padding: '28px 0 12px' })
 const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(36px, 6vw, 58px)', lineHeight: 1.05, margin: 0, textShadow: '0 3px 0 rgb(30 41 86 / 0.22)' })
 const subheadingStyle = css({ fontFamily: 'var(--font-display)', fontSize: '28px', margin: 0 })
-const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.6, margin: '22px 0 0', maxWidth: '760px' })
 const sectionStyle = css({ display: 'grid', gap: '20px', marginTop: '52px' })
 const gridStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' })
 const leagueHeadingStyle = css({ fontSize: '22px', margin: '0 0 10px' })

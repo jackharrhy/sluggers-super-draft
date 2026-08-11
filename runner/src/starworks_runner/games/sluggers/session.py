@@ -15,6 +15,7 @@ from starworks_runner.contracts import validate_contract
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
 from starworks_runner.games.sluggers.bridge.configuration import (
     RuntimeConfigurationBlock,
+    TeamSelection,
 )
 from starworks_runner.games.sluggers.bridge.layout import (
     BRIDGE_ENTRY_ADDRESS,
@@ -56,6 +57,32 @@ class RuntimeLineupObservation:
     home_batting_order: tuple[int, ...]
     defense_side: str
     defense_by_position: tuple[int, ...]
+
+
+# MSS-AutoTeam reads this word as the home-team formation-buffer address after
+# its menu path. The value is not populated on every Starworks path, so it is a
+# validated hint before the bounded fallback search below. Starworks uses the
+# same narrow buffer boundary through DME instead of installing transient code.
+FINAL_FORMATION_POINTER_ADDRESS = 0x806D121E
+FORMATION_SLOT_SIZE = 0x10
+FORMATION_TEAM_SIZE = 9 * FORMATION_SLOT_SIZE
+MEM2_START = 0x90000000
+MEM2_END = 0x94000000
+FORMATION_SCAN_CHUNK_SIZE = 0x100000
+
+
+def _formation_ids(value: bytes, offset: int) -> set[int]:
+    return {
+        value[offset + slot * FORMATION_SLOT_SIZE + 1]
+        for slot in range(9)
+    }
+
+
+def _formation_positions(value: bytes, offset: int) -> set[int]:
+    return {
+        value[offset + slot * FORMATION_SLOT_SIZE + 12]
+        for slot in range(9)
+    }
 
 
 def load_game_build_manifest(build_directory: Path) -> dict[str, Any]:
@@ -426,6 +453,119 @@ class LiveSluggersSession:
             away_captain_brand_id=captains[0],
             home_captain_brand_id=captains[1],
         )
+
+    def apply_final_formation(
+        self, configuration: RuntimeConfigurationBlock
+    ) -> None:
+        """Apply both immutable teams at AutoTeam's final formation boundary.
+
+        Random Fill is still the reliable way to make the game allocate and
+        initialize both team buffers. The earlier selection hook replaces the
+        roster sets, but Sluggers subsequently shuffles batting and fielding.
+        This final DME write changes only the character and position bytes in
+        the two initialized 9x16-byte buffers, then reads them back before the
+        runner advances to Begin.
+        """
+
+        if self.transport is None:
+            raise BridgeProtocolError("Live Sluggers session is not started")
+        pointer_bytes = self.transport.read(FINAL_FORMATION_POINTER_ADDRESS, 4)
+        if len(pointer_bytes) != 4:
+            raise BridgeProtocolError("Final formation pointer read was short")
+        home_address = int.from_bytes(pointer_bytes, "big")
+        away_address = home_address - FORMATION_TEAM_SIZE
+        pointer_is_valid = (
+            away_address >= 0x80000000
+            and home_address + FORMATION_TEAM_SIZE <= MEM2_END
+        )
+        if not pointer_is_valid or not self._formation_pair_matches(
+            away_address, configuration
+        ):
+            away_address, home_address = self._discover_final_formation_pair(
+                configuration
+            )
+        self._write_formation_team(away_address, configuration.away)
+        self._write_formation_team(home_address, configuration.home)
+
+    def _formation_pair_matches(
+        self, away_address: int, configuration: RuntimeConfigurationBlock
+    ) -> bool:
+        assert self.transport is not None
+        value = self.transport.read(away_address, FORMATION_TEAM_SIZE * 2)
+        return _formation_ids(value, 0) == {
+            entry[0] for entry in configuration.away.entries
+        } and _formation_ids(value, FORMATION_TEAM_SIZE) == {
+            entry[0] for entry in configuration.home.entries
+        }
+
+    def _discover_final_formation_pair(
+        self, configuration: RuntimeConfigurationBlock
+    ) -> tuple[int, int]:
+        """Locate AutoTeam's adjacent final buffers in the initialized MEM2 heap.
+
+        The pointer lead used by AutoTeam is not populated in every menu path.
+        The buffers themselves are unambiguous at this boundary: two adjacent
+        nine-slot arrays contain the exact away and home roster sets, and each
+        has one of every fielding position. Search is bounded to MEM2 and runs
+        once per fresh match setup.
+        """
+
+        assert self.transport is not None
+        away_ids = {entry[0] for entry in configuration.away.entries}
+        home_ids = {entry[0] for entry in configuration.home.entries}
+        anchor = bytes((next(iter(away_ids)),))
+        overlap = FORMATION_TEAM_SIZE * 2
+        candidates: set[int] = set()
+        for address in range(MEM2_START, MEM2_END, FORMATION_SCAN_CHUNK_SIZE):
+            size = min(FORMATION_SCAN_CHUNK_SIZE + overlap, MEM2_END - address)
+            value = self.transport.read(address, size)
+            search_from = 0
+            while (found := value.find(anchor, search_from)) != -1:
+                for slot in range(9):
+                    base = found - 1 - slot * FORMATION_SLOT_SIZE
+                    if base < 0 or base + overlap > len(value):
+                        continue
+                    if (
+                        _formation_ids(value, base) == away_ids
+                        and _formation_ids(value, base + FORMATION_TEAM_SIZE)
+                        == home_ids
+                        and _formation_positions(value, base) == set(range(9))
+                        and _formation_positions(
+                            value, base + FORMATION_TEAM_SIZE
+                        )
+                        == set(range(9))
+                    ):
+                        candidates.add(address + base)
+                search_from = found + 1
+        if len(candidates) != 1:
+            rendered = ", ".join(f"0x{value:08X}" for value in sorted(candidates))
+            raise BridgeProtocolError(
+                "Final formation buffers were not uniquely discoverable in MEM2"
+                + (f": {rendered}" if rendered else "")
+            )
+        away_address = candidates.pop()
+        return away_address, away_address + FORMATION_TEAM_SIZE
+
+    def _write_formation_team(self, address: int, team: TeamSelection) -> None:
+        assert self.transport is not None
+        buffer = bytearray(self.transport.read(address, FORMATION_TEAM_SIZE))
+        if len(buffer) != FORMATION_TEAM_SIZE:
+            raise BridgeProtocolError("Final formation team buffer read was short")
+        for game_id, batting_slot, fielding_position in team.entries:
+            offset = batting_slot * FORMATION_SLOT_SIZE
+            buffer[offset + 1] = game_id
+            buffer[offset + 12] = fielding_position
+        self.transport.write(address, bytes(buffer))
+        observed = self.transport.read(address, FORMATION_TEAM_SIZE)
+        for game_id, batting_slot, fielding_position in team.entries:
+            offset = batting_slot * FORMATION_SLOT_SIZE
+            if (
+                observed[offset + 1] != game_id
+                or observed[offset + 12] != fielding_position
+            ):
+                raise BridgeProtocolError(
+                    "Dolphin did not retain the final formation buffer write"
+                )
 
     def read_runtime_lineups(self, snapshot: GameSnapshot) -> RuntimeLineupObservation:
         """Read the game-owned lineups after match initialization.

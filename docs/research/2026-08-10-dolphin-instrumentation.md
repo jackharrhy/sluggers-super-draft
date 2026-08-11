@@ -39,7 +39,7 @@ healthy.
 - MSS AutoTeam: commit
   `66c7e439399b97c720d1fe14690de2e4d36121de`.
 
-Local research clones live under ignored `.starworks/research/` directories.
+Local research clones live under the ignored top-level `research/` directory.
 
 ## Why not read the XFB through GDB?
 

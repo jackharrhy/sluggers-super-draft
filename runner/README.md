@@ -104,6 +104,11 @@ and game build IDs, negotiate a one-attempt nonce, and consume only events
 attributed to that attempt. `smoke-sluggers` and `run-sluggers-station` use that
 transport by default; no GDB option is required.
 
+Runner-managed matches explicitly use Dolphin's normal `1.0` emulation speed.
+Unlimited-speed research profiles are normalized when an attempt profile is
+prepared because menu timing, bridge polling, and telemetry deadlines require
+real-time emulation.
+
 `probe-bridge` remains an explicit reverse-engineering diagnostic for Dolphin
 2606's GDB remote stub:
 

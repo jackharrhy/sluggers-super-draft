@@ -12,6 +12,11 @@ import { and, eq } from 'drizzle-orm'
 import lineupFixture from '../../contracts/fixtures/valid/team-lineup-revision.json' with { type: 'json' }
 import rulesetFixture from '../../contracts/fixtures/valid/ruleset-revision.json' with { type: 'json' }
 import statProfileFixture from '../../contracts/fixtures/valid/stat-profile-revision.json' with { type: 'json' }
+import demoMatchFixture from '../../demo/sluggers-match.json' with { type: 'json' }
+import { DraftService } from '../app/draft/service.ts'
+import { buildStatEditorV4Fixture } from '../app/import/stat-editor-v4.fixture.ts'
+import { importStatEditorV4 } from '../app/import/stat-editor-v4.ts'
+import { demoTeamLineup, parseLocalDemoMatch } from '../app/import/local-demo-match.ts'
 import { RunnerAdminService } from '../app/runner/admin-service.ts'
 import { createDatabase } from '../app/platform/database/connection.ts'
 import {
@@ -37,6 +42,7 @@ import { PostgresPlatformRepository } from '../app/platform/database/postgres-re
 import type { SessionIdentity } from '../app/platform/model.ts'
 import { createOpaqueToken, hashSecret } from '../app/platform/security.ts'
 import { PlatformService } from '../app/platform/service.ts'
+import { displayCharacterName, SLUGGERS_CHARACTER_IDS } from '../app/sluggers/characters.ts'
 
 const DEMO_SLUG = 'mushroom-league'
 const DEMO_GAME_BUILD_SHA256 = '1016a24051e66c309b6399692acf1c50601d9b3c49c0ec467a55d24d62743d00'
@@ -49,6 +55,9 @@ const ids = {
   homeTeam: '10000000-0000-4000-8000-000000000201',
   profile: '10000000-0000-4000-8000-000000000301',
   profileRevision: '10000000-0000-4000-8000-000000000302',
+  statEditorProfile: '10000000-0000-4000-8000-000000000303',
+  statEditorRevision: '10000000-0000-4000-8000-000000000304',
+  statEditorPublishedRevision: '10000000-0000-4000-8000-000000000305',
   ruleset: '10000000-0000-4000-8000-000000000401',
   rulesetRevision: '10000000-0000-4000-8000-000000000402',
   runnerCredential: '10000000-0000-4000-8000-000000000801',
@@ -56,38 +65,10 @@ const ids = {
   venue: '10000000-0000-4000-8000-000000000701',
 } as const
 
-const characterNames = new Map([
-  ['baby-mario', 'Baby Mario'],
-  ['birdo', 'Birdo'],
-  ['boo', 'Boo'],
-  ['bowser', 'Bowser'],
-  ['bowser-jr', 'Bowser Jr.'],
-  ['daisy', 'Daisy'],
-  ['diddy-kong', 'Diddy Kong'],
-  ['dixie-kong', 'Dixie Kong'],
-  ['donkey-kong', 'Donkey Kong'],
-  ['funky-kong', 'Funky Kong'],
-  ['king-boo', 'King Boo'],
-  ['luigi', 'Luigi'],
-  ['mario', 'Mario'],
-  ['peach', 'Peach'],
-  ['petey-piranha', 'Petey Piranha'],
-  ['toad', 'Toad'],
-  ['toadette', 'Toadette'],
-  ['waluigi', 'Waluigi'],
-  ['wario', 'Wario'],
-  ['yoshi', 'Yoshi'],
-])
-
-const homeRoster = [
-  'mario', 'luigi', 'peach', 'daisy', 'yoshi',
-  'birdo', 'toad', 'toadette', 'bowser', 'baby-mario',
-]
-const awayRoster = [
-  'wario', 'waluigi', 'donkey-kong', 'diddy-kong', 'bowser-jr',
-  'boo', 'king-boo', 'petey-piranha', 'dixie-kong', 'funky-kong',
-]
-const positions = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'] as const
+const demoMatch = parseLocalDemoMatch(demoMatchFixture)
+if (demoMatch.league !== DEMO_SLUG || demoMatch.home.team !== 'mario-fireballs' || demoMatch.away.team !== 'wario-muscles') {
+  throw new Error('The default demo file must target the seeded Mushroom League teams')
+}
 
 let repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 let environmentPath = path.join(repositoryRoot, '.starworks/demo.env')
@@ -134,9 +115,9 @@ try {
       role: 'owner',
     }).onConflictDoNothing()
     await database.insert(gameCharacters).values(
-      [...characterNames].map(([characterId, displayName]) => ({
+      SLUGGERS_CHARACTER_IDS.map((characterId) => ({
         characterId,
-        displayName,
+        displayName: displayCharacterName(characterId),
         gameId: 'RMBE01',
         isCaptain: [
           'mario', 'luigi', 'donkey-kong', 'diddy-kong', 'peach', 'daisy',
@@ -203,6 +184,59 @@ try {
       status: 'published',
     }).onConflictDoNothing()
 
+    let statEditorDraft = importStatEditorV4({
+      profileName: 'Stat Editor Sandbox',
+      rawText: buildStatEditorV4Fixture(),
+      sourceVersion: 'v4',
+    })
+    await database.insert(statProfiles).values({
+      id: ids.statEditorProfile,
+      leagueId: league.id,
+      name: statEditorDraft.name,
+      slug: 'stat-editor-sandbox',
+    }).onConflictDoNothing()
+    await database.update(statProfileRevisions).set({
+      revisionNumber: 2,
+    }).where(eq(statProfileRevisions.id, ids.statEditorRevision))
+    await database.insert(statProfileRevisions).values({
+      basedOnRevisionId: null,
+      characterValues: statEditorDraft.characterValues,
+      createdByPersonId: admin.personId,
+      definitions: statEditorDraft.definitions,
+      id: ids.statEditorPublishedRevision,
+      leagueId: league.id,
+      name: 'Summer 2026 Draft Pool',
+      profileId: ids.statEditorProfile,
+      publishedAt,
+      revisionNumber: 1,
+      sluggersTuning: statEditorDraft.sluggersTuning,
+      status: 'published',
+    }).onConflictDoNothing()
+    await database.insert(statProfileRevisions).values({
+      basedOnRevisionId: ids.statEditorPublishedRevision,
+      characterValues: statEditorDraft.characterValues,
+      createdByPersonId: admin.personId,
+      definitions: statEditorDraft.definitions,
+      id: ids.statEditorRevision,
+      leagueId: league.id,
+      name: statEditorDraft.name,
+      profileId: ids.statEditorProfile,
+      publishedAt: null,
+      revisionNumber: 2,
+      sluggersTuning: statEditorDraft.sluggersTuning,
+      status: 'draft',
+    }).onConflictDoUpdate({
+      set: {
+        basedOnRevisionId: ids.statEditorPublishedRevision,
+        characterValues: statEditorDraft.characterValues,
+        definitions: statEditorDraft.definitions,
+        name: statEditorDraft.name,
+        revisionNumber: 2,
+        sluggersTuning: statEditorDraft.sluggersTuning,
+      },
+      target: statProfileRevisions.id,
+    })
+
     let rulesSource = RulesetRevisionSchema.parse(rulesetFixture)
     await database.insert(rulesets).values({
       id: ids.ruleset,
@@ -220,14 +254,14 @@ try {
       revisionNumber: 1,
       rulesetId: ids.ruleset,
       settings: rulesSource.settings.map((setting) =>
-        setting.key === 'game.innings' ? { ...setting, value: 7 } : setting,
+        setting.key === 'game.innings' ? { ...setting, value: demoMatch.innings } : setting,
       ),
       status: 'published',
     }).onConflictDoNothing()
 
     for (let team of [
-      createTeamFixture(league.id, ids.homeTeam, ids.homeRoster, ids.homeLineup, homeRoster, 'mario', 'luigi'),
-      createTeamFixture(league.id, ids.awayTeam, ids.awayRoster, ids.awayLineup, awayRoster, 'wario', 'waluigi'),
+      createTeamFixture(league.id, ids.homeTeam, ids.homeRoster, ids.homeLineup, demoTeamLineup(demoMatch.home)),
+      createTeamFixture(league.id, ids.awayTeam, ids.awayRoster, ids.awayLineup, demoTeamLineup(demoMatch.away)),
     ]) {
       await database.insert(rosterRevisions).values({
         createdByPersonId: admin.personId,
@@ -307,6 +341,21 @@ try {
     ))
     .limit(1)
   let runnerAdmin = new RunnerAdminService(connection.database)
+  let draftService = new DraftService(connection.database)
+  let draftDashboard = await draftService.dashboard(demoIdentity, league.id)
+  let seededDraftId = draftDashboard.drafts.find((draft) => draft.name === 'Summer 2026 Demo Draft')?.id
+  if (!seededDraftId) {
+    seededDraftId = (await draftService.createDraft(demoIdentity, league.id, {
+      gameId: 'RMBE01',
+      name: 'Summer 2026 Demo Draft',
+      orderMode: 'snake',
+      pickSeconds: 120,
+      rounds: 9,
+      seasonId: ids.season,
+      slotTeamIds: [ids.homeTeam, ids.awayTeam],
+      statProfileRevisionId: ids.statEditorPublishedRevision,
+    })).id
+  }
   if (!match) {
     match = await runnerAdmin.scheduleMatch(demoIdentity, league.id, {
       awayTeamId: ids.awayTeam,
@@ -328,9 +377,9 @@ try {
     await runnerAdmin.queueAttempt(demoIdentity, league.id, match.id, {
       awayLineupRevisionId: ids.awayLineup,
       contentPackRevisionId: null,
-      dynamicRuleOverrides: { 'game.innings': 7 },
+      dynamicRuleOverrides: { 'game.innings': demoMatch.innings },
       executionMode: 'cpu-vs-cpu',
-      gameStadiumId: 'mario-stadium',
+      gameStadiumId: demoMatch.stadium,
       homeLineupRevisionId: ids.homeLineup,
       requiredGameBuildSha256: DEMO_GAME_BUILD_SHA256,
       rulesetRevisionId: ids.rulesetRevision,
@@ -355,6 +404,7 @@ try {
     environmentFile: environmentPath,
     league: league.name,
     loginUrl: 'http://127.0.0.1:3000/auth/local-demo',
+    draftUrl: `http://127.0.0.1:3000/leagues/${DEMO_SLUG}/drafts/${seededDraftId}`,
     operationsUrl: `http://127.0.0.1:3000/leagues/${DEMO_SLUG}/operations`,
     seededAttempt: true,
   }, null, 2))
@@ -367,32 +417,18 @@ function createTeamFixture(
   teamId: string,
   rosterRevisionId: string,
   lineupRevisionId: string,
-  rosterCharacterIds: string[],
-  captainCharacterId: string,
-  pitcherCharacterId: string,
+  input: ReturnType<typeof demoTeamLineup>,
 ) {
-  let battingOrder = rosterCharacterIds.slice(0, 9)
   return TeamLineupRevisionSchema.parse({
     ...lineupFixture,
     basedOnLineupRevisionId: null,
     createdAt: new Date().toISOString(),
     leagueId,
-    lineup: {
-      battingOrder,
-      bench: rosterCharacterIds.slice(9),
-      captainCharacterId,
-      fielding: positions.map((position, index) => ({
-        characterId: index === 0
-          ? pitcherCharacterId
-          : battingOrder.filter((characterId) => characterId !== pitcherCharacterId)[index - 1],
-        position,
-      })),
-      pitcherCharacterId,
-    },
+    lineup: input.lineup,
     lineupRevisionId,
     lineupRevisionNumber: 1,
     publishedAt: new Date().toISOString(),
-    rosterCharacterIds,
+    rosterCharacterIds: input.rosterCharacterIds,
     rosterRevisionId,
     rosterRevisionNumber: 1,
     teamId,

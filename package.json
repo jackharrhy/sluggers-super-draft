@@ -11,7 +11,9 @@
     "test": "npm --prefix contracts test && npm --prefix web test && uv run --project runner --group test pytest runner/tests",
     "contracts:generate": "npm --prefix contracts run generate",
     "contracts:check": "npm --prefix contracts run check && uv run --project runner --group test pytest runner/tests",
-    "demo:seed": "npm --prefix web run demo:seed"
+    "demo:seed": "npm --prefix web run demo:seed",
+    "demo:queue": "npm --prefix web run demo:queue --",
+    "demo:runner": "./scripts/run-local-sluggers-demo.sh"
   },
   "engines": {
     "node": ">=24.3.0"

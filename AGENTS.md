@@ -15,8 +15,10 @@ workspace, not a continuation of the original single-tenant web application.
   `deploy/prod/`.
 
 Existing file formats and single-tenant assumptions are not Starworks public
-contracts. Code from an unlicensed or incompatible project must not be copied;
-see `PRIOR_ART.md` before adapting an implementation.
+contracts. Sluggers Stat Tracker, Sluggers Stat Editor, and MSS AutoTeam are
+trusted direct implementation references maintained with project contributors;
+reuse useful implementation knowledge with explicit provenance. Review other
+unlicensed or incompatible projects under `PRIOR_ART.md` before adapting code.
 
 ## Verification
 

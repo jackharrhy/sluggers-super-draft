@@ -50,9 +50,41 @@ and it refuses non-loopback hostnames. Production remains Discord-only.
 
 The seeded **Mushroom League** contains Mario Fireballs and Wario Muscles,
 published lineups, a ruleset, a stat profile, Mario Stadium, and a queued match
-attempt. The Operations page can schedule additional matches, issue station
-credentials, and queue attempts. The same private environment file contains
+attempt. Its human-readable match definition is
+[`demo/sluggers-match.json`](demo/sluggers-match.json). Edit that file, then
+publish the exact teams and queue a fresh server-backed attempt with:
+
+```shell
+npm run demo:queue
+```
+
+This uses the same lineup publication, scheduling, lease, and configuration
+path as the web product; it is not a separate hard-coded Dolphin demo. The
+Operations page can also schedule matches, issue station credentials, and
+queue attempts. The private environment file contains
 `STARWORKS_RUNNER_CREDENTIAL` for launching the native Python runner.
+
+With the demo services running and a queued attempt available, launch the
+local CPU-vs-CPU station with:
+
+```shell
+npm run demo:runner
+```
+
+The command loads the ignored demo credential itself, uses the reviewed local
+checkpoint and seed profile, and keeps polling until interrupted with Ctrl+C.
+Runner options can be forwarded after `--`; for example,
+`npm run demo:runner -- --max-ticks 1` performs one station tick.
+The runner uses the game's Random Fill action only to allocate its formation
+buffers. It replaces those buffers with the scheduled captains, batting orders,
+and fielding positions before Begin, then independently reads them back from
+live gameplay memory. A mismatch fails the attempt instead of silently playing
+a random team.
+
+Miis are not supported by this demo yet. Unlike the 77 built-in characters,
+their identities come from the runner profile's local `RFL_DB.dat`; Starworks
+will need an explicit station-local Mii mapping before they can safely appear
+in a portable league lineup.
 
 The preserved application's data enters through a dry-run-first, idempotent adapter documented in
 [`docs/migration/legacy-super-draft.md`](docs/migration/legacy-super-draft.md). Its old database and

@@ -83,6 +83,7 @@ export interface DraftCharacter {
   }>
   displayName: string
   isCaptain: boolean
+  stats?: Array<{ key: string; label: string; value: boolean | number | string | null }>
   values: Record<string, boolean | number | string | null>
 }
 
@@ -302,7 +303,10 @@ export class DraftService {
         .where(and(eq(draftEvents.leagueId, leagueId), eq(draftEvents.draftId, draftId)))
         .orderBy(asc(draftEvents.sequence)),
       this.database
-        .select({ characterValues: statProfileRevisions.characterValues })
+        .select({
+          characterValues: statProfileRevisions.characterValues,
+          definitions: statProfileRevisions.definitions,
+        })
         .from(statProfileRevisions)
         .where(and(
           eq(statProfileRevisions.leagueId, leagueId),
@@ -351,6 +355,14 @@ export class DraftService {
       }),
       displayName: names.get(character.characterId)!,
       isCaptain: catalog.get(character.characterId)?.isCaptain ?? false,
+      stats: profile.definitions.flatMap((definition) => {
+        let value = character.values[definition.key]
+        return value === undefined ? [] : [{
+          key: definition.key,
+          label: definition.display.label,
+          value,
+        }]
+      }),
       values: character.values,
     }))
 
