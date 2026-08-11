@@ -78,10 +78,44 @@ class StaticAssetTarget:
 
 
 @dataclass(frozen=True)
+class PatternRegionGuard:
+    guard_id: str
+    target_path: PurePosixPath
+    target_offset: int
+    virtual_address: int
+    size_bytes: int
+    expected_sha256: str
+    supported_input_sha256: tuple[str, ...]
+
+    @property
+    def end_offset(self) -> int:
+        return self.target_offset + self.size_bytes
+
+
+@dataclass(frozen=True)
+class MatrixPatternTarget:
+    target_id: str
+    guard_id: str
+    source: str
+    source_row_start: int
+    source_column_start: int
+    rows: int
+    columns: int
+    target_offset: int
+    virtual_address: int
+    row_stride: int
+    column_stride: int
+    codec: str
+    activation_rows_per_entry: int | None
+
+
+@dataclass(frozen=True)
 class StaticTargetCatalog:
     adapter_version: str
     value_targets: tuple[StaticValueTarget, ...]
     asset_targets: tuple[StaticAssetTarget, ...]
+    profile_guards: tuple[PatternRegionGuard, ...] = ()
+    profile_patterns: tuple[MatrixPatternTarget, ...] = ()
     provisioning_note: str = ""
 
     @classmethod
@@ -102,6 +136,8 @@ class StaticTargetCatalog:
                 "target",
                 "valueTargets",
                 "assetTargets",
+                "profileGuards",
+                "profilePatterns",
                 "provisioningNote",
             },
             "Static target catalog",
@@ -119,6 +155,12 @@ class StaticTargetCatalog:
             ),
             asset_targets=tuple(
                 _parse_asset_target(item) for item in raw["assetTargets"]
+            ),
+            profile_guards=tuple(
+                _parse_pattern_guard(item) for item in raw["profileGuards"]
+            ),
+            profile_patterns=tuple(
+                _parse_matrix_pattern(item) for item in raw["profilePatterns"]
             ),
             provisioning_note=raw["provisioningNote"],
         ).validated()
@@ -143,6 +185,69 @@ class StaticTargetCatalog:
             if not target.supported_input_sha256:
                 raise BuildIntegrityError(
                     f"Static target {target.target_id} declares no supported base hash"
+                )
+        guards = {guard.guard_id: guard for guard in self.profile_guards}
+        if len(guards) != len(self.profile_guards):
+            raise BuildIntegrityError("Profile guard IDs must be unique")
+        for guard in self.profile_guards:
+            if (
+                guard.target_offset < 0
+                or guard.virtual_address < 0x80000000
+                or guard.size_bytes <= 0
+                or not guard.supported_input_sha256
+            ):
+                raise BuildIntegrityError(
+                    f"Profile guard {guard.guard_id} has invalid bounds"
+                )
+        pattern_ids = [pattern.target_id for pattern in self.profile_patterns]
+        if len(set(pattern_ids)) != len(pattern_ids):
+            raise BuildIntegrityError("Profile pattern IDs must be unique")
+        for pattern in self.profile_patterns:
+            guard = guards.get(pattern.guard_id)
+            if guard is None:
+                raise BuildIntegrityError(
+                    f"Profile pattern {pattern.target_id} references an unknown guard"
+                )
+            codec_size = _codec_size(pattern.codec)
+            if (
+                pattern.source not in _PROFILE_MATRIX_SOURCES
+                or min(
+                    pattern.source_row_start,
+                    pattern.source_column_start,
+                    pattern.target_offset,
+                )
+                < 0
+                or pattern.rows <= 0
+                or pattern.columns <= 0
+                or pattern.row_stride <= 0
+                or pattern.column_stride < codec_size
+                or pattern.virtual_address < 0x80000000
+            ):
+                raise BuildIntegrityError(
+                    f"Profile pattern {pattern.target_id} is invalid"
+                )
+            final_offset = (
+                pattern.target_offset
+                + (pattern.rows - 1) * pattern.row_stride
+                + (pattern.columns - 1) * pattern.column_stride
+                + codec_size
+            )
+            if (
+                pattern.target_offset < guard.target_offset
+                or final_offset > guard.end_offset
+                or pattern.virtual_address - guard.virtual_address
+                != pattern.target_offset - guard.target_offset
+            ):
+                raise BuildIntegrityError(
+                    f"Profile pattern {pattern.target_id} escapes or disagrees with its guard"
+                )
+            if pattern.activation_rows_per_entry is not None and (
+                pattern.source != "trajectory-tables"
+                or pattern.activation_rows_per_entry <= 0
+                or pattern.rows % pattern.activation_rows_per_entry != 0
+            ):
+                raise BuildIntegrityError(
+                    f"Profile pattern {pattern.target_id} has an invalid activation mask"
                 )
         return self
 
@@ -211,19 +316,20 @@ class PlannedWrite:
     target_id: str
     target_path: PurePosixPath
     target_offset: int
-    expected_bytes: bytes
+    expected_bytes: bytes | None
     replacement_bytes: bytes
     supported_input_sha256: tuple[str, ...]
 
     @property
     def end_offset(self) -> int:
-        return self.target_offset + len(self.expected_bytes)
+        return self.target_offset + len(self.replacement_bytes)
 
 
 @dataclass(frozen=True)
 class ContentCompilationPlan:
     content_pack_sha256: str
     writes: tuple[PlannedWrite, ...]
+    guards: tuple[PatternRegionGuard, ...] = ()
 
     def apply(self, game_root: Path) -> list[dict[str, str]]:
         by_path: dict[PurePosixPath, list[PlannedWrite]] = {}
@@ -231,9 +337,14 @@ class ContentCompilationPlan:
             by_path.setdefault(write.target_path, []).append(write)
 
         outputs: dict[Path, tuple[bytes, str]] = {}
-        for relative_path, writes in sorted(
-            by_path.items(), key=lambda item: item[0].as_posix()
-        ):
+        guards_by_path: dict[PurePosixPath, list[PatternRegionGuard]] = {}
+        for guard in self.guards:
+            guards_by_path.setdefault(guard.target_path, []).append(guard)
+        all_paths = sorted(
+            {*by_path, *guards_by_path}, key=lambda item: item.as_posix()
+        )
+        for relative_path in all_paths:
+            writes = by_path.get(relative_path, [])
             target_path = (game_root.resolve() / relative_path).resolve()
             try:
                 target_path.relative_to(game_root.resolve())
@@ -247,6 +358,29 @@ class ContentCompilationPlan:
                 )
             original = target_path.read_bytes()
             input_sha256 = hashlib.sha256(original).hexdigest()
+            for guard in guards_by_path.get(relative_path, []):
+                if input_sha256 not in guard.supported_input_sha256:
+                    raise BuildIntegrityError(
+                        f"Profile guard {guard.guard_id} does not support input {input_sha256}"
+                    )
+                if guard.end_offset > len(original):
+                    raise BuildIntegrityError(
+                        f"Profile guard {guard.guard_id} exceeds its target file"
+                    )
+                mapped_offset = _dol_virtual_to_file_offset(
+                    original, guard.virtual_address
+                )
+                if mapped_offset != guard.target_offset:
+                    raise BuildIntegrityError(
+                        f"Profile guard {guard.guard_id} virtual and file offsets disagree"
+                    )
+                actual_sha256 = hashlib.sha256(
+                    original[guard.target_offset : guard.end_offset]
+                ).hexdigest()
+                if actual_sha256 != guard.expected_sha256:
+                    raise BuildIntegrityError(
+                        f"Profile guard {guard.guard_id} region hash failed"
+                    )
             for write in writes:
                 if input_sha256 not in write.supported_input_sha256:
                     raise BuildIntegrityError(
@@ -267,7 +401,7 @@ class ContentCompilationPlan:
                         f"Static target {write.target_id} exceeds its file"
                     )
                 actual = bytes(output[write.target_offset : write.end_offset])
-                if actual != write.expected_bytes:
+                if write.expected_bytes is not None and actual != write.expected_bytes:
                     raise BuildIntegrityError(
                         f"Static target {write.target_id} expected-byte guard failed at "
                         f"0x{write.target_offset:X}: expected {write.expected_bytes.hex()}, "
@@ -349,7 +483,12 @@ class ContentPackCompiler:
         build_operations = [
             operation
             for operation in bundle["operations"]
-            if operation["operation"] in {"set-character-stat", "set-game-rule"}
+            if operation["operation"]
+            in {
+                "apply-sluggers-stat-profile",
+                "set-character-stat",
+                "set-game-rule",
+            }
             and operation["loadPhase"] == "build-time"
             and (
                 operation["operation"] != "set-character-stat"
@@ -366,7 +505,16 @@ class ContentPackCompiler:
         )
 
         writes: list[PlannedWrite] = []
+        guards: dict[str, PatternRegionGuard] = {}
         for operation in build_operations:
+            if operation["operation"] == "apply-sluggers-stat-profile":
+                profile_writes, profile_guards = _compile_profile_patterns(
+                    operation, catalog
+                )
+                writes.extend(profile_writes)
+                for guard in profile_guards:
+                    guards[guard.guard_id] = guard
+                continue
             target = catalog.value_target(operation)
             replacement = _encode_value(operation["value"], target)
             writes.append(
@@ -425,7 +573,136 @@ class ContentPackCompiler:
                 )
             )
         _reject_planned_conflicts(writes)
-        return ContentCompilationPlan(content_pack_sha256, tuple(writes))
+        return ContentCompilationPlan(
+            content_pack_sha256,
+            tuple(writes),
+            tuple(sorted(guards.values(), key=lambda item: item.guard_id)),
+        )
+
+
+_PROFILE_MATRIX_SOURCES = {
+    "character-stats",
+    "chemistry",
+    "trajectory-tables",
+    "character-sizes",
+    "pitching",
+    "global-speed-curves",
+    "team-star-events",
+    "star-boosts",
+    "star-handicaps",
+    "handicap-parameters",
+}
+
+_REQUIRED_PROFILE_MATRIX_SOURCES = _PROFILE_MATRIX_SOURCES
+
+
+def _compile_profile_patterns(
+    operation: dict[str, Any], catalog: StaticTargetCatalog
+) -> tuple[list[PlannedWrite], tuple[PatternRegionGuard, ...]]:
+    if not catalog.profile_patterns or not catalog.profile_guards:
+        raise BuildIntegrityError(
+            "The adapter has no reviewed full Stat Editor profile mapping"
+        )
+    patterns_by_source: dict[str, list[MatrixPatternTarget]] = {}
+    for pattern in catalog.profile_patterns:
+        patterns_by_source.setdefault(pattern.source, []).append(pattern)
+    missing = sorted(_REQUIRED_PROFILE_MATRIX_SOURCES - patterns_by_source.keys())
+    if missing:
+        raise BuildIntegrityError(
+            f"Full Stat Editor mapping is incomplete: {', '.join(missing)}"
+        )
+
+    tuning = operation["tuning"]
+    activation = tuning["trajectoryActivation"]
+    if any(value not in {0, 1} for value in activation):
+        raise BuildIntegrityError(
+            "Trajectory activation values must be 0 or 1 for a game build"
+        )
+
+    guards_by_id = {guard.guard_id: guard for guard in catalog.profile_guards}
+    used_guards: dict[str, PatternRegionGuard] = {}
+    writes: list[PlannedWrite] = []
+    matrices: dict[str, list[list[object]]] = {}
+    for source in sorted(patterns_by_source):
+        matrix = matrices.setdefault(source, _profile_source_matrix(operation, source))
+        for pattern in patterns_by_source[source]:
+            guard = guards_by_id[pattern.guard_id]
+            used_guards[guard.guard_id] = guard
+            source_row_end = pattern.source_row_start + pattern.rows
+            if source_row_end > len(matrix):
+                raise BuildIntegrityError(
+                    f"Profile pattern {pattern.target_id} exceeds {source} rows"
+                )
+            for row in range(pattern.rows):
+                if pattern.activation_rows_per_entry is not None:
+                    activation_index = row // pattern.activation_rows_per_entry
+                    if activation[activation_index] == 0:
+                        continue
+                source_row = matrix[pattern.source_row_start + row]
+                source_column_end = pattern.source_column_start + pattern.columns
+                if source_column_end > len(source_row):
+                    raise BuildIntegrityError(
+                        f"Profile pattern {pattern.target_id} exceeds {source} columns"
+                    )
+                for column in range(pattern.columns):
+                    value = source_row[pattern.source_column_start + column]
+                    replacement = _encode_scalar(
+                        value,
+                        pattern.codec,
+                        _codec_size(pattern.codec),
+                        pattern.target_id,
+                    )
+                    target_offset = (
+                        pattern.target_offset
+                        + row * pattern.row_stride
+                        + column * pattern.column_stride
+                    )
+                    writes.append(
+                        PlannedWrite(
+                            target_id=f"{pattern.target_id}-{row}-{column}",
+                            target_path=guard.target_path,
+                            target_offset=target_offset,
+                            expected_bytes=None,
+                            replacement_bytes=replacement,
+                            supported_input_sha256=guard.supported_input_sha256,
+                        )
+                    )
+    return writes, tuple(used_guards.values())
+
+
+def _profile_source_matrix(
+    operation: dict[str, Any], source: str
+) -> list[list[object]]:
+    if source.startswith("character-") or source == "pitching":
+        group, columns = {
+            "character-stats": ("stat", 30),
+            "character-sizes": ("size", 14),
+            "pitching": ("pitching", 5),
+        }[source]
+        rows: list[list[object]] = []
+        for assignment in operation["characterValues"]:
+            values = assignment["values"]
+            row: list[object] = []
+            for column in range(columns):
+                key = f"legacy.stat-editor.{group}-{column:02d}"
+                if key not in values:
+                    raise BuildIntegrityError(
+                        f"Full Stat Editor profile is missing {key} for "
+                        f"{assignment['characterId']}"
+                    )
+                row.append(values[key])
+            rows.append(row)
+        return rows
+    tuning_key = {
+        "chemistry": "chemistry",
+        "trajectory-tables": "trajectoryTables",
+        "global-speed-curves": "globalSpeedCurves",
+        "team-star-events": "teamStarEvents",
+        "star-boosts": "starBoosts",
+        "star-handicaps": "starHandicaps",
+        "handicap-parameters": "handicapParameters",
+    }[source]
+    return operation["tuning"][tuning_key]
 
 
 def _reject_planned_conflicts(writes: list[PlannedWrite]) -> None:
@@ -448,17 +725,51 @@ def _reject_planned_conflicts(writes: list[PlannedWrite]) -> None:
 
 
 def _encode_value(value: object, target: StaticValueTarget) -> bytes:
-    codec = target.codec
+    return _encode_scalar(
+        value,
+        target.codec,
+        len(target.expected_bytes),
+        target.target_id,
+        target.enum_values,
+    )
+
+
+def _codec_size(codec: str) -> int:
+    try:
+        return {
+            "bool": 1,
+            "enum": 1,
+            "f32-be": 4,
+            "s16-be": 2,
+            "u16-be": 2,
+            "u32-be": 4,
+            "u8": 1,
+        }[codec]
+    except KeyError as error:
+        raise BuildIntegrityError(f"Unsupported static codec {codec!r}") from error
+
+
+def _encode_scalar(
+    value: object,
+    codec: str,
+    expected_size: int,
+    target_id: str,
+    enum_values: dict[str, int] | None = None,
+) -> bytes:
     try:
         if codec == "bool":
             if not isinstance(value, bool):
                 raise ValueError
             encoded = bytes([int(value)])
         elif codec == "enum":
-            if not isinstance(value, str) or value not in target.enum_values:
+            if (
+                not isinstance(value, str)
+                or enum_values is None
+                or value not in enum_values
+            ):
                 raise ValueError
-            numeric = target.enum_values[value]
-            encoded = numeric.to_bytes(len(target.expected_bytes), "big", signed=False)
+            numeric = enum_values[value]
+            encoded = numeric.to_bytes(expected_size, "big", signed=False)
         elif codec == "f32-be":
             if (
                 isinstance(value, bool)
@@ -480,14 +791,32 @@ def _encode_value(value: object, target: StaticValueTarget) -> bytes:
             encoded = value.to_bytes(size, "big", signed=signed)
     except (KeyError, OverflowError, ValueError, struct.error) as error:
         raise BuildIntegrityError(
-            f"Value {value!r} cannot be encoded as {codec} for {target.target_id}"
+            f"Value {value!r} cannot be encoded as {codec} for {target_id}"
         ) from error
-    if len(encoded) != len(target.expected_bytes):
+    if len(encoded) != expected_size:
         raise BuildIntegrityError(
-            f"Static target {target.target_id} expects {len(target.expected_bytes)} bytes, "
+            f"Static target {target_id} expects {expected_size} bytes, "
             f"but {codec} emits {len(encoded)}"
         )
     return encoded
+
+
+def _dol_virtual_to_file_offset(source: bytes, virtual_address: int) -> int:
+    if len(source) < 0x100:
+        raise BuildIntegrityError("DOL target is too short to contain a header")
+    offsets = struct.unpack(">18I", source[0x00:0x48])
+    addresses = struct.unpack(">18I", source[0x48:0x90])
+    sizes = struct.unpack(">18I", source[0x90:0xD8])
+    matches = [
+        file_offset + virtual_address - address
+        for file_offset, address, size in zip(offsets, addresses, sizes, strict=True)
+        if size and address <= virtual_address < address + size
+    ]
+    if len(matches) != 1:
+        raise BuildIntegrityError(
+            f"Virtual address 0x{virtual_address:08X} is not uniquely mapped by the DOL"
+        )
+    return matches[0]
 
 
 def _parse_value_target(raw: dict[str, Any]) -> StaticValueTarget:
@@ -567,4 +896,81 @@ def _parse_asset_target(raw: dict[str, Any]) -> StaticAssetTarget:
             for value in raw["supportedInputSha256"]
         ),
         media_types=tuple(raw["mediaTypes"]),
+    )
+
+
+def _parse_pattern_guard(raw: dict[str, Any]) -> PatternRegionGuard:
+    _exact_keys(
+        raw,
+        {
+            "id",
+            "targetPath",
+            "targetOffset",
+            "virtualAddress",
+            "sizeBytes",
+            "expectedSha256",
+            "supportedInputSha256",
+        },
+        "Profile pattern guard",
+    )
+    try:
+        virtual_address = int(raw["virtualAddress"], 16)
+    except (TypeError, ValueError) as error:
+        raise BuildIntegrityError(
+            "Profile guard virtualAddress must be hexadecimal"
+        ) from error
+    return PatternRegionGuard(
+        guard_id=raw["id"],
+        target_path=_safe_path(raw["targetPath"], "targetPath"),
+        target_offset=raw["targetOffset"],
+        virtual_address=virtual_address,
+        size_bytes=raw["sizeBytes"],
+        expected_sha256=_sha256(raw["expectedSha256"], "expectedSha256"),
+        supported_input_sha256=tuple(
+            _sha256(value, "supportedInputSha256")
+            for value in raw["supportedInputSha256"]
+        ),
+    )
+
+
+def _parse_matrix_pattern(raw: dict[str, Any]) -> MatrixPatternTarget:
+    _exact_keys(
+        raw,
+        {
+            "id",
+            "guardId",
+            "source",
+            "sourceRowStart",
+            "sourceColumnStart",
+            "rows",
+            "columns",
+            "targetOffset",
+            "virtualAddress",
+            "rowStride",
+            "columnStride",
+            "codec",
+            "activationRowsPerEntry",
+        },
+        "Profile matrix pattern",
+    )
+    try:
+        virtual_address = int(raw["virtualAddress"], 16)
+    except (TypeError, ValueError) as error:
+        raise BuildIntegrityError(
+            "Profile pattern virtualAddress must be hexadecimal"
+        ) from error
+    return MatrixPatternTarget(
+        target_id=raw["id"],
+        guard_id=raw["guardId"],
+        source=raw["source"],
+        source_row_start=raw["sourceRowStart"],
+        source_column_start=raw["sourceColumnStart"],
+        rows=raw["rows"],
+        columns=raw["columns"],
+        target_offset=raw["targetOffset"],
+        virtual_address=virtual_address,
+        row_stride=raw["rowStride"],
+        column_stride=raw["columnStride"],
+        codec=raw["codec"],
+        activation_rows_per_entry=raw["activationRowsPerEntry"],
     )

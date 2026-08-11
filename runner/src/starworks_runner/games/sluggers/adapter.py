@@ -22,10 +22,19 @@ class AdapterManifest:
     protocol_version: int
     bridge_source: Path
     bridge_source_sha256: str
+    static_target_catalog: Path
     artifacts: tuple[dict[str, Any], ...]
     patch_plans: tuple[dict[str, Any], ...]
     release_gates: tuple[str, ...]
     raw: dict[str, Any]
+
+    @property
+    def adapter_build_sha256(self) -> str:
+        if len(self.artifacts) != 1:
+            raise BuildIntegrityError(
+                "Adapter manifest must pin exactly one bridge artifact"
+            )
+        return str(self.artifacts[0]["sha256"])
 
     def trusted_patch_set(self) -> PrecompiledPatchSetApplier:
         plans = tuple(
@@ -101,6 +110,9 @@ class AdapterManifest:
                 raise BuildIntegrityError(
                     "Patch plan and adapter manifest pin different artifacts"
                 )
+        static_target_catalog = verified_path(
+            raw["staticTargetCatalog"], "Static target catalog"
+        )
         memory_map_path = (root / protocol["memoryMap"]).resolve()
         MemoryMap.load(memory_map_path)
         release_gates = tuple(raw["releaseGates"])
@@ -114,6 +126,7 @@ class AdapterManifest:
             protocol_version=protocol["version"],
             bridge_source=source_path,
             bridge_source_sha256=source["sha256"],
+            static_target_catalog=static_target_catalog,
             artifacts=tuple(raw["artifacts"]),
             patch_plans=tuple(raw["patchPlans"]),
             release_gates=release_gates,

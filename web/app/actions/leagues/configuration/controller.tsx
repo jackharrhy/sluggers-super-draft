@@ -67,6 +67,7 @@ export default createController(routes.leagues.configuration, {
           characterValues: imported.characterValues,
           definitions: imported.definitions,
           name: imported.name,
+          sluggersTuning: imported.sluggersTuning,
           slug: readString(data, 'slug'),
         })
         return redirect(routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId: revision.revisionId }), 303)
@@ -95,6 +96,9 @@ export default createController(routes.leagues.configuration, {
           characterValues: readJson(data, 'characterValues', StatProfileRevisionSchema.shape.characterValues),
           definitions: readJson(data, 'definitions', StatProfileRevisionSchema.shape.definitions),
           name: readString(data, 'name'),
+          ...(data.has('sluggersTuning') ? {
+            sluggersTuning: readJson(data, 'sluggersTuning', StatProfileRevisionSchema.shape.sluggersTuning.unwrap()),
+          } : {}),
         })
         return redirect(routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId: context.params.revisionId }), 303)
       } catch (error) {

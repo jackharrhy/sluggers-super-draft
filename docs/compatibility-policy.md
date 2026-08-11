@@ -1,33 +1,30 @@
-# Starworks compatibility policy
+# Starworks pre-release compatibility policy
 
-Starworks has several independent version boundaries. A release note must name
-all of them; “the app is version X” is not enough to decide whether a runner,
-game build, or stored message is compatible.
+Starworks is v0. The web, runner, contracts, and Sluggers adapter evolve as one
+current system until the first real release boundary. We do not maintain old
+protocol variants or promise cross-build compatibility yet.
 
 ## JSON contracts
 
-Every network and artifact contract contains `schemaVersion` and `kind`.
+Every network and artifact contract contains `schemaVersion` and `kind`, but
+the current discriminator is not a promise that Starworks supports multiple
+historical schemas. During v0, a change updates the one checked-in contract,
+its fixtures, generated JSON Schema, web producer/consumer, and Python
+producer/consumer together.
 
-- Additive optional fields may be added within schema version 1 only when old
-  producers and consumers continue to validate the message.
-- A required field removal, meaning change, type change, or discriminator
-  change requires a new schema version.
-- A new major schema is introduced alongside the old one for at least one
-  release when a safe translation is possible.
+- Do not introduce parallel v1/v2 models during v0.
+- Breaking changes replace the current pre-release shape and require all
+  Starworks components to update together.
 - Unknown or invalid input is rejected at the boundary. Neither the web nor the
   runner guesses a legacy file format from shape.
 - TypeScript Zod schemas are the source; checked-in JSON Schema is generated and
   validated by both TypeScript and Python in CI.
 
-The public broadcast overlay, runner control, run envelope, telemetry upload,
-rules, stats, lineup, content, and game-build contracts currently use schema
-version 1.
-
 ## Web and runner
 
-Starworks follows semantic versions once a 1.0 release is declared. During the
-0.x preview, a minor release may make a breaking operational change and must
-call it out in release notes.
+Starworks will define upgrade and compatibility guarantees when a real release
+boundary exists. Before then, the supported combination is the web and runner
+from the same source revision.
 
 - A runner declares its runner version, operating system, architecture,
   adapter IDs, Dolphin version, and features at registration.
@@ -38,10 +35,6 @@ call it out in release notes.
   nonce.
 - Operators update idle runners first, validate contracts, then update the web.
   Do not change a runner during an active attempt.
-
-Before 1.0, the supported combination is the web image and runner wheel from
-the same Git tag. Cross-minor support is best-effort unless the release notes
-explicitly list it.
 
 ## Sluggers adapter and game builds
 
@@ -60,8 +53,8 @@ The first adapter ID is `sluggers-rmbe01`.
   a boot, bridge, telemetry, capture, and recovery acceptance run before the
   compatibility table changes.
 
-Adapter releases are immutable. A fixed adapter gets a new version and build
-ID; an old cached build is never silently rewritten in place.
+Published build artifacts are content-addressed and never silently rewritten.
+The adapter implementation itself remains the one current v0 implementation.
 
 ## Database and storage
 
@@ -74,9 +67,9 @@ Garage stores user-created content assets. PostgreSQL stores their hashes and
 object keys. Materialized game builds and retail game content remain local to
 the runner and are outside server backup scope.
 
-## Release record
+## Future release record
 
-Each GitHub release should include:
+Once Starworks starts producing supported releases, each release should include:
 
 - web image tag and digest;
 - runner wheel SHA-256;

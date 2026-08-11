@@ -32,6 +32,7 @@ export const GameBuildManifestSchema = z
       fstSha256: Sha256Schema,
     }),
     adapterVersion: VersionSchema,
+    adapterBuildSha256: Sha256Schema,
     compilerVersion: VersionSchema,
     contentPackSha256: Sha256Schema,
     buildSha256: Sha256Schema,
@@ -47,9 +48,9 @@ export const GameBuildManifestSchema = z
     ),
   })
   .meta({
-    title: "GameBuildManifest v1",
+    title: "GameBuildManifest",
     description:
-      "A deterministic local build receipt containing hashes but no game data.",
+      "A deterministic local build receipt whose identity includes the exact adapter artifact but no game data.",
   });
 
 export type GameBuildManifest = z.infer<typeof GameBuildManifestSchema>;

@@ -8,14 +8,15 @@
 
 ## Implementation status
 
-As of 2026-08-10, the public-checkout software is implemented through the
-production/release slice and verified with contract, Remix/Chromium,
-PostgreSQL, runner, Compose, image, wheel, capture, and recovery tests. The
-criterion-by-criterion record is
+As of 2026-08-10, milestones 0–4 are substantially implemented, milestones
+5–8 contain foundations and partial live evidence, and milestone 9 is release
+and deployment scaffolding rather than an accepted production deployment. The
+platform is not yet a playable alpha because no scheduled match has completed
+unattended with real semantic telemetry and health-gated finalization. The
+criterion-by-criterion evidence record is
 [`2026-08-10-starworks-completion-audit.md`](2026-08-10-starworks-completion-audit.md).
-It is authoritative about which criteria are fully verified and which still
-require a lawfully dumped reviewed game image, compiled in-game bridge, actual
-Dolphin/hardware run, external RTMP/deployment, or maintainer action.
+[`PLAN.md`](../../PLAN.md) is authoritative for product status and the current
+critical path.
 
 No pending hardware or game-data gate should be interpreted as a reason to
 weaken a fingerprint, expected-byte, nonce, tenancy, or credential check.
@@ -29,7 +30,9 @@ weaken a fingerprint, expected-byte, nonce, tenancy, or credential check.
 - Discord is required for initial interactive login; email is optional and later.
 - The web application is a modular monolith.
 - The runner is a native Python/PySide6 application.
-- Stock Dolphin is used until a custom-fork decision gate is met.
+- Stock Dolphin 2606 remains the alpha emulator. Dolphin Memory Engine is the
+  runtime memory transport; GDB is optional reverse-engineering tooling and a
+  custom fork remains decision-gated.
 - Game images and materialized builds never pass through the Starworks server.
 - Matching decompilation improves the adapter but does not gate product delivery.
 
@@ -49,7 +52,7 @@ The workstreams meet at explicit integration milestones. Reverse engineering can
 ### Outcomes
 
 - Starworks has one documented architecture and vocabulary.
-- Web and runner code can share versioned JSON contracts without sharing runtime implementation.
+- Web and runner code share one generated pre-release JSON contract without sharing runtime implementation.
 - Local and production infrastructure layouts are established.
 - Licensing blockers are recorded before code is copied.
 
@@ -72,7 +75,7 @@ The workstreams meet at explicit integration milestones. Reverse engineering can
   single-tenant application in place.
 - Move Sluggers Super Draft under `legacy/` with its original branding intact,
   and treat it as a migration source rather than a Starworks package.
-- Adopt Zod schemas with explicit `schemaVersion` discriminators.
+- Adopt Zod schemas as the source of the one current v0 contract; keep a discriminator for strict validation without building compatibility branches.
 - Generate JSON Schema artifacts and prove validation of the same fixture in TypeScript and Python.
 - Add correlation IDs, actor IDs, league IDs, match-attempt IDs, and runner IDs to structured logs.
 - Expand root `compose.yml` to include PostgreSQL and Garage, with Mailpit behind an optional profile.
@@ -178,7 +181,7 @@ This milestone deliberately precedes a large web rewrite. It retires the highest
 - Users cannot read or mutate unpublished data from another league.
 - Importing the same source twice does not duplicate domain records.
 
-## Milestone 3 — Versioned rules, stats, and teams
+## Milestone 3 — Immutable rules, stats, and teams
 
 ### Stat definitions and profiles
 
@@ -249,10 +252,18 @@ This milestone deliberately precedes a large web rewrite. It retires the highest
 - Claim a `RunEnvelope` with a short-lived attempt nonce.
 - Download only manifests and user-created assets.
 - Resolve or build the required local game-build hash.
-- Launch Dolphin with an isolated profile and deterministic settings.
+- Launch Dolphin with a fresh isolated profile cloned from a validated seed
+  containing the normal Wii save and deterministic settings.
+- Treat any version-pinned savestate as a disposable startup cache, never the
+  durable save or a substitute for game-state detection.
 - Load teams, lineups, stats, and rules through the adapter.
-- Guide or automate menu transitions according to proven capabilities.
+- Guide or automate menu transitions as a guarded state machine whose
+  preconditions and postconditions are observed from game memory; screenshots
+  are diagnostics only.
 - Prevent two runners or two attempts from submitting as the same execution.
+
+The evidence and revised startup acceptance gates are recorded in
+[`2026-08-10-resource-folder-and-dolphin-startup.md`](../research/2026-08-10-resource-folder-and-dolphin-startup.md).
 
 ### Recovery
 
@@ -514,24 +525,28 @@ Progress is measured by product-relevant unknowns retired as well as matching pe
 - Production backup/restore and observability.
 - Explicit workflow for requesting a new league from the site administrator.
 
-Custom models, external content archives, a custom Dolphin fork, and unattended container runners may graduate independently when their decision gates are met.
+Custom models, external content archives, a Dolphin fork, and unattended
+container runners may graduate independently when their decision gates are met.
 
-## Immediate next planning tickets
+## Active critical path
 
-The first implementation tickets should be created in this order:
+The platform-foundation work above is complete. The active implementation
+sequence is now:
 
-1. Define Starworks repository layout and contract generation.
-2. Add Garage and optional Mailpit to root Compose.
-3. Create the Python runner package and headless CLI.
-4. Spike `decomp-toolkit` identification/extraction for `RMBE01`.
-5. Define `GameBuildManifest` and produce a deterministic no-op build.
-6. Define the bridge control block and event ring protocol.
-7. Prove the synthetic Dolphin handshake and event.
-8. Audit licenses and request DAT-tool/Mii-library permission.
-9. Design the multi-tenant identity and league schema.
-10. Build site-admin league provisioning and Discord invitation activation.
+1. Complete DME-first session provisioning and finish the observed post-lineup
+   flow on the already accepted team/rule configuration.
+2. Extend the single v0 run/configuration/telemetry contracts and bridge event
+   layout in place. Do not add compatibility variants before public release.
+3. Implement the complete typed Stat Editor v4 profile and lossless importer.
+4. Add guarded stat-table compilation and exact-`RMBE01` receipts.
+5. Implement observed startup, adapter-owned CPU play, and game completion.
+6. Hook the core semantic event stream and maintain the tracker parity ledger.
+7. Add reattach-or-retry-once recovery and health-gated auto-confirmation.
+8. Pass the macOS arm64 clean-station happy path and fault matrix.
 
-The game-boundary tickets and platform-foundation tickets can proceed together. Draft UI expansion waits until the tenancy and revision model is established.
+Every deferred legacy tracker metric is recorded in the parity ledger with its
+research lead, evidence, blocker, and intended follow-up; an absent metric is
+never represented as zero.
 
 ## Research references
 

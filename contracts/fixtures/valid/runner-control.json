@@ -10,8 +10,8 @@
     "features": [
       "build-sluggers",
       "launch-dolphin",
-      "runtime-bridge-v1",
-      "telemetry-spool-v1"
+      "runtime-bridge",
+      "telemetry-spool"
     ],
     "dolphinVersion": "2606"
   }

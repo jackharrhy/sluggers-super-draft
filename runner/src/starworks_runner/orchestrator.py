@@ -21,7 +21,7 @@ class AttemptExecutionError(RuntimeError):
 
 @dataclass(frozen=True)
 class ExecutionOutcome:
-    action: Literal["complete", "cancel"] = "complete"
+    action: Literal["complete", "cancel", "continue"] = "complete"
 
 
 class AttemptExecutor(Protocol):
@@ -41,7 +41,7 @@ class AttemptExecutor(Protocol):
 
 @dataclass(frozen=True)
 class RunOnceResult:
-    status: Literal["no-work", "completed", "cancelled", "failed"]
+    status: Literal["no-work", "running", "completed", "cancelled", "failed"]
     attempt_id: str | None
 
 
@@ -124,10 +124,14 @@ class RunnerStation:
             if active is None or active.configuration is None:
                 raise RuntimeError("Match configuration was not persisted")
 
+        resolved_content = None
         if self.content_cache is not None:
-            ContentPackDownloader(self.client, self.content_cache).resolve(
-                active.envelope, active.configuration
-            )
+            resolved_content = ContentPackDownloader(
+                self.client, self.content_cache
+            ).resolve(active.envelope, active.configuration)
+        supply_content = getattr(executor, "supply_content_pack", None)
+        if callable(supply_content):
+            supply_content(resolved_content.source if resolved_content else None)
 
         self.flush_pending_telemetry(active, registration.runner_id)
 
@@ -162,12 +166,19 @@ class RunnerStation:
                 )
 
         try:
+            if recovering and active.runtime_metadata is not None:
+                restore = getattr(executor, "restore_runtime", None)
+                if callable(restore):
+                    restore(active.runtime_metadata)
             outcome = executor.execute(
                 active.envelope,
                 active.configuration,
                 recovering=recovering,
                 emit_telemetry=self.state.queue_telemetry,
             )
+            runtime_metadata = getattr(executor, "runtime_metadata", None)
+            if callable(runtime_metadata):
+                self.state.save_runtime_metadata(attempt_id, runtime_metadata())
         except AttemptExecutionError as error:
             self._report_failure(active, registration.runner_id, error.failure_kind)
             return RunOnceResult(status="failed", attempt_id=attempt_id)
@@ -177,6 +188,10 @@ class RunnerStation:
         active = self.state.load_active_run()
         if active is None:
             raise RuntimeError("Active attempt disappeared during execution")
+        if outcome.action == "continue":
+            self.flush_pending_telemetry(active, registration.runner_id)
+            self.heartbeat("running")
+            return RunOnceResult(status="running", attempt_id=attempt_id)
         self.state.mark_execution_outcome(attempt_id, outcome.action)
         active = self.state.load_active_run()
         if active is None:

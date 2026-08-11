@@ -44,21 +44,44 @@ export function compileAdapterOperations(
   }
 
   let operations: AdapterOperation[] = [];
-  let definitions = new Map(input.profile.definitions.map((definition) => [definition.key, definition]));
-  for (let assignment of [...input.profile.characterValues].sort((left, right) => left.characterId.localeCompare(right.characterId))) {
-    for (let [key, value] of Object.entries(assignment.values).sort(([left], [right]) => left.localeCompare(right))) {
-      let mapping = definitions.get(key)?.gameplayMapping;
-      if (!mapping) continue;
-      operations.push({
-        operation: "set-character-stat",
-        characterId: assignment.characterId,
-        statKey: key,
-        gameplayTarget: mapping.target.field,
-        loadPhase: mapping.loadPhase,
-        resource: mapping.target.resource,
-        codec: mapping.target.codec,
-        value,
-      });
+  if (input.profile.sluggersTuning) {
+    let valuesByCharacter = new Map(
+      input.profile.characterValues.map((assignment) => [assignment.characterId, assignment]),
+    );
+    let orderedValues = input.profile.sluggersTuning.characterIdsByIndex.map((characterId) => {
+      let assignment = valuesByCharacter.get(characterId);
+      if (!assignment) {
+        throw new Error(`Full Sluggers profile is missing character values for ${characterId}`);
+      }
+      return assignment;
+    });
+    if (new Set(input.profile.sluggersTuning.characterIdsByIndex).size !== 101) {
+      throw new Error("Full Sluggers profile character slots must be unique");
+    }
+    operations.push({
+      operation: "apply-sluggers-stat-profile",
+      loadPhase: "build-time",
+      resource: "main-dol",
+      characterValues: orderedValues,
+      tuning: input.profile.sluggersTuning,
+    });
+  } else {
+    let definitions = new Map(input.profile.definitions.map((definition) => [definition.key, definition]));
+    for (let assignment of [...input.profile.characterValues].sort((left, right) => left.characterId.localeCompare(right.characterId))) {
+      for (let [key, value] of Object.entries(assignment.values).sort(([left], [right]) => left.localeCompare(right))) {
+        let mapping = definitions.get(key)?.gameplayMapping;
+        if (!mapping) continue;
+        operations.push({
+          operation: "set-character-stat",
+          characterId: assignment.characterId,
+          statKey: key,
+          gameplayTarget: mapping.target.field,
+          loadPhase: mapping.loadPhase,
+          resource: mapping.target.resource,
+          codec: mapping.target.codec,
+          value,
+        });
+      }
     }
   }
   for (let setting of [...input.ruleset.settings].sort((left, right) => left.key.localeCompare(right.key))) {

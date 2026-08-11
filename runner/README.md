@@ -80,14 +80,14 @@ uv run --project runner starworks-runner fingerprint-sluggers \
 
 Managed extracted builds are launched by pointing Dolphin at their
 `game/sys/main.dol`; Dolphin recognizes the adjacent `sys/`, `files/`, and
-`disc/` directories as an extracted Wii filesystem:
+`disc/` directories as an extracted Wii filesystem. Plain launches do not
+need a GDB endpoint:
 
 ```shell
 uv run --project runner starworks-runner launch-sluggers \
   --build-directory .starworks/cache/builds/BUILD_KEY \
   --dolphin /path/to/Dolphin \
-  --profile .starworks/profiles/station-1 \
-  --gdb-socket /tmp/starworks-station-1.sock
+  --profile .starworks/profiles/station-1
 ```
 
 Bridge protocol v1 is documented in
@@ -98,10 +98,14 @@ no game data or Dolphin process:
 uv run --project runner starworks-runner benchmark-bridge --iterations 10000
 ```
 
-With a bridge-enabled build starting paused, `probe-bridge` connects to
-Dolphin 2606's built-in GDB remote stub, initializes the bounded bridge control
-block, continues the CPU, validates the adapter and game build IDs, negotiates
-a one-attempt nonce, and consumes only events attributed to that attempt:
+The match runtime uses Dolphin Memory Engine 1.3.1 to attach to Dolphin's
+emulated RAM, initialize the bounded bridge control block, validate the adapter
+and game build IDs, negotiate a one-attempt nonce, and consume only events
+attributed to that attempt. `smoke-sluggers` and `run-sluggers-station` use that
+transport by default; no GDB option is required.
+
+`probe-bridge` remains an explicit reverse-engineering diagnostic for Dolphin
+2606's GDB remote stub:
 
 ```shell
 uv run --project runner starworks-runner probe-bridge \
@@ -111,10 +115,11 @@ uv run --project runner starworks-runner probe-bridge \
   --attempt-nonce URL_SAFE_NONCE_OF_AT_LEAST_32_CHARACTERS
 ```
 
-Unix-domain sockets are used on macOS/Linux. On Windows, launch and probe with
-the same `--gdb-port`; the probe defaults to `127.0.0.1`. The optional
-`legacy-dme` extra retains Dolphin Memory Engine for supported Windows/Linux
-setups, but it is not the primary path and is not used on macOS.
+Unix-domain GDB sockets are used for that diagnostic on macOS/Linux. On
+Windows, launch and probe with the same `--gdb-port`; the probe defaults to
+`127.0.0.1`. On macOS, process-memory attachment requires the runner-managed
+Dolphin copy to carry the `com.apple.security.get-task-allow` entitlement. The
+system-installed app is never modified in place.
 
 The patch-toolchain spike can be reproduced locally:
 

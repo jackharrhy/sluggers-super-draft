@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import plistlib
+import subprocess
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 
@@ -38,6 +40,20 @@ from starworks_runner.games.sluggers.tools import (
     ToolAsset,
     install_dtk,
 )
+
+TEST_ADAPTER_BUILD_SHA256 = "7" * 64
+
+
+def build_request(image: Path, cache_root: Path, **values: object) -> BuildRequest:
+    adapter_build_sha256 = str(
+        values.pop("adapter_build_sha256", TEST_ADAPTER_BUILD_SHA256)
+    )
+    return BuildRequest(
+        image_path=image,
+        cache_root=cache_root,
+        adapter_build_sha256=adapter_build_sha256,
+        **values,
+    )
 
 
 def create_extraction(root: Path, *, dat_payload: bytes = b"clean dat") -> None:
@@ -130,7 +146,7 @@ def test_no_op_build_is_deterministic_atomic_cached_and_source_preserving(
         registry,
         clock=lambda: datetime(2026, 8, 10, 12, 0, tzinfo=UTC),
     )
-    request = BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+    request = build_request(image, tmp_path / "cache")
 
     first = service.build(request)
     first_manifest_bytes = (
@@ -156,6 +172,41 @@ def test_no_op_build_is_deterministic_atomic_cached_and_source_preserving(
         assert sha256_file(first.game_directory / output["path"]) == output["sha256"]
 
 
+def test_adapter_artifact_hash_changes_the_managed_build_identity(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+    )
+
+    first = service.build(build_request(image, tmp_path / "cache"))
+    changed = service.build(
+        build_request(
+            image,
+            tmp_path / "cache",
+            adapter_build_sha256="8" * 64,
+        )
+    )
+
+    assert first.build_directory != changed.build_directory
+    assert first.manifest["buildSha256"] != changed.manifest["buildSha256"]
+    assert first.manifest["adapterVersion"] == changed.manifest["adapterVersion"]
+    assert first.manifest["adapterBuildSha256"] == TEST_ADAPTER_BUILD_SHA256
+    assert changed.manifest["adapterBuildSha256"] == "8" * 64
+
+
 def test_modified_base_fails_closed_without_promoting_a_build(tmp_path: Path) -> None:
     image = tmp_path / "user-owned.rvz"
     image.write_bytes(b"synthetic image")
@@ -174,7 +225,7 @@ def test_modified_base_fails_closed_without_promoting_a_build(tmp_path: Path) ->
     )
 
     with pytest.raises(UnsupportedBaseError, match="modified or unknown files"):
-        service.build(BuildRequest(image_path=image, cache_root=tmp_path / "cache"))
+        service.build(build_request(image, tmp_path / "cache"))
 
     assert not list((tmp_path / "cache/builds").iterdir())
     assert not list((tmp_path / "cache/.staging").iterdir())
@@ -287,7 +338,7 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
             timeout_seconds=10,
         ),
         registry_for(clean),
-    ).build(BuildRequest(image_path=image, cache_root=tmp_path / "cache"))
+    ).build(build_request(image, tmp_path / "cache"))
     dolphin = tmp_path / "Dolphin"
     dolphin.write_text(
         '#!/bin/sh\nif [ "$1" = "--version" ]; then echo \'Dolphin 2606\'; fi\n',
@@ -303,6 +354,22 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
         str(result.game_directory / "sys/main.dol"),
     )
     assert command[command.index("--user") + 1] == str(tmp_path / "profile")
+    save_state = tmp_path / "pre-begin.sav"
+    save_state.write_bytes(b"checkpoint")
+    checkpoint_command = launcher.command_for(
+        result.build_directory,
+        tmp_path / "profile",
+        save_state=save_state,
+    )
+    assert checkpoint_command[checkpoint_command.index("--save_state") + 1] == str(
+        save_state
+    )
+    with pytest.raises(DolphinLaunchError, match="initial save state not found"):
+        launcher.command_for(
+            result.build_directory,
+            tmp_path / "profile",
+            save_state=tmp_path / "missing.sav",
+        )
     gdb_command = launcher.command_for(
         result.build_directory,
         tmp_path / "profile",
@@ -328,6 +395,42 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
         launcher.command_for(result.build_directory, tmp_path / "profile")
 
 
+def test_macos_dme_target_requires_debugger_entitlement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    dolphin = tmp_path / "Dolphin"
+    dolphin.write_bytes(b"executable")
+    launcher = DolphinLauncher(dolphin)
+    monkeypatch.setattr(
+        "starworks_runner.games.sluggers.dolphin.sys.platform", "darwin"
+    )
+
+    def codesign_with(
+        entitlements: dict[str, object],
+    ) -> subprocess.CompletedProcess[bytes]:
+        return subprocess.CompletedProcess(
+            args=("codesign",),
+            returncode=0,
+            stdout=plistlib.dumps(entitlements),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(
+        "starworks_runner.games.sluggers.dolphin.subprocess.run",
+        lambda *args, **kwargs: codesign_with({}),
+    )
+    with pytest.raises(DolphinLaunchError, match="runner-managed Dolphin copy"):
+        launcher.verify_dme_compatible()
+
+    monkeypatch.setattr(
+        "starworks_runner.games.sluggers.dolphin.subprocess.run",
+        lambda *args, **kwargs: codesign_with(
+            {"com.apple.security.get-task-allow": True}
+        ),
+    )
+    launcher.verify_dme_compatible()
+
+
 def test_corrupt_cache_is_not_silently_reused(tmp_path: Path) -> None:
     image = tmp_path / "user-owned.rvz"
     image.write_bytes(b"synthetic image")
@@ -344,7 +447,7 @@ def test_corrupt_cache_is_not_silently_reused(tmp_path: Path) -> None:
         ),
         registry_for(clean),
     )
-    request = BuildRequest(image_path=image, cache_root=tmp_path / "cache")
+    request = build_request(image, tmp_path / "cache")
     result = service.build(request)
     (result.game_directory / "files/dt_na.dat").write_bytes(b"tampered")
 
@@ -394,18 +497,12 @@ def test_published_stat_content_build_is_deterministic_and_removable(
     )
 
     first = service.build(
-        BuildRequest(
-            image_path=image, cache_root=tmp_path / "cache", content_pack=content
-        )
+        build_request(image, tmp_path / "cache", content_pack=content)
     )
     second = service.build(
-        BuildRequest(
-            image_path=image, cache_root=tmp_path / "cache", content_pack=content
-        )
+        build_request(image, tmp_path / "cache", content_pack=content)
     )
-    clean_result = service.build(
-        BuildRequest(image_path=image, cache_root=tmp_path / "cache")
-    )
+    clean_result = service.build(build_request(image, tmp_path / "cache"))
 
     assert first.cache_hit is False
     assert second.cache_hit is True
@@ -467,9 +564,7 @@ def test_trusted_static_hook_is_preflighted_and_recorded_in_the_build(
         trusted_patch_set=PrecompiledPatchSetApplier(artifacts, (plan,)),
     )
 
-    result = service.build(
-        BuildRequest(image_path=image, cache_root=tmp_path / "cache")
-    )
+    result = service.build(build_request(image, tmp_path / "cache"))
 
     assert (result.game_directory / "sys/main.dol").read_bytes() == output
     assert result.manifest["patchReceipts"] == [plan.receipt()]

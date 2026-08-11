@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto'
 
-import { StatProfileRevisionSchema, type StatDefinition } from '@starworks/contracts'
+import {
+  SluggersTuningSchema,
+  StatProfileRevisionSchema,
+  type SluggersTuning,
+  type StatDefinition,
+} from '@starworks/contracts'
 import { z } from 'zod'
 
 import { PlatformError } from '../platform/errors.ts'
@@ -16,6 +21,7 @@ export interface StatEditorImportDraft {
   characterValues: Array<{ characterId: string; values: Record<string, boolean | number | string | null> }>
   definitions: StatDefinition[]
   name: string
+  sluggersTuning: SluggersTuning
   sourceVersion: 'v4'
   warnings: string[]
 }
@@ -94,27 +100,49 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
     throw new PlatformError(`Stat Editor v4 snapshots must contain 507 lines; received ${lines.length}`, 'invalid_input')
   }
 
+  let normalizedSource = lines.join('\n')
   let cursor = 0
   let parsed = new Map<string, number[][]>()
   for (let [name, rows, columns] of sectionLayout) {
     parsed.set(name, readNumericRows(lines, cursor, rows, columns, name))
     cursor += rows
   }
-  readTextRow(lines[cursor++]!, 6, 'trajectory names')
-  readNumericRow(lines[cursor++]!, 6, 'trajectory activation')
+  let trajectoryNames = readTextRow(lines[cursor++]!, 6, 'trajectory names')
+  let trajectoryActivation = readNumericRow(lines[cursor++]!, 6, 'trajectory activation')
   let sizes = readNumericRows(lines, cursor, 101, 14, 'character sizes')
   cursor += 101
   let pitching = readNumericRows(lines, cursor, 101, 5, 'pitching values')
   cursor += 101
-  readNumericRows(lines, cursor, 43, 2, 'global speed curves')
+  let globalSpeedCurves = readNumericRows(lines, cursor, 43, 2, 'global speed curves')
   cursor += 43
-  readNumericRows(lines, cursor, 12, 41, 'team star events')
+  let teamStarEvents = readNumericRows(lines, cursor, 12, 41, 'team star events')
   cursor += 12
-  readNumericRows(lines, cursor, 16, 4, 'star boosts')
+  let starBoosts = readNumericRows(lines, cursor, 16, 4, 'star boosts')
   cursor += 16
-  readNumericRows(lines, cursor, 4, 2, 'star handicaps')
+  let starHandicaps = readNumericRows(lines, cursor, 4, 2, 'star handicaps')
   cursor += 4
-  readNumericRows(lines, cursor, 2, 3, 'handicap parameters')
+  let handicapParameters = readNumericRows(lines, cursor, 2, 3, 'handicap parameters')
+
+  let characterIds = request.characterIdsByIndex ?? Array.from(
+    { length: 101 },
+    (_, index) => `rmbe01-character-${String(index).padStart(3, '0')}`,
+  )
+  let sluggersTuning = SluggersTuningSchema.parse({
+    characterIdsByIndex: characterIds,
+    chemistry: parsed.get('chemistry'),
+    globalSpeedCurves,
+    handicapParameters,
+    importSource: {
+      format: 'stat-editor-v4',
+      sha256: createHash('sha256').update(normalizedSource).digest('hex'),
+    },
+    starBoosts,
+    starHandicaps,
+    teamStarEvents,
+    trajectoryActivation,
+    trajectoryNames,
+    trajectoryTables: parsed.get('trajectory tables'),
+  })
 
   let stats = parsed.get('character stats')!
   let definitions = [
@@ -122,10 +150,6 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
     ...buildDefinitions('size', sizeLabels, sizes, coreStatLabels.length),
     ...buildDefinitions('pitching', pitchingLabels, pitching, coreStatLabels.length + sizeLabels.length),
   ]
-  let characterIds = request.characterIdsByIndex ?? Array.from(
-    { length: 101 },
-    (_, index) => `rmbe01-character-${String(index).padStart(3, '0')}`,
-  )
   let characterValues = characterIds.map((characterId, characterIndex) => {
     let values: Record<string, number> = {}
     definitions.forEach((definition, definitionIndex) => {
@@ -146,10 +170,9 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
     characterValues,
     definitions,
     name: request.profileName,
+    sluggersTuning,
     sourceVersion: 'v4',
     warnings: [
-      'Chemistry is relational and was validated but not flattened into character stats.',
-      'Trajectory tables, global speed curves, star event tables, boosts, and handicaps require dedicated Starworks domains.',
       'Default character IDs preserve RMBe01 numeric slots; replace them with canonical roster IDs when a verified mapping is available.',
     ],
   }
@@ -170,11 +193,11 @@ function buildDefinitions(
       display: { group: `Imported ${titleCase(group)}`, label, order: orderOffset + column },
       gameplayMapping: {
         adapterId: 'sluggers-rmbe01' as const,
-        loadPhase: 'runtime' as const,
+        loadPhase: 'build-time' as const,
         target: {
           codec: integer ? 'u32-be' as const : 'f32-be' as const,
           field: key,
-          resource: 'runtime-bridge' as const,
+          resource: 'main-dol' as const,
         },
       },
       key,
@@ -197,6 +220,65 @@ function buildDefinitions(
       step: 0.0001,
     }
   })
+}
+
+export function exportStatEditorV4(
+  profile: Pick<StatEditorImportDraft, 'characterValues' | 'sluggersTuning'>,
+): string {
+  let valuesByCharacter = new Map(
+    profile.characterValues.map((character) => [character.characterId, character.values]),
+  )
+  let orderedCharacters = profile.sluggersTuning.characterIdsByIndex
+  if (orderedCharacters.some((characterId) => !valuesByCharacter.has(characterId))) {
+    throw new PlatformError('Stat Editor v4 export requires all 101 numeric character slots', 'invalid_input')
+  }
+  let lines: string[] = []
+  appendMatrix(lines, profile.sluggersTuning.chemistry)
+  appendCharacterGroup(lines, orderedCharacters, valuesByCharacter, 'stat', coreStatLabels.length)
+  appendMatrix(lines, profile.sluggersTuning.trajectoryTables)
+  lines.push(profile.sluggersTuning.trajectoryNames.join(','))
+  lines.push(profile.sluggersTuning.trajectoryActivation.map(formatNumber).join(','))
+  appendCharacterGroup(lines, orderedCharacters, valuesByCharacter, 'size', sizeLabels.length)
+  appendCharacterGroup(lines, orderedCharacters, valuesByCharacter, 'pitching', pitchingLabels.length)
+  appendMatrix(lines, profile.sluggersTuning.globalSpeedCurves)
+  appendMatrix(lines, profile.sluggersTuning.teamStarEvents)
+  appendMatrix(lines, profile.sluggersTuning.starBoosts)
+  appendMatrix(lines, profile.sluggersTuning.starHandicaps)
+  appendMatrix(lines, profile.sluggersTuning.handicapParameters)
+  if (lines.length !== 507) {
+    throw new PlatformError('Stat Editor v4 export did not produce its required 507 rows', 'invalid_input')
+  }
+  return lines.join('\n')
+}
+
+function appendCharacterGroup(
+  lines: string[],
+  characterIds: string[],
+  valuesByCharacter: Map<string, Record<string, boolean | number | string | null>>,
+  group: string,
+  columns: number,
+): void {
+  for (let characterId of characterIds) {
+    let values = valuesByCharacter.get(characterId)!
+    let row = Array.from({ length: columns }, (_, column) => {
+      let key = `legacy.stat-editor.${group}-${String(column).padStart(2, '0')}`
+      let value = values[key]
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        throw new PlatformError(`Stat Editor v4 export is missing ${key} for ${characterId}`, 'invalid_input')
+      }
+      return value
+    })
+    lines.push(row.map(formatNumber).join(','))
+  }
+}
+
+function appendMatrix(lines: string[], matrix: number[][]): void {
+  for (let row of matrix) lines.push(row.map(formatNumber).join(','))
+}
+
+function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) throw new PlatformError('Stat Editor v4 export contains an invalid number', 'invalid_input')
+  return String(value)
 }
 
 function readNumericRows(

@@ -1,6 +1,6 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto'
 
-import { and, asc, desc, eq, inArray } from 'drizzle-orm'
+import { and, asc, count, desc, eq, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 
 import {
@@ -29,6 +29,7 @@ import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { scoringRoles } from '../platform/repository.ts'
 import { hashSecret } from '../platform/security.ts'
+import { SLUGGERS_ADAPTER_VERSION } from '../runner/adapter-version.ts'
 import { correctionValue, deriveTelemetry } from './derive.ts'
 import type {
   MatchBoxScore,
@@ -95,6 +96,11 @@ export interface TelemetryApplication {
   derive(identity: SessionIdentity | null, leagueId: string, attemptId: string): Promise<TelemetryDerivationResult>
   correct(identity: SessionIdentity | null, leagueId: string, attemptId: string, input: unknown): Promise<TelemetryDerivationResult>
   confirm(identity: SessionIdentity | null, leagueId: string, attemptId: string): Promise<void>
+  finalizeHealthyAttempt(bearerCredential: string, attemptId: string): Promise<{
+    leagueId: string
+    matchId: string
+    status: 'confirmed' | 'review'
+  }>
   rebuildSeason(identity: SessionIdentity | null, leagueId: string, seasonId: string): Promise<SeasonStatistics>
 }
 
@@ -352,6 +358,7 @@ export class TelemetryService implements TelemetryApplication {
         .limit(1)
       if (confirmed.length) throw new PlatformError('This match already has a confirmed attempt', 'conflict')
       await transaction.update(matchAttempts).set({
+        confirmationSource: 'manual',
         confirmedAt: now,
         confirmedByPersonId: identity!.personId,
         status: 'confirmed',
@@ -364,6 +371,176 @@ export class TelemetryService implements TelemetryApplication {
         actorPersonId: identity!.personId,
         leagueId,
         metadata: { derivationVersion: 1, inputDigest: derived.inputDigest },
+        targetId: attemptId,
+        targetType: 'match-attempt',
+      })
+    })
+  }
+
+  async finalizeHealthyAttempt(
+    bearerCredential: string,
+    attemptId: string,
+  ): Promise<{ leagueId: string; matchId: string; status: 'confirmed' | 'review' }> {
+    let credential = await this.#authenticate(bearerCredential)
+    if (!credential.stationId) {
+      throw new PlatformError('Runner credential is not bound to a station', 'unauthorized')
+    }
+    let [bound] = await this.database
+      .select({ attempt: matchAttempts, lease: runnerLeases })
+      .from(matchAttempts)
+      .innerJoin(runnerLeases, and(
+        eq(runnerLeases.leagueId, matchAttempts.leagueId),
+        eq(runnerLeases.matchAttemptId, matchAttempts.id),
+      ))
+      .where(and(
+        eq(matchAttempts.leagueId, credential.leagueId),
+        eq(matchAttempts.id, attemptId),
+        eq(runnerLeases.runnerStationId, credential.stationId),
+      ))
+      .limit(1)
+    if (!bound) throw new PlatformError('Completed telemetry attempt was not found', 'not_found')
+    if (bound.attempt.status === 'confirmed') {
+      return { leagueId: bound.attempt.leagueId, matchId: bound.attempt.matchId, status: 'confirmed' }
+    }
+    if (!['provisional', 'review'].includes(bound.attempt.status)) {
+      throw new PlatformError('Only a completed attempt can be finalized', 'conflict')
+    }
+
+    let derived: TelemetryDerivationResult
+    try {
+      derived = await this.#deriveAndStore(credential.leagueId, attemptId)
+    } catch (error) {
+      if (!(error instanceof PlatformError) || error.message !== 'No telemetry has been accepted for this attempt') throw error
+      await this.#markAutomaticReview(credential.leagueId, attemptId, bound.attempt.matchId, [error.message])
+      return { leagueId: credential.leagueId, matchId: bound.attempt.matchId, status: 'review' }
+    }
+    if (derived.health.requiresReview || derived.correctionCount > 0) {
+      await this.#markAutomaticReview(
+        credential.leagueId,
+        attemptId,
+        bound.attempt.matchId,
+        derived.correctionCount > 0
+          ? [...derived.health.issues, 'manual telemetry corrections require review']
+          : derived.health.issues,
+      )
+      return { leagueId: credential.leagueId, matchId: bound.attempt.matchId, status: 'review' }
+    }
+
+    let now = this.#clock()
+    let confirmed = await this.database.transaction(async (transaction) => {
+      let [row] = await transaction
+        .select({ attempt: matchAttempts, match: matches })
+        .from(matchAttempts)
+        .innerJoin(matches, and(
+          eq(matches.leagueId, matchAttempts.leagueId),
+          eq(matches.id, matchAttempts.matchId),
+        ))
+        .where(and(
+          eq(matchAttempts.leagueId, credential.leagueId),
+          eq(matchAttempts.id, attemptId),
+        ))
+        .for('update')
+        .limit(1)
+      if (!row) throw new PlatformError('Match attempt was not found', 'not_found')
+      if (row.attempt.status === 'confirmed' && row.match.status === 'confirmed') return true
+      if (row.attempt.status !== 'provisional') {
+        throw new PlatformError('Attempt entered review before automatic confirmation', 'conflict')
+      }
+      let [currentEventCount, currentCorrectionCount] = await Promise.all([
+        transaction.select({ value: count() }).from(telemetryEvents).where(and(
+          eq(telemetryEvents.leagueId, credential.leagueId),
+          eq(telemetryEvents.matchAttemptId, attemptId),
+        )),
+        transaction.select({ value: count() }).from(telemetryCorrections).where(and(
+          eq(telemetryCorrections.leagueId, credential.leagueId),
+          eq(telemetryCorrections.matchAttemptId, attemptId),
+        )),
+      ])
+      if (currentEventCount[0]?.value !== derived.health.eventCount
+        || currentCorrectionCount[0]?.value !== derived.correctionCount) {
+        let issues = ['telemetry changed during automatic confirmation']
+        await transaction.update(matchAttempts).set({ status: 'review' }).where(and(
+          eq(matchAttempts.leagueId, credential.leagueId),
+          eq(matchAttempts.id, attemptId),
+        ))
+        await transaction.update(matches).set({ status: 'provisional', updatedAt: now }).where(and(
+          eq(matches.leagueId, credential.leagueId),
+          eq(matches.id, row.match.id),
+        ))
+        await transaction.insert(auditRecords).values({
+          action: 'telemetry.auto_confirmation_blocked',
+          actorPersonId: null,
+          leagueId: credential.leagueId,
+          metadata: { issues },
+          targetId: attemptId,
+          targetType: 'match-attempt',
+        })
+        return false
+      }
+      let existingConfirmation = await transaction.select({ id: matchAttempts.id }).from(matchAttempts).where(and(
+        eq(matchAttempts.leagueId, credential.leagueId),
+        eq(matchAttempts.matchId, row.match.id),
+        eq(matchAttempts.status, 'confirmed'),
+      )).limit(1)
+      if (existingConfirmation.length) throw new PlatformError('This match already has a confirmed attempt', 'conflict')
+      await transaction.update(matchAttempts).set({
+        confirmationSource: 'system',
+        confirmedAt: now,
+        confirmedByPersonId: null,
+        status: 'confirmed',
+      }).where(and(
+        eq(matchAttempts.leagueId, credential.leagueId),
+        eq(matchAttempts.id, attemptId),
+      ))
+      await transaction.update(matches).set({ status: 'confirmed', updatedAt: now }).where(and(
+        eq(matches.leagueId, credential.leagueId),
+        eq(matches.id, row.match.id),
+      ))
+      await transaction.insert(auditRecords).values({
+        action: 'telemetry.auto_confirmed',
+        actorPersonId: null,
+        leagueId: credential.leagueId,
+        metadata: {
+          adapterVersion: SLUGGERS_ADAPTER_VERSION,
+          derivationVersion: 1,
+          eventCount: derived.health.eventCount,
+          gameBuildSha256: bound.attempt.requiredGameBuildSha256,
+          inputDigest: derived.inputDigest,
+          observationSource: 'bridge-hook',
+          protocolVersion: 1,
+        },
+        targetId: attemptId,
+        targetType: 'match-attempt',
+      })
+      return true
+    })
+    return {
+      leagueId: credential.leagueId,
+      matchId: bound.attempt.matchId,
+      status: confirmed ? 'confirmed' : 'review',
+    }
+  }
+
+  async #markAutomaticReview(
+    leagueId: string,
+    attemptId: string,
+    matchId: string,
+    issues: string[],
+  ): Promise<void> {
+    await this.database.transaction(async (transaction) => {
+      await transaction.update(matchAttempts).set({ status: 'review' }).where(and(
+        eq(matchAttempts.leagueId, leagueId),
+        eq(matchAttempts.id, attemptId),
+      ))
+      await transaction.update(matches).set({ status: 'provisional', updatedAt: this.#clock() }).where(and(
+        eq(matches.leagueId, leagueId),
+        eq(matches.id, matchId),
+      ))
+      await transaction.insert(auditRecords).values({
+        action: 'telemetry.auto_confirmation_blocked',
+        actorPersonId: null,
+        leagueId,
+        metadata: { issues },
         targetId: attemptId,
         targetType: 'match-attempt',
       })
@@ -513,7 +690,8 @@ export class TelemetryService implements TelemetryApplication {
   ): void {
     if (event.leagueId !== attempt.leagueId || event.matchId !== match.id || event.attemptId !== attempt.id
       || event.attemptNonce !== attempt.attemptNonce || event.correlationId !== attempt.correlationId
-      || event.gameBuildSha256 !== attempt.requiredGameBuildSha256) {
+      || event.gameBuildSha256 !== attempt.requiredGameBuildSha256
+      || event.adapterVersion !== SLUGGERS_ADAPTER_VERSION) {
       throw new PlatformError(`Telemetry sequence ${event.sequence} is not bound to this attempt`, 'conflict')
     }
   }

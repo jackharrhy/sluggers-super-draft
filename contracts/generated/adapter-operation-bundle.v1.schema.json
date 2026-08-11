@@ -65,6 +65,233 @@
             "properties": {
               "operation": {
                 "type": "string",
+                "const": "apply-sluggers-stat-profile"
+              },
+              "loadPhase": {
+                "type": "string",
+                "const": "build-time"
+              },
+              "resource": {
+                "type": "string",
+                "const": "main-dol"
+              },
+              "characterValues": {
+                "minItems": 101,
+                "maxItems": 101,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "characterId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 127
+                    },
+                    "values": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"
+                      },
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "characterId",
+                    "values"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "tuning": {
+                "type": "object",
+                "properties": {
+                  "characterIdsByIndex": {
+                    "minItems": 101,
+                    "maxItems": 101,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 127
+                    }
+                  },
+                  "chemistry": {
+                    "minItems": 101,
+                    "maxItems": 101,
+                    "type": "array",
+                    "items": {
+                      "minItems": 101,
+                      "maxItems": 101,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "trajectoryTables": {
+                    "minItems": 24,
+                    "maxItems": 24,
+                    "type": "array",
+                    "items": {
+                      "minItems": 25,
+                      "maxItems": 25,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "trajectoryNames": {
+                    "minItems": 6,
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    }
+                  },
+                  "trajectoryActivation": {
+                    "minItems": 6,
+                    "maxItems": 6,
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "globalSpeedCurves": {
+                    "minItems": 43,
+                    "maxItems": 43,
+                    "type": "array",
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "teamStarEvents": {
+                    "minItems": 12,
+                    "maxItems": 12,
+                    "type": "array",
+                    "items": {
+                      "minItems": 41,
+                      "maxItems": 41,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "starBoosts": {
+                    "minItems": 16,
+                    "maxItems": 16,
+                    "type": "array",
+                    "items": {
+                      "minItems": 4,
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "starHandicaps": {
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": {
+                        "type": "number"
+                      }
+                    }
+                  },
+                  "handicapParameters": {
+                    "minItems": 2,
+                    "maxItems": 2,
+                    "type": "array",
+                    "items": {
+                      "minItems": 3,
+                      "maxItems": 3,
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 255
+                      }
+                    }
+                  },
+                  "importSource": {
+                    "type": "object",
+                    "properties": {
+                      "format": {
+                        "type": "string",
+                        "const": "stat-editor-v4"
+                      },
+                      "sha256": {
+                        "type": "string",
+                        "pattern": "^[a-f0-9]{64}$"
+                      }
+                    },
+                    "required": [
+                      "format",
+                      "sha256"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "characterIdsByIndex",
+                  "chemistry",
+                  "trajectoryTables",
+                  "trajectoryNames",
+                  "trajectoryActivation",
+                  "globalSpeedCurves",
+                  "teamStarEvents",
+                  "starBoosts",
+                  "starHandicaps",
+                  "handicapParameters",
+                  "importSource"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "operation",
+              "loadPhase",
+              "resource",
+              "characterValues",
+              "tuning"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "operation": {
+                "type": "string",
                 "const": "set-character-stat"
               },
               "characterId": {
@@ -313,7 +540,7 @@
     "generatedAt"
   ],
   "additionalProperties": false,
-  "title": "AdapterOperationBundle v1",
-  "description": "Symbolic, bounded operations translated by a versioned game adapter; never raw memory writes.",
+  "title": "AdapterOperationBundle",
+  "description": "Symbolic, bounded operations translated by the current game adapter; never raw memory writes.",
   "$id": "https://starworks.community/contracts/adapter-operation-bundle/v1.schema.json"
 }

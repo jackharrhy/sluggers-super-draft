@@ -139,7 +139,7 @@ export class ConfigurationService {
   async createStatProfileDraft(
     identity: SessionIdentity | null,
     leagueId: string,
-    input: Pick<StatProfileRevision, 'name' | 'definitions' | 'characterValues'> & { slug: string },
+    input: Pick<StatProfileRevision, 'name' | 'definitions' | 'characterValues' | 'sluggersTuning'> & { slug: string },
   ): Promise<StatProfileRevision> {
     this.#requireLeagueAdmin(identity, leagueId)
     let now = this.#clock()
@@ -154,6 +154,7 @@ export class ConfigurationService {
       name: input.name,
       definitions: input.definitions,
       characterValues: input.characterValues,
+      sluggersTuning: input.sluggersTuning,
       basedOnRevisionId: null,
       createdAt: now.toISOString(),
       publishedAt: null,
@@ -175,6 +176,7 @@ export class ConfigurationService {
         leagueId,
         name: revision.name,
         profileId: revision.profileId,
+        sluggersTuning: revision.sluggersTuning,
         revisionNumber: 1,
       })
       await audit(transaction, identity!.personId, leagueId, 'stat_profile.draft.created', revision.revisionId)
@@ -205,7 +207,7 @@ export class ConfigurationService {
     identity: SessionIdentity | null,
     leagueId: string,
     revisionId: string,
-    input: Pick<StatProfileRevision, 'name' | 'definitions' | 'characterValues'>,
+    input: Pick<StatProfileRevision, 'name' | 'definitions' | 'characterValues' | 'sluggersTuning'>,
   ): Promise<StatProfileRevision> {
     this.#requireLeagueAdmin(identity, leagueId)
     let current = await this.#loadStatRevision(leagueId, revisionId)
@@ -213,7 +215,7 @@ export class ConfigurationService {
     let revision = StatProfileRevisionSchema.parse({ ...current, ...input })
     let updated = await this.database
       .update(statProfileRevisions)
-      .set({ characterValues: revision.characterValues, definitions: revision.definitions, name: revision.name })
+      .set({ characterValues: revision.characterValues, definitions: revision.definitions, name: revision.name, sluggersTuning: revision.sluggersTuning })
       .where(and(eq(statProfileRevisions.id, revisionId), eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.status, 'draft')))
       .returning({ id: statProfileRevisions.id })
     if (!updated.length) throw new PlatformError('Published revisions cannot be edited', 'conflict')
@@ -279,6 +281,7 @@ export class ConfigurationService {
         leagueId,
         name: revision.name,
         profileId: revision.profileId,
+        sluggersTuning: revision.sluggersTuning,
         revisionNumber: revision.revisionNumber,
       })
       await audit(transaction, identity!.personId, leagueId, 'stat_profile.revision.cloned', revision.revisionId)
@@ -638,7 +641,7 @@ export class ConfigurationService {
 
   async #loadStatRevision(leagueId: string, revisionId: string): Promise<StatProfileRevision | null> {
     let [row] = await this.database.select().from(statProfileRevisions).where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.id, revisionId))).limit(1)
-    return row ? StatProfileRevisionSchema.parse({ schemaVersion: 1, kind: 'stat-profile-revision', leagueId: row.leagueId, profileId: row.profileId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, definitions: row.definitions, characterValues: row.characterValues, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
+    return row ? StatProfileRevisionSchema.parse({ schemaVersion: 1, kind: 'stat-profile-revision', leagueId: row.leagueId, profileId: row.profileId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, definitions: row.definitions, characterValues: row.characterValues, sluggersTuning: row.sluggersTuning ?? undefined, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
   }
 
   async #loadRulesetRevision(leagueId: string, revisionId: string): Promise<RulesetRevision | null> {

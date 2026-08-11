@@ -100,6 +100,24 @@ def test_capture_profile_reads_rtmp_only_from_the_runner_environment(
     assert "rtmp://" not in repr(profile)
 
 
+def test_capture_profile_never_overwrites_an_existing_attempt_recording(
+    tmp_path: Path,
+) -> None:
+    attempt_id = "11111111-1111-4111-8111-111111111111"
+    (tmp_path / f"{attempt_id}.mkv").touch()
+    (tmp_path / f"{attempt_id}-recovery-1.mkv").touch()
+    profile = CaptureProfile(
+        source=CaptureSource("lavfi", "testsrc=size=320x180:rate=30"),
+        recording_directory=tmp_path,
+    )
+
+    request = profile.request_for_attempt(attempt_id, {})
+
+    assert (
+        request.recording_path == (tmp_path / f"{attempt_id}-recovery-2.mkv").resolve()
+    )
+
+
 def test_runner_secret_can_be_mounted_as_a_file(tmp_path: Path) -> None:
     secret_file = tmp_path / "rtmp-url"
     secret_file.write_text(
@@ -133,6 +151,25 @@ class TelemetryExecutor:
         return ExecutionOutcome()
 
 
+class IncrementalTelemetryExecutor(TelemetryExecutor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.executions = 0
+
+    def execute(
+        self,
+        envelope: dict[str, Any],
+        configuration: dict[str, Any],
+        *,
+        recovering: bool,
+        emit_telemetry: Any,
+    ) -> ExecutionOutcome:
+        self.executions += 1
+        return ExecutionOutcome(
+            action="continue" if self.executions == 1 else "complete"
+        )
+
+
 def test_capture_start_failure_does_not_interrupt_match_telemetry(
     tmp_path: Path,
 ) -> None:
@@ -163,6 +200,48 @@ def test_capture_start_failure_does_not_interrupt_match_telemetry(
     assert outcome.action == "complete"
     assert events == [{"sequence": 1, "eventType": "synthetic"}]
     assert executor.last_health.state == "failed"
+
+
+def test_incremental_attempt_keeps_one_recording_worker_until_game_end(
+    tmp_path: Path,
+) -> None:
+    processes: list[FakeProcess] = []
+
+    def launch(_: tuple[str, ...]) -> FakeProcess:
+        process = FakeProcess()
+        processes.append(process)
+        return process
+
+    capture = FfmpegCaptureController(process_factory=launch)
+    inner = IncrementalTelemetryExecutor()
+    executor = CapturingAttemptExecutor(
+        inner,
+        capture,
+        CaptureProfile(
+            source=CaptureSource("lavfi", "testsrc=size=320x180:rate=30"),
+            recording_directory=tmp_path,
+        ),
+    )
+    envelope = {"attemptId": "22222222-2222-4222-8222-222222222222"}
+
+    assert (
+        executor.execute(
+            envelope, {}, recovering=False, emit_telemetry=lambda _: None
+        ).action
+        == "continue"
+    )
+    assert len(processes) == 1
+    assert processes[0].poll() is None
+
+    assert (
+        executor.execute(
+            envelope, {}, recovering=True, emit_telemetry=lambda _: None
+        ).action
+        == "complete"
+    )
+    assert len(processes) == 1
+    assert processes[0].stdin.getvalue() == b"q\n"
+    assert executor.last_health.state == "stopped"
 
 
 class TimeoutProcess(FakeProcess):

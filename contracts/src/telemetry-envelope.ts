@@ -93,8 +93,7 @@ export function parseTelemetryEventPayload(
   return TelemetryEventPayloadSchemas[eventType].parse(payload);
 }
 
-export const TelemetryEnvelopeSchema = z
-  .strictObject({
+const TelemetryEnvelopeFields = {
     schemaVersion: z.literal(1),
     kind: z.literal("telemetry-envelope"),
     protocolVersion: z.literal(1),
@@ -105,17 +104,37 @@ export const TelemetryEnvelopeSchema = z
     attemptNonce: AttemptNonceSchema,
     sequence: z.number().int().positive(),
     frame: z.number().int().nonnegative(),
-    eventType: TelemetryEventTypeSchema,
     observationSource: TelemetryObservationSourceSchema,
-    payload: z.record(z.string().min(1), z.unknown()),
     adapterVersion: VersionSchema,
     gameBuildSha256: Sha256Schema,
     stateFingerprint: Sha256Schema.optional(),
-  })
-  .meta({
-    title: "TelemetryEnvelope v1",
-    description: "One ordered, idempotently ingestible game event.",
+} as const;
+
+function telemetryEnvelope<EventType extends keyof typeof TelemetryEventPayloadSchemas>(
+  eventType: EventType,
+  payload: (typeof TelemetryEventPayloadSchemas)[EventType],
+) {
+  return z.strictObject({
+    ...TelemetryEnvelopeFields,
+    eventType: z.literal(eventType),
+    payload,
   });
+}
+
+export const TelemetryEnvelopeSchema = z.discriminatedUnion("eventType", [
+  telemetryEnvelope("synthetic", TelemetryEventPayloadSchemas.synthetic),
+  telemetryEnvelope("game-started", TelemetryEventPayloadSchemas["game-started"]),
+  telemetryEnvelope("inning-started", TelemetryEventPayloadSchemas["inning-started"]),
+  telemetryEnvelope("batter-changed", TelemetryEventPayloadSchemas["batter-changed"]),
+  telemetryEnvelope("pitcher-changed", TelemetryEventPayloadSchemas["pitcher-changed"]),
+  telemetryEnvelope("plate-appearance-ended", TelemetryEventPayloadSchemas["plate-appearance-ended"]),
+  telemetryEnvelope("substitution", TelemetryEventPayloadSchemas.substitution),
+  telemetryEnvelope("game-ended", TelemetryEventPayloadSchemas["game-ended"]),
+  telemetryEnvelope("bridge-warning", TelemetryEventPayloadSchemas["bridge-warning"]),
+]).meta({
+    title: "TelemetryEnvelope",
+    description: "One ordered, idempotently ingestible game event.",
+});
 
 export type TelemetryEnvelope = z.infer<typeof TelemetryEnvelopeSchema>;
 
@@ -144,7 +163,7 @@ export const TelemetryUploadMessageSchema = z.union([
   TelemetryUploadRequestSchema,
   TelemetryUploadResponseSchema,
 ]).meta({
-  title: "TelemetryUploadMessage v1",
+  title: "TelemetryUploadMessage",
   description: "Bounded, retry-safe upload of locally spooled telemetry events.",
 });
 

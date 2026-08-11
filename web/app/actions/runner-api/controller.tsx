@@ -1,6 +1,6 @@
 import { createController } from 'remix/router'
 
-import { RunnerControl, Telemetry } from '../../middleware/platform.ts'
+import { Notifications, RunnerControl, Telemetry } from '../../middleware/platform.ts'
 import { RequestLog, type StructuredLogger } from '../../middleware/request-logging.ts'
 import { PlatformError } from '../../platform/errors.ts'
 import { routes } from '../../routes.ts'
@@ -79,14 +79,29 @@ export default createController(routes.runnerApi, {
     async updateLease(context) {
       return handle(async () => {
         let body = await readJson(context.request)
-        if (!isRecord(body) || body.leaseId !== context.params.leaseId) {
+        if (!isRecord(body) || body.leaseId !== context.params.leaseId || typeof body.attemptId !== 'string') {
           throw new PlatformError('Lease URL and message do not match', 'invalid_input')
         }
         bindRunnerIdentifiers(context.get(RequestLog), body)
-        return json(await context.get(RunnerControl).updateLease(
+        let response = await context.get(RunnerControl).updateLease(
           readBearerCredential(context.request),
           body,
-        ))
+        )
+        if (response.attemptStatus === 'provisional') {
+          let finalized = await context.get(Telemetry).finalizeHealthyAttempt(
+            readBearerCredential(context.request),
+            body.attemptId,
+          )
+          if (finalized.status === 'confirmed') {
+            await context.get(Notifications)?.publish(finalized.leagueId, {
+              dedupeKey: `match-result:${body.attemptId}`,
+              eventType: 'match.result_confirmed',
+              message: `✅ Starworks automatically confirmed match ${finalized.matchId}.`,
+            })
+          }
+          response = { ...response, attemptStatus: finalized.status }
+        }
+        return json(response)
       })
     },
     async telemetry(context) {

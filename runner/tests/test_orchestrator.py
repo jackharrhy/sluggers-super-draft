@@ -93,6 +93,45 @@ class RecordingExecutor:
         return ExecutionOutcome()
 
 
+class IncrementalExecutor(RecordingExecutor):
+    def execute(
+        self,
+        envelope: dict[str, Any],
+        configuration: dict[str, Any],
+        *,
+        recovering: bool,
+        emit_telemetry: Any,
+    ) -> ExecutionOutcome:
+        self.executions.append(recovering)
+        return ExecutionOutcome(
+            action="continue" if len(self.executions) == 1 else "complete"
+        )
+
+
+class RecoverableExecutor(RecordingExecutor):
+    def __init__(self, action: str) -> None:
+        super().__init__()
+        self.action = action
+        self.restored: list[dict[str, Any]] = []
+
+    def restore_runtime(self, metadata: dict[str, Any]) -> None:
+        self.restored.append(metadata)
+
+    def runtime_metadata(self) -> dict[str, Any]:
+        return {"kind": "test-runtime", "processId": 42}
+
+    def execute(
+        self,
+        envelope: dict[str, Any],
+        configuration: dict[str, Any],
+        *,
+        recovering: bool,
+        emit_telemetry: Any,
+    ) -> ExecutionOutcome:
+        self.executions.append(recovering)
+        return ExecutionOutcome(action=self.action)  # type: ignore[arg-type]
+
+
 def test_runner_recovers_unsent_completion_without_executing_twice(
     tmp_path: Path,
 ) -> None:
@@ -149,6 +188,57 @@ def test_runner_spools_telemetry_and_finishes_without_replaying_the_game(
         assert recovered.list_pending_telemetry(envelope["attemptId"]) == []
         assert executor.executions == [False]
         assert client.telemetry_sequences == [1]
+
+
+def test_incremental_executor_keeps_the_attempt_running_until_game_end(
+    tmp_path: Path,
+) -> None:
+    envelope, configuration = execution_fixtures()
+    client = FakeControlClient(envelope, configuration)
+    client.fail_complete_once = False
+    executor = IncrementalExecutor()
+    with RunnerStateStore(tmp_path / "runner.sqlite3") as state:
+        state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
+        station = create_station(client, state)
+
+        first = station.run_once(executor)
+        active = state.load_active_run()
+
+        assert first.status == "running"
+        assert active is not None and active.stage == "running"
+        assert active.pending_outcome is None
+        assert client.updates == ["started"]
+        assert client.heartbeats[-1] == "running"
+
+        second = station.run_once(executor)
+
+        assert second.status == "completed"
+        assert state.load_active_run() is None
+        assert executor.executions == [False, True]
+        assert client.updates == ["started", "renew", "complete"]
+
+
+def test_runner_persists_and_restores_live_runtime_identity(tmp_path: Path) -> None:
+    envelope, configuration = execution_fixtures()
+    client = FakeControlClient(envelope, configuration)
+    client.fail_complete_once = False
+    state_path = tmp_path / "runner.sqlite3"
+    with RunnerStateStore(state_path) as state:
+        state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
+        first = RecoverableExecutor("continue")
+        result = create_station(client, state).run_once(first)
+        assert result.status == "running"
+        assert state.load_active_run().runtime_metadata == {  # type: ignore[union-attr]
+            "kind": "test-runtime",
+            "processId": 42,
+        }
+
+    with RunnerStateStore(state_path) as recovered_state:
+        second = RecoverableExecutor("complete")
+        result = create_station(client, recovered_state).run_once(second)
+        assert result.status == "completed"
+        assert second.executions == [True]
+        assert second.restored == [{"kind": "test-runtime", "processId": 42}]
 
 
 def create_station(client: FakeControlClient, state: RunnerStateStore) -> RunnerStation:

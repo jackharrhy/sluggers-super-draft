@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   AttemptNonceSchema,
   JsonScalarSchema,
+  Sha256Schema,
   TimestampSchema,
   UuidSchema,
   VersionSchema,
@@ -10,6 +11,7 @@ import { RulesetRevisionSchema } from "./ruleset-revision.ts";
 import { StatProfileRevisionSchema } from "./stat-profile-revision.ts";
 import { TeamLineupRevisionSchema } from "./team-lineup-revision.ts";
 import { ContentPackManifestSchema } from "./content-pack-manifest.ts";
+import { MatchExecutionSchema } from "./run-envelope.ts";
 
 const HomeConfigurationSchema = z.strictObject({
   side: z.literal("home"),
@@ -39,7 +41,9 @@ export const MatchConfigurationPackageSchema = z
       z.tuple([AwayConfigurationSchema, HomeConfigurationSchema]),
     ]),
     dynamicRuleOverrides: z.record(z.string().min(1), JsonScalarSchema),
+    execution: MatchExecutionSchema,
     generatedAt: TimestampSchema,
+    requiredGameBuildSha256: Sha256Schema,
   })
   .superRefine((configuration, context) => {
     let leagueIds = new Set([
@@ -78,7 +82,7 @@ export const MatchConfigurationPackageSchema = z
     }
   })
   .meta({
-    title: "MatchConfigurationPackage v1",
+    title: "MatchConfigurationPackage",
     description:
       "Published declarative inputs for one leased attempt; contains no game buffers, addresses, or executable patches.",
   });

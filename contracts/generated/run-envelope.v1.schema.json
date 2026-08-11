@@ -231,6 +231,65 @@
         ]
       }
     },
+    "execution": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "cpu-vs-cpu"
+        },
+        "stadium": {
+          "type": "object",
+          "properties": {
+            "gameStadiumId": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9-]{0,63}$"
+            },
+            "venueId": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "gameStadiumId",
+            "venueId"
+          ],
+          "additionalProperties": false
+        },
+        "recovery": {
+          "type": "object",
+          "properties": {
+            "allowLiveReattach": {
+              "type": "boolean",
+              "const": true
+            },
+            "freshAttemptLimit": {
+              "type": "number",
+              "const": 1
+            }
+          },
+          "required": [
+            "allowLiveReattach",
+            "freshAttemptLimit"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "mode",
+        "stadium",
+        "recovery"
+      ],
+      "additionalProperties": false
+    },
     "lease": {
       "type": "object",
       "properties": {
@@ -279,11 +338,12 @@
     "rulesetRevisionId",
     "teams",
     "dynamicRuleOverrides",
+    "execution",
     "lease",
     "issuedAt"
   ],
   "additionalProperties": false,
-  "title": "RunEnvelope v1",
+  "title": "RunEnvelope",
   "description": "An immutable, leased instruction to execute one match attempt.",
   "$id": "https://starworks.community/contracts/run-envelope/v1.schema.json"
 }

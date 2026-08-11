@@ -21,15 +21,16 @@ The `RMBE01` Rev 0 release uses:
   `STUBHAXX` marker and before the OS exception/runtime tables;
 - main-loop call site `0x8039A688` (`main.dol+0x33A388`), guarded by original
   instruction `48170c5d`;
-- bridge entry `0x80002A00`, preserving the original call to `0x8050B2E4`;
+- bridge entry `0x80002700`, preserving the original call to `0x8050B2E4`;
 - artifact SHA-256
-  `86f373bc4ec8741bd966b8232702f839206195988a782da93c0f323022cef09d`;
+  `a2689ed5259e1037754996a36a0d221f9ffd42c573291f0b00b6d15fb7443c23`;
 - patched `main.dol` SHA-256
-  `077211c054c8bf977d4f387ad4945a7baeb0aadf2a95d2a132dd4d6e78b472e2`.
+  `84f1355c13489109c2cb7f3491a435ddf2a68304f74786c1e0b35a61908339e8`.
 
-The release builder verifies LLVM 22.1.8, the exact exported symbol addresses
-and sizes, the compiled `.text` hash, the complete retail input hash, and every
-original byte before producing the artifact and plan. The artifact contains
+The release builder verifies the expected entry points and region bounds, the
+complete retail input hash, and every original byte before producing the
+artifact and plan. The artifact manifest records the exact compiler, C source,
+linker script, and output hashes. The artifact contains
 only Starworks code, zero-initialized bridge storage, and DOL metadata; it does
 not contain retail game bytes.
 
@@ -41,11 +42,17 @@ continued the paused CPU, negotiated attempt epoch 1, consumed synthetic event
 sequence 1, and observed heartbeat 121. The game continued through its opening
 sequence after the probe.
 
-The official GDB stub is the first-class transport because it works without
-re-signing Dolphin or attaching to another process. Unix-domain sockets are
-used on macOS/Linux and the built-in TCP port is available on Windows. Dolphin
-Memory Engine remains an optional legacy backend on platforms where its process
-attachment model is supported.
+Dolphin Memory Engine 1.3.1 is the first-class match-runtime transport. Its
+macOS arm64 wheel attached to a runner-managed, DME-enabled copy of stock
+Dolphin 2606, read `RMBE01`, initialized this real bridge, negotiated and
+acknowledged a nonce, consumed synthetic event 1, and observed an advancing
+heartbeat. It avoids the GDB stub's save-state lifecycle and one-shot connection
+limitations and follows the same process-memory approach proven by MSS AutoTeam.
+
+The official GDB stub remains an optional reverse-engineering transport for CPU
+interrupts, registers, and breakpoints. On macOS, DME requires the Dolphin target
+to carry `com.apple.security.get-task-allow`; Starworks creates and signs a local
+managed copy rather than modifying the user's installed Dolphin application.
 
 ## Guarded application
 
@@ -59,7 +66,8 @@ Rebuild the artifact only in a trusted maintainer environment with a lawful
 reviewed DOL:
 
 ```shell
-uv run --project runner python runner/tools/build_sluggers_bridge.py \
+uv run --project runner python runner/scripts/build_sluggers_bridge.py \
   --base-dol /private/path/to/clean/main.dol \
-  --output-root runner/src/starworks_runner/games/sluggers
+  --output runner/src/starworks_runner/games/sluggers/artifacts/bridge-v1-rmbe01.bin \
+  --patch-plan runner/src/starworks_runner/games/sluggers/patches/bridge-v1-rmbe01.json
 ```

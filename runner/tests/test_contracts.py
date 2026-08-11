@@ -45,3 +45,12 @@ def test_generated_schema_rejects_two_home_teams() -> None:
         team["side"] = "home"
     with pytest.raises(ValidationError):
         validate_contract("run-envelope", fixture, CONTRACTS_DIRECTORY)
+
+
+def test_generated_schema_rejects_invalid_semantic_payload() -> None:
+    fixture = load_fixture("telemetry-envelope")
+    fixture["eventType"] = "game-ended"
+    fixture["observationSource"] = "bridge-hook"
+    fixture["payload"] = {"value": 1}
+    with pytest.raises(ValidationError):
+        validate_contract("telemetry-envelope", fixture, CONTRACTS_DIRECTORY)

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import plistlib
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -50,6 +52,44 @@ class DolphinLauncher:
             )
         return output
 
+    def verify_dme_compatible(self) -> None:
+        """Fail early when macOS will deny Dolphin Memory Engine attachment."""
+
+        if sys.platform != "darwin":
+            return
+        try:
+            completed = subprocess.run(
+                [
+                    "codesign",
+                    "-d",
+                    "--entitlements",
+                    ":-",
+                    str(self.executable),
+                ],
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            raise DolphinLaunchError(
+                f"Unable to inspect Dolphin's macOS entitlements: {error}"
+            ) from error
+        try:
+            entitlements = plistlib.loads(completed.stdout)
+        except plistlib.InvalidFileException as error:
+            raise DolphinLaunchError(
+                "Dolphin's macOS entitlements could not be read"
+            ) from error
+        if (
+            completed.returncode != 0
+            or entitlements.get("com.apple.security.get-task-allow") is not True
+        ):
+            raise DolphinLaunchError(
+                "Dolphin Memory Engine requires a runner-managed Dolphin copy "
+                "signed with com.apple.security.get-task-allow; do not modify the "
+                "normal Dolphin installation in place"
+            )
+
     def command_for(
         self,
         build_directory: Path,
@@ -57,6 +97,8 @@ class DolphinLauncher:
         *,
         gdb_socket: Path | None = None,
         gdb_port: int | None = None,
+        save_state: Path | None = None,
+        quiet_output: bool = False,
     ) -> tuple[str, ...]:
         if gdb_socket is not None and gdb_port is not None:
             raise DolphinLaunchError("Choose either a Dolphin GDB socket or TCP port")
@@ -92,6 +134,13 @@ class DolphinLauncher:
         main_dol = game_directory / "sys/main.dol"
         profile = user_directory.expanduser().resolve()
         profile.mkdir(parents=True, exist_ok=True)
+        resolved_save_state: Path | None = None
+        if save_state is not None:
+            resolved_save_state = save_state.expanduser().resolve()
+            if not resolved_save_state.is_file():
+                raise DolphinLaunchError(
+                    f"Dolphin initial save state not found: {resolved_save_state}"
+                )
         command = [
             str(self.executable),
             "--batch",
@@ -107,6 +156,8 @@ class DolphinLauncher:
             )
         elif gdb_port is not None:
             command.extend(("-C", f"Dolphin.General.GDBPort={gdb_port}"))
+        if resolved_save_state is not None:
+            command.extend(("--save_state", str(resolved_save_state)))
         command.extend(
             (
                 "--exec",
@@ -122,6 +173,8 @@ class DolphinLauncher:
         *,
         gdb_socket: Path | None = None,
         gdb_port: int | None = None,
+        save_state: Path | None = None,
+        quiet_output: bool = False,
     ) -> DolphinLaunch:
         self.verify()
         command = self.command_for(
@@ -129,11 +182,15 @@ class DolphinLauncher:
             user_directory,
             gdb_socket=gdb_socket,
             gdb_port=gdb_port,
+            save_state=save_state,
+            quiet_output=quiet_output,
         )
         try:
             process = subprocess.Popen(
                 command,
                 start_new_session=os.name != "nt",
+                stdout=subprocess.DEVNULL if quiet_output else None,
+                stderr=subprocess.DEVNULL if quiet_output else None,
             )
         except OSError as error:
             raise DolphinLaunchError(f"Unable to launch Dolphin: {error}") from error

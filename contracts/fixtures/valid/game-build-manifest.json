@@ -11,6 +11,7 @@
     "fstSha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
   },
   "adapterVersion": "0.1.0",
+  "adapterBuildSha256": "7777777777777777777777777777777777777777777777777777777777777777",
   "compilerVersion": "0.1.0",
   "contentPackSha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
   "buildSha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",

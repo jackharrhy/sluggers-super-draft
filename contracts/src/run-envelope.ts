@@ -21,6 +21,18 @@ const AwayTeamSelectionSchema = TeamSelectionSchema.extend({
   side: z.literal("away"),
 });
 
+export const MatchExecutionSchema = z.strictObject({
+  mode: z.literal("cpu-vs-cpu"),
+  stadium: z.strictObject({
+    gameStadiumId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/),
+    venueId: UuidSchema.nullable(),
+  }),
+  recovery: z.strictObject({
+    allowLiveReattach: z.literal(true),
+    freshAttemptLimit: z.literal(1),
+  }),
+});
+
 export const RunEnvelopeSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
@@ -41,6 +53,7 @@ export const RunEnvelopeSchema = z
       z.tuple([AwayTeamSelectionSchema, HomeTeamSelectionSchema]),
     ]),
     dynamicRuleOverrides: z.record(z.string().min(1), JsonScalarSchema),
+    execution: MatchExecutionSchema,
     lease: z.strictObject({
       leaseId: UuidSchema,
       runnerId: UuidSchema,
@@ -49,7 +62,7 @@ export const RunEnvelopeSchema = z
     issuedAt: TimestampSchema,
   })
   .meta({
-    title: "RunEnvelope v1",
+    title: "RunEnvelope",
     description: "An immutable, leased instruction to execute one match attempt.",
   });
 

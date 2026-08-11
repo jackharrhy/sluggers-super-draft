@@ -167,6 +167,8 @@ describe('critical Starworks browser workflows', () => {
       awayLineupRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       contentPackRevisionId: null,
       dynamicRuleOverrides: {},
+      executionMode: 'cpu-vs-cpu',
+      gameStadiumId: 'mario-stadium',
       homeLineupRevisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
       requiredGameBuildSha256: 'a'.repeat(64),
       rulesetRevisionId: RULESET_ID,
@@ -412,6 +414,7 @@ function operationsDashboard(): RunnerOperationsDashboard {
     }],
     stations: [],
     statProfiles: [{ id: PROFILE_ID, name: 'Competitive stats', revisionNumber: 1 }],
+    venues: [],
   }
 }
 
@@ -513,6 +516,7 @@ function telemetryApplication(
     },
     async dashboard() { return [attempt()] },
     async derive() { return {} as never },
+    async finalizeHealthyAttempt() { throw new Error('Unexpected automatic finalization') },
     async ingest() { return {} as never },
     async rebuildSeason() { return { playerTotals: {}, standings: [] } },
   }

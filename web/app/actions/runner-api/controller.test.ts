@@ -10,6 +10,7 @@ import telemetryUploadFixture from '../../../../contracts/fixtures/valid/telemet
 import type { ConfigurationApplication } from '../../configuration/service.ts'
 import type { DiscordOAuthClient } from '../../platform/discord-oauth.ts'
 import { IdentityService } from '../../platform/identity-service.ts'
+import { PlatformError } from '../../platform/errors.ts'
 import type { PlatformRepository } from '../../platform/repository.ts'
 import type { AppRuntime } from '../../platform/runtime.ts'
 import { PlatformService } from '../../platform/service.ts'
@@ -170,6 +171,83 @@ describe('runner API controller', () => {
     })
   })
 
+  it('health-gates a completed lease through automatic telemetry finalization', async () => {
+    let finalized: unknown
+    let runnerControl = createRunnerControl({
+      async updateLease() {
+        return {
+          attemptStatus: 'provisional',
+          expiresAt: null,
+          kind: 'runner-lease-update-response',
+          schemaVersion: 1,
+        }
+      },
+    })
+    let telemetry: AppRuntime['telemetry'] = {
+      async confirm() { throw new Error('Unexpected manual confirmation') },
+      async correct() { throw new Error('Unexpected correction') },
+      async dashboard() { return [] },
+      async derive() { throw new Error('Unexpected derivation') },
+      async finalizeHealthyAttempt(credential, attemptId) {
+        finalized = { attemptId, credential }
+        return { leagueId: RUNNER_ID, matchId: LEASE_ID, status: 'confirmed' }
+      },
+      async ingest() { throw new Error('Unexpected telemetry upload') },
+      async rebuildSeason() { return { playerTotals: {}, standings: [] } },
+    }
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createRuntime(runnerControl, telemetry),
+    })
+    let response = await router.fetch(new Request(
+      'http://localhost' + routes.runnerApi.updateLease.href({ leaseId: LEASE_ID }),
+      {
+        body: JSON.stringify({
+          action: 'complete',
+          attemptId: ATTEMPT_ID,
+          failureKind: null,
+          kind: 'runner-lease-update-request',
+          leaseId: LEASE_ID,
+          observedAt: '2026-08-10T12:00:00Z',
+          runnerId: RUNNER_ID,
+          schemaVersion: 1,
+        }),
+        headers: {
+          authorization: 'Bearer runner-secret',
+          'content-type': 'application/json',
+        },
+        method: 'POST',
+      },
+    ))
+
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).attemptStatus, 'confirmed')
+    assert.deepEqual(finalized, { attemptId: ATTEMPT_ID, credential: 'runner-secret' })
+  })
+
+  it('returns a structured conflict when a legacy attempt configuration is invalid', async () => {
+    let router = createAppRouter({
+      logging: { sink: () => {} },
+      runtime: createRuntime(createRunnerControl({
+        async configuration() {
+          throw new PlatformError('Published attempt configuration is invalid', 'conflict')
+        },
+      })),
+    })
+    let response = await router.fetch(new Request(
+      'http://localhost' + routes.runnerApi.configuration.href({ attemptId: ATTEMPT_ID }),
+      { headers: { authorization: 'Bearer runner-secret' } },
+    ))
+
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), {
+      error: {
+        code: 'conflict',
+        message: 'Published attempt configuration is invalid',
+      },
+    })
+  })
+
   it('streams an attempt-scoped user asset without a JSON wrapper', async () => {
     let bytes = new Uint8Array([0x89, 0x50, 0x4e, 0x47])
     let received: unknown
@@ -216,6 +294,7 @@ describe('runner API controller', () => {
       async derive() { throw new Error('Unexpected derive') },
       async correct() { throw new Error('Unexpected correction') },
       async confirm() { throw new Error('Unexpected confirmation') },
+      async finalizeHealthyAttempt() { throw new Error('Unexpected automatic finalization') },
       async rebuildSeason() { return { playerTotals: {}, standings: [] } },
     }
     let router = createAppRouter({

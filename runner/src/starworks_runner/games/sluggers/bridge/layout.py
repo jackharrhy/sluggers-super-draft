@@ -11,13 +11,15 @@ MAGIC = b"SWB1"
 PROTOCOL_VERSION = 1
 BRIDGE_BASE_ADDRESS = 0x80001900
 BRIDGE_REGION_SIZE = 0x1700
+BRIDGE_ENTRY_ADDRESS = 0x80002700
+BRIDGE_ENTRY_SIGNATURE = bytes.fromhex("9421fff0")
 CONTROL_BLOCK_SIZE = 0x100
-EVENT_SIZE = 0x40
-EVENT_CAPACITY = 64
+EVENT_SIZE = 0x50
+EVENT_CAPACITY = 32
 EVENT_RING_OFFSET = CONTROL_BLOCK_SIZE
 
 CONTROL_STRUCT = struct.Struct(">4sHHII32s32s32sQQQIHHIIQQ88x")
-EVENT_STRUCT = struct.Struct(">QQ32sHHIQ")
+EVENT_STRUCT = struct.Struct(">QQ32sHHIQQQ")
 
 ATTEMPT_NONCE_OFFSET = 0x50
 PRODUCER_SEQUENCE_OFFSET = 0x78
@@ -40,6 +42,14 @@ class BridgeState(IntEnum):
 
 class EventType(IntEnum):
     SYNTHETIC = 1
+    GAME_STARTED = 2
+    INNING_STARTED = 3
+    BATTER_CHANGED = 4
+    PITCHER_CHANGED = 5
+    PLATE_APPEARANCE_ENDED = 6
+    SUBSTITUTION = 7
+    GAME_ENDED = 8
+    BRIDGE_WARNING = 9
 
 
 def digest_from_hex(value: str, field_name: str) -> bytes:
@@ -207,6 +217,9 @@ class BridgeEvent:
     event_type: EventType
     flags: int
     payload_value: int
+    payload_aux1: int = 0
+    payload_aux2: int = 0
+    payload_size: int = 8
 
     @classmethod
     def unpack(cls, value: bytes) -> BridgeEvent:
@@ -214,10 +227,10 @@ class BridgeEvent:
             raise BridgeProtocolError(
                 f"Bridge event must be {EVENT_SIZE} bytes, got {len(value)}"
             )
-        sequence, frame, nonce, event_type, payload_size, flags, payload = (
+        sequence, frame, nonce, event_type, payload_size, flags, *payload = (
             EVENT_STRUCT.unpack(value)
         )
-        if payload_size != 8:
+        if not 0 <= payload_size <= 24:
             raise BridgeProtocolError(
                 f"Unsupported bridge event payload size {payload_size}"
             )
@@ -227,19 +240,66 @@ class BridgeEvent:
             raise BridgeProtocolError(
                 f"Unknown bridge event type {event_type}"
             ) from error
-        return cls(sequence, frame, nonce, typed_event, flags, payload)
+        return cls(
+            sequence,
+            frame,
+            nonce,
+            typed_event,
+            flags,
+            payload[0],
+            payload[1],
+            payload[2],
+            payload_size,
+        )
+
+    @property
+    def payload_bytes(self) -> bytes:
+        return struct.pack(
+            ">QQQ", self.payload_value, self.payload_aux1, self.payload_aux2
+        )[: self.payload_size]
 
     def pack(self) -> bytes:
         if len(self.attempt_nonce_digest) != 32:
             raise BridgeProtocolError("Event attempt nonce digest must be 32 bytes")
+        if not 0 <= self.payload_size <= 24:
+            raise BridgeProtocolError("Event payload must contain at most 24 bytes")
         return EVENT_STRUCT.pack(
             self.sequence,
             self.frame,
             self.attempt_nonce_digest,
             int(self.event_type),
-            8,
+            self.payload_size,
             self.flags,
             self.payload_value,
+            self.payload_aux1,
+            self.payload_aux2,
+        )
+
+    @classmethod
+    def with_payload(
+        cls,
+        *,
+        sequence: int,
+        frame: int,
+        attempt_nonce_digest: bytes,
+        event_type: EventType,
+        flags: int,
+        payload: bytes,
+    ) -> BridgeEvent:
+        if len(payload) > 24:
+            raise BridgeProtocolError("Event payload must contain at most 24 bytes")
+        padded = payload.ljust(24, b"\0")
+        words = struct.unpack(">QQQ", padded)
+        return cls(
+            sequence=sequence,
+            frame=frame,
+            attempt_nonce_digest=attempt_nonce_digest,
+            event_type=event_type,
+            flags=flags,
+            payload_value=words[0],
+            payload_aux1=words[1],
+            payload_aux2=words[2],
+            payload_size=len(payload),
         )
 
 

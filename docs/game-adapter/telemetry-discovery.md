@@ -40,10 +40,43 @@ Its workbook derives these output families:
 | Sluggers actions | star, buddy-jump, bobble, steal, pickoff flags | action resolution functions for later event extensions |
 
 Every catalogue entry remains `candidate` until a supported build fingerprint,
-function boundary, structure layout, and reproducible fixture establish it. A
-bridge hook is preferred over snapshots. Read-only memory observations are
-allowed during discovery only when envelopes use `memory-observation`; that
-provenance blocks automatic finalization.
+structure layout, trace, and reproducible fixture establish it. Read-only DME
+snapshots are the preferred v0 boundary because the existing tools already
+prove that model and it keeps the implementation in ordinary Python. A game
+hook is justified only for a concrete value that cannot be observed reliably.
+`memory-observation` provenance still blocks automatic finalization until the
+complete reducer and fault matrix are accepted.
+
+## Live DME slice
+
+The current reader takes four contiguous read-only snapshots for gameplay,
+batter, pitcher, and frame timer state. On exact `RMBE01` in Dolphin 2606 it has
+live-observed:
+
+- game start and the `0x01`/`0x02`/`0x03` gameplay transitions;
+- inning and top/bottom changes;
+- current batter and pitcher changes;
+- cumulative team scores and hits; and
+- the stable result states used for one final `game-ended` event.
+
+The first complete adapter-owned trace covered seven innings, finished 4–11 in
+1,153.9 seconds, and emitted 96 ordered events through `game-ended`. It remains
+ineligible for result acceptance because the independently read game formation
+did not match the scheduled batting order and fielding positions.
+
+Two trace findings constrain the reducer:
+
+- replay/load boundaries temporarily expose lower scoreboard values, so
+  cumulative runs and hits are monotonic-clamped within one attempt; and
+- `LOAD_NEXT_BATTER` does not necessarily complete a plate appearance—a runner
+  can be retired while the same batter remains. The safe commit boundary is a
+  real batter change after accumulating count, hit/landing, bases-advanced,
+  score/hit deltas, and outs for the prior batter.
+
+Walk, strikeout, hit-by-pitch, home run, ordinary hit, and ordinary out can be
+researched from those fields. Error, sacrifice, RBI, and scorer attribution
+remain unavailable until the trace supplies unambiguous evidence; Starworks
+will not collapse them into a guessed result.
 
 ## Semantic event boundary
 
@@ -59,5 +92,7 @@ The first stable stream is intentionally smaller than the legacy workbook:
 
 `plate-appearance-ended` carries the resolved outcome, scorers, RBI, and outs,
 so the server can deterministically derive the core box score. More granular
-pitch, fielding, running, and Sluggers-specific events can be added in a later
-protocol version after their hook boundaries are proven.
+pitch, fielding, running, and Sluggers-specific events will be added to the
+single pre-release contract after their hook boundaries are proven. The
+exhaustive field status is maintained in
+[the tracker parity ledger](./tracker-parity-ledger.md).

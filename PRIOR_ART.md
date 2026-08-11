@@ -66,6 +66,8 @@ Starworks adopts Rio's strongest patterns—game-side instrumentation, explicit 
 | [Hoitemmie Sluggers-Decomp](https://github.com/Hoitemmie-wii/Sluggers-Decomp) | A second public Sluggers decomp/modding starting point; currently close to an unconfigured template. | CC0-1.0. Coordinate before duplicating future work. |
 | [Sluggers Stat Upgrades](https://github.com/JohnKircher/SluggersStatUpgrades) | Browser stat editor, character data, constraints, and generated ASM/Gecko-oriented output. | Apache-2.0. |
 | [Super Sluggers Online](https://github.com/RealClayton/supersluggers-online) | Experimental physical-Wiimote/netplay, proxy, Dolphin-extension, launch, relay, and desync-detection ideas. | No license declared despite README claims observed during research; reference/collaboration candidate pending an actual license file/grant. |
+| [Mario Super Sluggers Archipelago world](https://github.com/MarioManTAW/Archipelago/tree/sluggers/worlds/mario_super_sluggers) | Active Challenge Mode randomizer and long-lived DME client. It demonstrates a thin host-generated patch package, local user-owned-image materialization, persistent item cursors, game/patch identity checks, and a deliberate move from broad runtime patching to build-time mutation for stability. Its removed buggy direct auto-team write is especially relevant evidence for Starworks' acknowledged game-side lineup hook. | The `sluggers` branch is covered by the Archipelago repository's MIT license; preserve MarioManTAW attribution and independently verify every game address against Starworks' exact base. |
+| [MSS AP Patcher](https://github.com/MarioManTAW/mss-ap-patcher) | Companion local materializer for the Archipelago world's `.apmss` JSON package. It patches extracted `main.dol`, `dt_na.dat`, and disc-header data before rebuilding a WBFS, and provides address leads for stats, music, Challenge Mode flags, text, and puzzles. | No license declared. Treat implementation as reference/collaboration material only; do not copy it into Starworks without permission. Bundled WIT/Cygwin binaries also require their own provenance review. |
 | [Gecko Archive RMBE01 codes](https://github.com/SpaceXCheeseWheel/GeckoArchive/blob/master/codes/RMBE01.txt) | Historical public Gecko codes and known `RMBE01` addresses. | Repository-specific/unclear; use as address provenance and validate every code against supported builds. |
 
 ## GameCube/Wii decompilation toolchain and examples
@@ -95,15 +97,14 @@ The matching decomp is an upstream research program. Starworks consumes reviewed
 | --- | --- | --- |
 | [Dolphin Emulator](https://github.com/dolphin-emu/dolphin) | Wii emulation, extracted-filesystem boot, profiles, controller configuration, capture surface, and the possible future fork base. | GPL-2.0-or-later. |
 | [Dolphin Memory Engine](https://github.com/aldelaro5/Dolphin-memory-engine) | Cross-platform Dolphin process/memory access lineage used by several community tools. | MIT. |
-| [Python Dolphin Memory Engine](https://github.com/henriquegemignani/py-dolphin-memory-engine) | Optional Python process-attachment backend. The v1.3.1 package is retained only as a legacy Windows/Linux extra; it could not attach to stock Dolphin 2606 on macOS without changing application signing. | MIT. |
+| [Python Dolphin Memory Engine](https://github.com/randovania/py-dolphin-memory-engine) | Primary Python runtime-memory transport. Version 1.3.1 publishes macOS arm64 and x86-64 wheels and has been live-proven against a runner-managed, DME-enabled copy of stock Dolphin 2606. | MIT. On macOS the managed Dolphin target needs a debugger-compatible signature; Starworks does not alter the user's installed application. |
 | [Dolphin Emulator website](https://dolphin-emu.org/) | Releases, documentation, and supported emulator behavior. | Project documentation/release terms. |
 
 A pinned stock Dolphin is the initial runtime. A future fork stays a separately governed GPL component and requires a measured decision gate.
 
-Stock Dolphin 2606's built-in GDB remote stub is Starworks' primary transport:
-Unix-domain sockets on macOS/Linux and TCP on Windows. This is a documented
-Dolphin facility and avoids platform-specific process attachment or re-signing
-the emulator.
+Dolphin Memory Engine 1.3.1 is Starworks' primary match-runtime transport behind
+the adapter boundary. Stock Dolphin 2606's GDB remote stub remains optional
+reverse-engineering tooling for registers, breakpoints, and paused CPU work.
 
 | Tool | Relevance to Starworks | License/status observed |
 | --- | --- | --- |

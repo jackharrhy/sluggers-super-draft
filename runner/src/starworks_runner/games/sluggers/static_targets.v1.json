@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "sluggers-static-target-catalog",
-  "adapterVersion": "0.2.0",
+  "adapterVersion": "0.3.3",
   "target": {
     "gameId": "RMBE01",
     "region": "NTSC-U",
@@ -9,5 +9,177 @@
   },
   "valueTargets": [],
   "assetTargets": [],
-  "provisioningNote": "The lawful RMBE01 base is reviewed, but production stat and asset offsets still require independent mapping and exact-byte validation. The bridge release does not guess these targets; synthetic catalogs exercise the compiler without distributing game data."
+  "profileGuards": [
+    {
+      "id": "character-records",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 7121575,
+      "virtualAddress": "0x806CE9A7",
+      "sizeBytes": 14342,
+      "expectedSha256": "c8ac150fbdcd8d80735b494d29b1091e48633558a28fdc31df64961502af1742",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "trajectory-tables",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6434696,
+      "virtualAddress": "0x80626E88",
+      "sizeBytes": 600,
+      "expectedSha256": "762b8badfd7a4cb8ff44cca3eafe952765d6ee81fdb320c8bc5fbad4c1bc5c39",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "fielding-speed",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6429080,
+      "virtualAddress": "0x80625898",
+      "sizeBytes": 172,
+      "expectedSha256": "a860bc5233032cc0e2b279cca8cfc01428dfde66c469babfc2fc7a51d80a99cf",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "baserunning-speed",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6431496,
+      "virtualAddress": "0x80626208",
+      "sizeBytes": 172,
+      "expectedSha256": "d40dceccc2c28dd442a0354b7ae7e2ab391ec8bca6668714a609afeb3193be82",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "pitching-windup",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6440192,
+      "virtualAddress": "0x80628400",
+      "sizeBytes": 1212,
+      "expectedSha256": "fc652237f724450129ed21ee21b578fba027ad810897f9184109dd1e33413717",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "star-pitch-type",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6441404,
+      "virtualAddress": "0x806288BC",
+      "sizeBytes": 101,
+      "expectedSha256": "23c3cc59263a99fd6e6290f785ac79f07e80ae1c53fd916d24e633a842934b71",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "stamina",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6441508,
+      "virtualAddress": "0x80628924",
+      "sizeBytes": 202,
+      "expectedSha256": "ddce8b6bb6aa33694c994dc7a56f7448527d3c61fd61b6e3e11fa96750d1aa4e",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "changeup",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6442928,
+      "virtualAddress": "0x80628EB0",
+      "sizeBytes": 808,
+      "expectedSha256": "56aa2aece2f01efc5ca1f0759df94c3b6cb04d4ffe78bec5b26a30c29819a1c6",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "character-trajectory",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6447708,
+      "virtualAddress": "0x8062A15C",
+      "sizeBytes": 202,
+      "expectedSha256": "4019666fe51710bc55ddeda0fb2cb05ca13d9c1bf84b03f16152ee6b318456db",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "catch-ranges",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6449032,
+      "virtualAddress": "0x8062A688",
+      "sizeBytes": 4040,
+      "expectedSha256": "07cd6bdb3367e7bc69ade772e86c4e16a9d134c964052d10de5c9143193c6ac9",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "hitboxes",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6454024,
+      "virtualAddress": "0x8062BA08",
+      "sizeBytes": 808,
+      "expectedSha256": "307e6fc06843c4274dd7226ce2c305a59f568c4ee0c3dceea5dfa7eca551778b",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "team-stars",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6454864,
+      "virtualAddress": "0x8062BD50",
+      "sizeBytes": 984,
+      "expectedSha256": "349fc1ccb59a523454b2486cd6a22d4bf96457c79602f6d5bafe834454814db5",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "star-handicap",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6455848,
+      "virtualAddress": "0x8062C128",
+      "sizeBytes": 32,
+      "expectedSha256": "a78ce716dfb068a8b793d6752fd5bd57fae7014571e8553b3352bfd2462c56cf",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "size-scales",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6466640,
+      "virtualAddress": "0x8062EB50",
+      "sizeBytes": 808,
+      "expectedSha256": "bc4ae73cc7142ea3429952649d46228a4213121789164ea61297bb934ea1527d",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "star-boosts",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 6478296,
+      "virtualAddress": "0x806318D8",
+      "sizeBytes": 192,
+      "expectedSha256": "d7e1d49199df9b5a370a6a0eb087e72a9e9b27cca6eab7acfd7023f1e7b061b7",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    },
+    {
+      "id": "handicap-parameter-instructions",
+      "targetPath": "sys/main.dol",
+      "targetOffset": 1181164,
+      "virtualAddress": "0x801808EC",
+      "sizeBytes": 164,
+      "expectedSha256": "4908351852db6baa42757db0a0c8581d138966ea49ace4e0ebe46c3eb301b0aa",
+      "supportedInputSha256": ["3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"]
+    }
+  ],
+  "profilePatterns": [
+    {"id":"character-stats-u8","guardId":"character-records","source":"character-stats","sourceRowStart":0,"sourceColumnStart":0,"rows":101,"columns":10,"targetOffset":7121578,"virtualAddress":"0x806CE9AA","rowStride":142,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"character-stats-u16-primary","guardId":"character-records","source":"character-stats","sourceRowStart":0,"sourceColumnStart":10,"rows":101,"columns":8,"targetOffset":7121588,"virtualAddress":"0x806CE9B4","rowStride":142,"columnStride":2,"codec":"u16-be","activationRowsPerEntry":null},
+    {"id":"character-stats-display-u8","guardId":"character-records","source":"character-stats","sourceRowStart":0,"sourceColumnStart":18,"rows":101,"columns":4,"targetOffset":7121604,"virtualAddress":"0x806CE9C4","rowStride":142,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"character-stats-u16-pitching","guardId":"character-records","source":"character-stats","sourceRowStart":0,"sourceColumnStart":22,"rows":101,"columns":4,"targetOffset":7121608,"virtualAddress":"0x806CE9C8","rowStride":142,"columnStride":2,"codec":"u16-be","activationRowsPerEntry":null},
+    {"id":"chemistry","guardId":"character-records","source":"chemistry","sourceRowStart":0,"sourceColumnStart":0,"rows":101,"columns":101,"targetOffset":7121616,"virtualAddress":"0x806CE9D0","rowStride":142,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"trajectory-tables","guardId":"trajectory-tables","source":"trajectory-tables","sourceRowStart":0,"sourceColumnStart":0,"rows":24,"columns":25,"targetOffset":6434696,"virtualAddress":"0x80626E88","rowStride":25,"columnStride":1,"codec":"u8","activationRowsPerEntry":4},
+    {"id":"fielding-speed","guardId":"fielding-speed","source":"global-speed-curves","sourceRowStart":0,"sourceColumnStart":1,"rows":43,"columns":1,"targetOffset":6429080,"virtualAddress":"0x80625898","rowStride":4,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"baserunning-speed","guardId":"baserunning-speed","source":"global-speed-curves","sourceRowStart":0,"sourceColumnStart":0,"rows":43,"columns":1,"targetOffset":6431496,"virtualAddress":"0x80626208","rowStride":4,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"pitching-windup","guardId":"pitching-windup","source":"pitching","sourceRowStart":0,"sourceColumnStart":0,"rows":101,"columns":3,"targetOffset":6440192,"virtualAddress":"0x80628400","rowStride":12,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"star-pitch-type","guardId":"star-pitch-type","source":"character-stats","sourceRowStart":0,"sourceColumnStart":29,"rows":101,"columns":1,"targetOffset":6441404,"virtualAddress":"0x806288BC","rowStride":1,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"stamina","guardId":"stamina","source":"character-stats","sourceRowStart":0,"sourceColumnStart":28,"rows":101,"columns":1,"targetOffset":6441508,"virtualAddress":"0x80628924","rowStride":2,"columnStride":2,"codec":"u16-be","activationRowsPerEntry":null},
+    {"id":"changeup","guardId":"changeup","source":"pitching","sourceRowStart":0,"sourceColumnStart":3,"rows":101,"columns":2,"targetOffset":6442928,"virtualAddress":"0x80628EB0","rowStride":8,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"character-trajectory","guardId":"character-trajectory","source":"character-stats","sourceRowStart":0,"sourceColumnStart":26,"rows":101,"columns":2,"targetOffset":6447708,"virtualAddress":"0x8062A15C","rowStride":2,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"catch-ranges","guardId":"catch-ranges","source":"character-sizes","sourceRowStart":0,"sourceColumnStart":2,"rows":101,"columns":10,"targetOffset":6449032,"virtualAddress":"0x8062A688","rowStride":40,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"hitboxes","guardId":"hitboxes","source":"character-sizes","sourceRowStart":0,"sourceColumnStart":12,"rows":101,"columns":2,"targetOffset":6454024,"virtualAddress":"0x8062BA08","rowStride":8,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"team-stars","guardId":"team-stars","source":"team-star-events","sourceRowStart":0,"sourceColumnStart":0,"rows":12,"columns":41,"targetOffset":6454864,"virtualAddress":"0x8062BD50","rowStride":82,"columnStride":2,"codec":"s16-be","activationRowsPerEntry":null},
+    {"id":"star-handicap","guardId":"star-handicap","source":"star-handicaps","sourceRowStart":0,"sourceColumnStart":0,"rows":4,"columns":2,"targetOffset":6455848,"virtualAddress":"0x8062C128","rowStride":8,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"size-scales","guardId":"size-scales","source":"character-sizes","sourceRowStart":0,"sourceColumnStart":0,"rows":101,"columns":2,"targetOffset":6466640,"virtualAddress":"0x8062EB50","rowStride":8,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"star-boost-operation","guardId":"star-boosts","source":"star-boosts","sourceRowStart":0,"sourceColumnStart":0,"rows":16,"columns":1,"targetOffset":6478296,"virtualAddress":"0x806318D8","rowStride":12,"columnStride":4,"codec":"u32-be","activationRowsPerEntry":null},
+    {"id":"star-boost-amount","guardId":"star-boosts","source":"star-boosts","sourceRowStart":0,"sourceColumnStart":1,"rows":16,"columns":1,"targetOffset":6478300,"virtualAddress":"0x806318DC","rowStride":12,"columnStride":4,"codec":"f32-be","activationRowsPerEntry":null},
+    {"id":"star-boost-bounds","guardId":"star-boosts","source":"star-boosts","sourceRowStart":0,"sourceColumnStart":2,"rows":16,"columns":2,"targetOffset":6478304,"virtualAddress":"0x806318E0","rowStride":12,"columnStride":2,"codec":"u16-be","activationRowsPerEntry":null},
+    {"id":"handicap-parameter-operation","guardId":"handicap-parameter-instructions","source":"handicap-parameters","sourceRowStart":0,"sourceColumnStart":0,"rows":2,"columns":1,"targetOffset":1181167,"virtualAddress":"0x801808EF","rowStride":136,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"handicap-parameter-threshold","guardId":"handicap-parameter-instructions","source":"handicap-parameters","sourceRowStart":0,"sourceColumnStart":1,"rows":2,"columns":1,"targetOffset":1181179,"virtualAddress":"0x801808FB","rowStride":136,"columnStride":1,"codec":"u8","activationRowsPerEntry":null},
+    {"id":"handicap-parameter-award","guardId":"handicap-parameter-instructions","source":"handicap-parameters","sourceRowStart":0,"sourceColumnStart":2,"rows":2,"columns":1,"targetOffset":1181187,"virtualAddress":"0x80180903","rowStride":136,"columnStride":1,"codec":"u8","activationRowsPerEntry":null}
+  ],
+  "provisioningNote": "Profile patterns are independently checked against the exact Redump-matched RMBE01 Rev 0 DOL. Trajectory names are authoring metadata. Asset replacements and non-v4 scalar targets remain unprovisioned."
 }
