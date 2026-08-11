@@ -21,6 +21,10 @@ import {
   type DiscordOAuthClient,
 } from './discord-oauth.ts'
 import { IdentityService } from './identity-service.ts'
+import {
+  readLocalDemoLoginConfiguration,
+  type LocalDemoLoginConfiguration,
+} from './local-demo-login.ts'
 import { PlatformService } from './service.ts'
 
 export interface AppRuntime {
@@ -30,6 +34,7 @@ export interface AppRuntime {
   draft: DraftApplication
   identity: IdentityService
   leagueOperations: LeagueOperationsApplication
+  localDemoLogin?: LocalDemoLoginConfiguration | null
   notifications?: NotificationApplication
   oauthCookie: Cookie
   operations: OperationsApplication
@@ -69,6 +74,7 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
     draft: new DraftService(connection.database),
     identity: new IdentityService(repository, discord),
     leagueOperations: new LeagueOperationsService(connection.database),
+    localDemoLogin: readLocalDemoLoginConfiguration(process.env),
     notifications: new NotificationService(
       connection.database,
       createDiscordNotificationClient(process.env),

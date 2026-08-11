@@ -6,7 +6,7 @@ The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, 
 
 ## Current state
 
-**Last verified:** 2026-08-10 on `codex/starworks-platform`
+**Last verified:** 2026-08-11 on `codex/starworks-platform`
 
 Starworks has a substantial platform and runner foundation, but it is not yet a
 playable alpha. Status claims use three separate meanings:
@@ -19,7 +19,7 @@ playable alpha. Status claims use three separate meanings:
 | Area | Status | Next gate |
 | --- | --- | --- |
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, and schedules | Implemented | End-to-end alpha workflow |
-| Runner registration, leases, attempts, build verification, and local event spool | Implemented | Real scheduled-match recovery exercise |
+| Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, classified failure, and one fresh retry are live proven | Reconcile the reviewed checkpoint package, expose exact local failure detail, and complete a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
 | Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat after scheduled formation passes game-owned read-back |
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Partial live proof | Rules/stadium/captains, both roster sets, and CPU activation are live; game-owned read-back disproved the current batting-order/fielding receipt |
@@ -57,6 +57,22 @@ appear as unavailable rather than zero.
    ledger.
 3. Pass the clean-station happy path, network outage, reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
+
+### Latest acceptance evidence
+
+On 2026-08-11, the local-only Mushroom League fixture exercised the real Remix,
+PostgreSQL, and Python runner path. The native station registered, claimed the
+queued immutable attempt, fetched its configuration, reported a classified
+`build-failure`, and the server queued exactly one fresh attempt. The station did
+not launch Dolphin because the checkpoint package failed its integrity gate: the
+manifest records seed-profile SHA-256 `2d7ddf…`, while the packaged immutable
+profile currently hashes to `5cb34a…`. Attempt 2 remains queued and must not be
+consumed until that mismatch is reviewed.
+
+The exercise also exposed an operator-diagnostics gap: the CLI printed only the
+classified `failed` result, while the exact checkpoint error required a separate
+local probe. The Qt/CLI station should surface the persisted actionable failure
+detail before clean-station acceptance can pass.
 
 ## Product principles
 

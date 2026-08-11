@@ -199,6 +199,32 @@ describe('root controller', () => {
     assert.match(html, /one-time-invitation/)
     assert.match(html, /Private by default/)
   })
+
+  it('logs into an explicitly enabled loopback-only demo session', async () => {
+    let runtime = createTestRuntime({ identity: siteAdminIdentity() })
+    runtime.localDemoLogin = {
+      leagueSlug: 'mushroom-league',
+      sessionToken: 'local-demo-session-token-0123456789',
+    }
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+
+    let response = await router.fetch(
+      new Request('http://127.0.0.1' + routes.auth.localDemo.href()),
+    )
+    assert.equal(response.status, 302)
+    assert.equal(
+      response.headers.get('location'),
+      routes.leagues.operations.dashboard.href({ leagueSlug: 'mushroom-league' }),
+    )
+    let localCookie = response.headers.get('set-cookie') ?? ''
+    assert.match(localCookie, /test_session=/)
+    assert.doesNotMatch(localCookie, /; Secure/i)
+
+    let external = await router.fetch(
+      new Request('https://starworks.example' + routes.auth.localDemo.href()),
+    )
+    assert.equal(external.status, 404)
+  })
 })
 
 function createTestRuntime(

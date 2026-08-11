@@ -6,6 +6,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "node --import remix/node-tsx scripts/migrate.ts",
     "db:bootstrap-admin": "node --import remix/node-tsx scripts/bootstrap-site-admin.ts",
+    "demo:seed": "node --import remix/node-tsx scripts/seed-local-demo.ts",
     "import:legacy": "node --import remix/node-tsx scripts/import-legacy-super-draft.ts",
     "dev": "NODE_ENV=development node --watch --import remix/node-tsx server.ts",
     "start": "NODE_ENV=production node --import remix/node-tsx server.ts",

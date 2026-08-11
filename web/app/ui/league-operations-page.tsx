@@ -133,7 +133,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
                   <span mix={statusStyle}>{match.attempts.length} attempt{match.attempts.length === 1 ? '' : 's'}</span>
                 </div>
                 {match.attempts.length ? <ol mix={attemptListStyle}>{match.attempts.map((attempt) => (
-                  <li>#{attempt.attemptNumber} · {attempt.status}{attempt.failureKind ? ` · ${attempt.failureKind}` : ''}</li>
+                  <li>#{attempt.attemptNumber} · {attempt.status}{attempt.failureKind ? ` · ${attempt.failureKind}` : ''} · build <code>{attempt.requiredGameBuildSha256.slice(0, 12)}</code></li>
                 ))}</ol> : null}
                 <form action={routes.leagues.operations.queueAttempt.href({ leagueSlug: league.slug, matchId: match.id })} method="post" mix={queueFormStyle}>
                   <label>Home lineup<select name="homeLineupRevisionId" required mix={inputStyle}>
@@ -153,7 +153,7 @@ export function LeagueOperationsPage(handle: Handle<LeagueOperationsPageProps>) 
                     {dashboard.contentPacks.map((pack) => <option value={pack.id}>{pack.name} · revision {pack.revisionNumber}</option>)}
                   </select></label>
                   <label>Game stadium<input name="gameStadiumId" required defaultValue="mario-stadium" pattern="[a-z0-9][a-z0-9-]{0,63}" mix={inputStyle} /></label>
-                  <label mix={wideStyle}>Required game-build SHA-256<input name="requiredGameBuildSha256" required pattern="[a-f0-9]{64}" placeholder="64 lowercase hexadecimal characters" mix={inputStyle} /></label>
+                  <label mix={wideStyle}>Required game-build SHA-256<input name="requiredGameBuildSha256" required pattern="[a-f0-9]{64}" defaultValue={match.attempts.at(-1)?.requiredGameBuildSha256} placeholder="64 lowercase hexadecimal characters" mix={inputStyle} /></label>
                   <label mix={wideStyle}>Dynamic rule overrides<textarea name="dynamicRuleOverrides" rows={3} defaultValue="{}" mix={inputStyle} /></label>
                   <button type="submit" mix={buttonStyle}>Queue immutable attempt</button>
                 </form>

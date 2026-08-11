@@ -4,11 +4,13 @@ import type { RemixNode } from 'remix/ui'
 
 import {
   IdentityServiceContext,
+  LocalDemoLogin,
   OAuthCookie,
   Platform,
   SessionCookie,
 } from '../../middleware/platform.ts'
 import { PlatformError } from '../../platform/errors.ts'
+import { isLoopbackHostname } from '../../platform/local-demo-login.ts'
 import { routes } from '../../routes.ts'
 import { MessagePage } from '../../ui/message-page.tsx'
 
@@ -54,6 +56,38 @@ export default createController(routes.auth, {
           'set-cookie': await oauthCookie.serialize('', { maxAge: 0 }),
         })
       }
+    },
+    async localDemo(context) {
+      let configuration = context.get(LocalDemoLogin)
+      if (!configuration || !isLoopbackHostname(context.url.hostname)) {
+        return new Response('Not Found', { status: 404 })
+      }
+      let identity = await context.get(Platform).resolveSession(configuration.sessionToken)
+      if (!identity) {
+        return context.render(
+          <MessagePage
+            heading="Local demo needs reseeding"
+            message="Run npm run demo:seed and restart the local web service with .starworks/demo.env."
+          />,
+          { status: 503 },
+        )
+      }
+      let sessionCookie = context.get(SessionCookie)
+      return redirect(
+        routes.leagues.operations.dashboard.href({
+          leagueSlug: configuration.leagueSlug,
+        }),
+        {
+          headers: {
+            // The demo is deliberately limited to loopback, where local Compose is
+            // served over plain HTTP even though the container uses NODE_ENV=production.
+            'set-cookie': await sessionCookie.serialize(configuration.sessionToken, {
+              secure: false,
+            }),
+          },
+          status: 302,
+        },
+      )
     },
     async logout(context) {
       let sessionCookie = context.get(SessionCookie)

@@ -94,7 +94,13 @@ export interface RunnerOperationsDashboard {
     awayTeamName: string
     homeTeamId: string
     awayTeamId: string
-    attempts: Array<{ id: string; attemptNumber: number; status: string; failureKind: string | null }>
+    attempts: Array<{
+      id: string
+      attemptNumber: number
+      status: string
+      failureKind: string | null
+      requiredGameBuildSha256: string
+    }>
   }>
   stations: Array<{
     id: string
@@ -144,7 +150,14 @@ export class RunnerAdminService {
       this.database.select({ id: contentPackRevisions.id, name: contentPacks.name, revisionNumber: contentPackRevisions.revisionNumber, rulesetRevisionId: contentPackRevisions.rulesetRevisionId, statProfileRevisionId: contentPackRevisions.statProfileRevisionId }).from(contentPackRevisions).innerJoin(contentPacks, and(eq(contentPacks.leagueId, contentPackRevisions.leagueId), eq(contentPacks.id, contentPackRevisions.contentPackId))).where(and(eq(contentPackRevisions.leagueId, leagueId), eq(contentPackRevisions.status, 'published'))),
       this.database.select({ gameVenueId: venues.gameVenueId, id: venues.id, name: venues.name }).from(venues).where(eq(venues.leagueId, leagueId)),
       this.database.select().from(matches).where(eq(matches.leagueId, leagueId)),
-      this.database.select({ attemptNumber: matchAttempts.attemptNumber, failureKind: matchAttempts.failureKind, id: matchAttempts.id, matchId: matchAttempts.matchId, status: matchAttempts.status }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
+      this.database.select({
+        attemptNumber: matchAttempts.attemptNumber,
+        failureKind: matchAttempts.failureKind,
+        id: matchAttempts.id,
+        matchId: matchAttempts.matchId,
+        requiredGameBuildSha256: matchAttempts.requiredGameBuildSha256,
+        status: matchAttempts.status,
+      }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
       this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
       this.database
         .select({
