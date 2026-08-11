@@ -59,6 +59,30 @@ Rev 0 fingerprints produced from a lawfully dumped exact match. Unknown or
 modified bases remain a hard failure; update the registry only through the same
 review process.
 
+The production station loop records every claimed attempt locally while it
+runs Dolphin. Recordings default to an `artifacts/` directory beside the runner
+state database; an existing attempt recording is never overwritten. A custom
+directory and native capture inputs can be selected explicitly:
+
+```shell
+starworks-runner run-sluggers-station \
+  --cache /path/to/cache \
+  --image /path/to/RMBE01.iso \
+  --dolphin /path/to/runner-managed/Dolphin \
+  --profile /path/to/seed-profile \
+  --recordings /path/to/local-artifacts
+```
+
+The station uses Dolphin Memory Engine by default. The optional GDB flags are
+for reverse-engineering diagnostics, not normal match execution. On macOS, the
+selected runner-managed Dolphin copy must be signed with
+`com.apple.security.get-task-allow`; Starworks does not alter the user's normal
+Dolphin installation.
+
+Use `--capture-audio-input` only after selecting and testing an OS-native audio
+device. A recording failure is reported through station component health but
+cannot interrupt telemetry or decide the game result.
+
 ## Support matrix
 
 “Software verified” means contract, packaging, process, and synthetic tests
@@ -67,13 +91,32 @@ match on that target.
 
 | Profile | Package/CLI | Real Dolphin + bridge | Capture/RTMP | Status |
 | --- | --- | --- | --- | --- |
-| macOS 14+ arm64 | verified | Dolphin 2606 boot + bridge v1 handshake verified | real Dolphin screen recorded to H.264; audio/RTMP pending | preview |
+| macOS 14+ arm64 | verified | Stock Dolphin 2606 + DME 1.3.1 bridge handshake verified | real Dolphin screen recorded to H.264; per-attempt recording wired; audio/RTMP pending | preview |
 | macOS 14+ x64 | package supported | hardware pending | hardware pending | preview |
 | Windows 11 x64 | package supported; GDB TCP path implemented | hardware pending | `gdigrab`/`dshow` pending | preview |
 | Linux x64 native | test suite verified | hardware pending | `x11grab`/Pulse pending | preview |
 | Linux amd64 container | image build and synthetic H.264 capture verified | GPU/input/bridge pending | real RTMP pending | experimental |
 | Windows ARM64 | package supported; hardware untested | not tested | not tested | unsupported |
 | Linux ARM64 container | pinned upstream image unavailable | not tested | not tested | unsupported |
+
+The currently implemented controller Pipe backend is available in stock
+Dolphin only on Unix, so it covers macOS and Linux but not Windows. DME is
+cross-platform, but Windows still needs a proven native controller backend
+before menu automation can be claimed. Dolphin's built-in MemoryWatcher is
+likewise a Unix-only, read-only observer.
+
+On macOS, process-memory access requires `com.apple.security.get-task-allow` on
+the Dolphin target. The runner uses a private managed copy with a local signature
+and leaves the installed, notarized Dolphin application untouched. GDB remains
+available for maintainer reverse engineering, not scheduled-match execution.
+
+Runner attempts use a fresh isolated Dolphin user directory cloned from a
+validated seed containing the normal in-game Wii save. A Dolphin savestate may
+be used only as an optional startup cache pinned to the exact emulator, game,
+adapter, and controller configuration; it is never the durable save or an
+acceptance signal. The deterministic startup and validation procedure is
+documented in
+[`2026-08-10-resource-folder-and-dolphin-startup.md`](research/2026-08-10-resource-folder-and-dolphin-startup.md).
 
 The native release-support gate for a row is:
 
@@ -90,8 +133,11 @@ The native release-support gate for a row is:
 The experimental container has the additional GPU and input passthrough gates
 listed in `deploy/runner/README.md`. It is `linux/amd64` only. Dolphin's source
 and cross-platform build support are documented in the
-[official repository](https://github.com/dolphin-emu/dolphin); Starworks pins
-tag 2606 and commit `6094cfcf7b8fba733b3116fdf3414d51c1c0e4a4`.
+[official repository](https://github.com/dolphin-emu/dolphin). Starworks pins
+tag 2606 and commit `6094cfcf7b8fba733b3116fdf3414d51c1c0e4a4`. Match runtime
+memory uses Dolphin Memory Engine 1.3.1; the GDB findings and the live DME proof
+are recorded in the
+[instrumentation decision](research/2026-08-10-dolphin-instrumentation.md).
 
 ## Recovery and diagnostics
 

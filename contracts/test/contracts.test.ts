@@ -58,6 +58,35 @@ describe("Starworks v1 contracts", () => {
     ).toBe(false);
   });
 
+  it("requires unattended execution and bounded recovery on every run", () => {
+    const fixture = readFixture("run-envelope") as Record<string, unknown>;
+    expect(contractSchemas["run-envelope"].safeParse(fixture).success).toBe(true);
+    expect(contractSchemas["run-envelope"].safeParse({
+      ...fixture,
+      execution: {
+        mode: "operator-controlled",
+        recovery: { allowLiveReattach: true, freshAttemptLimit: 2 },
+        stadium: { gameStadiumId: "mario-stadium", venueId: null },
+      },
+    }).success).toBe(false);
+  });
+
+  it("validates telemetry payloads against their semantic event type", () => {
+    const fixture = readFixture("telemetry-envelope") as Record<string, unknown>;
+    expect(contractSchemas["telemetry-envelope"].safeParse({
+      ...fixture,
+      eventType: "game-ended",
+      observationSource: "bridge-hook",
+      payload: { awayRuns: 4, homeRuns: 7, reason: "completed" },
+    }).success).toBe(true);
+    expect(contractSchemas["telemetry-envelope"].safeParse({
+      ...fixture,
+      eventType: "game-ended",
+      observationSource: "bridge-hook",
+      payload: { value: 1 },
+    }).success).toBe(false);
+  });
+
   it("binds an optional content pack to the match adapter and revisions", () => {
     const configuration = readFixture("match-configuration-package") as Record<string, any>;
     const contentPack = readFixture("content-pack-manifest") as Record<string, any>;

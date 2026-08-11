@@ -24,6 +24,7 @@ import {
   leagueTeams,
   leagues,
   lineupRevisions,
+  matches,
   matchAttempts,
   people,
   rosterRevisions,
@@ -71,6 +72,37 @@ test(
             scheduledAt: new Date('2026-08-10T12:30:00Z'),
             seasonId: fixture.seasonId,
           })
+          let invalidProfileId = randomUUID()
+          let invalidProfileRevisionId = randomUUID()
+          await database.insert(statProfiles).values({
+            id: invalidProfileId,
+            leagueId: fixture.leagueId,
+            name: 'Invalid legacy stats',
+            slug: 'invalid-legacy-stats',
+          })
+          await database.insert(statProfileRevisions).values({
+            characterValues: [],
+            createdByPersonId: fixture.identity.personId,
+            definitions: [],
+            id: invalidProfileRevisionId,
+            leagueId: fixture.leagueId,
+            name: 'Invalid legacy stats',
+            profileId: invalidProfileId,
+            publishedAt: now,
+            revisionNumber: 1,
+            status: 'published',
+          })
+          await assert.rejects(
+            admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
+              awayLineupRevisionId: fixture.away.lineupRevisionId,
+              dynamicRuleOverrides: {},
+              homeLineupRevisionId: fixture.home.lineupRevisionId,
+              requiredGameBuildSha256: '0'.repeat(64),
+              rulesetRevisionId: fixture.rulesetRevisionId,
+              statProfileRevisionId: invalidProfileRevisionId,
+            }),
+            (error: unknown) => error instanceof PlatformError && error.code === 'invalid_input',
+          )
           let firstAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
             awayLineupRevisionId: fixture.away.lineupRevisionId,
             contentPackRevisionId: content.revisionId,
@@ -196,28 +228,35 @@ test(
           assert.ok(expiringClaim.run)
           now = new Date('2026-08-10T12:02:00Z')
           let afterExpiry = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
-          assert.equal(afterExpiry.run, null)
+          assert.ok(afterExpiry.run)
+          assert.equal(afterExpiry.run.requiredGameBuildSha256, 'c'.repeat(64))
+          assert.notEqual(afterExpiry.run.attemptNonce, expiringClaim.run.attemptNonce)
           let [expiredAttempt] = await database
             .select({ failureKind: matchAttempts.failureKind, status: matchAttempts.status })
             .from(matchAttempts)
             .where(eq(matchAttempts.id, expiringClaim.run!.attemptId))
           assert.deepEqual(expiredAttempt, { failureKind: 'runner-crash', status: 'failed' })
-
-          let replacementAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
-            awayLineupRevisionId: fixture.away.lineupRevisionId,
-            dynamicRuleOverrides: {},
-            homeLineupRevisionId: fixture.home.lineupRevisionId,
-            requiredGameBuildSha256: 'd'.repeat(64),
-            rulesetRevisionId: fixture.rulesetRevisionId,
-            statProfileRevisionId: fixture.statProfileRevisionId,
+          let [automaticRetry] = await database.select({
+            replacesAttemptId: matchAttempts.replacesAttemptId,
+            retryCount: matchAttempts.retryCount,
+          }).from(matchAttempts).where(eq(matchAttempts.id, afterExpiry.run.attemptId))
+          assert.deepEqual(automaticRetry, {
+            replacesAttemptId: expiringClaim.run.attemptId,
+            retryCount: 1,
           })
-          let replacementClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
-          assert.equal(replacementClaim.run?.attemptId, replacementAttempt.attemptId)
           await admin.revokeStation(fixture.identity, fixture.leagueId, secondRegistration.runnerId)
+          let [reviewAttempt] = await database.select({
+            failureKind: matchAttempts.failureKind,
+            status: matchAttempts.status,
+          }).from(matchAttempts).where(eq(matchAttempts.id, afterExpiry.run.attemptId))
+          let [reviewMatch] = await database.select({ status: matches.status })
+            .from(matches).where(eq(matches.id, match.id))
+          assert.deepEqual(reviewAttempt, { failureKind: 'runner-crash', status: 'review' })
+          assert.equal(reviewMatch?.status, 'provisional')
           await assert.rejects(
             control.heartbeat(fixture.credentials.second.raw, {
-              activeAttemptId: replacementAttempt.attemptId,
-              activeLeaseId: replacementClaim.run!.lease.leaseId,
+              activeAttemptId: afterExpiry.run.attemptId,
+              activeLeaseId: afterExpiry.run.lease.leaseId,
               kind: 'runner-heartbeat-request',
               lastCapturedSequence: null,
               runnerId: secondRegistration.runnerId,
@@ -348,7 +387,7 @@ async function createContentPackFixture(
   let revisionId = randomUUID()
   let objectKey = `leagues/${fixture.leagueId}/content-assets/${sha256}`
   let manifest = ContentPackManifestSchema.parse({
-    adapterVersion: '0.2.0',
+    adapterVersion: '0.3.3',
     assets: [{ displayName: 'Runner icon', mediaType: 'image/png', sha256, sizeBytes: bytes.byteLength }],
     assignments: [{ assignmentType: 'character-asset', assetSha256: sha256, characterId: 'mario', slot: 'icon' }],
     contentPackId,
@@ -377,7 +416,7 @@ async function createContentPackFixture(
     uploadedByPersonId: fixture.identity.personId,
   })
   await database.insert(contentPackRevisions).values({
-    adapterVersion: '0.2.0',
+    adapterVersion: '0.3.3',
     contentPackId,
     createdByPersonId: fixture.identity.personId,
     id: revisionId,
@@ -451,7 +490,12 @@ function registration(stationName: string): RunnerRegistrationRequest {
       adapterIds: ['sluggers-rmbe01'],
       architecture: 'arm64' as const,
       dolphinVersion: '2606',
-      features: ['build-sluggers', 'launch-dolphin', 'runtime-bridge-v1'],
+      features: [
+        'build-sluggers',
+        'launch-dolphin',
+        'runtime-bridge',
+        'telemetry-spool',
+      ],
       operatingSystem: 'macos' as const,
       runnerVersion: '0.1.0',
     },

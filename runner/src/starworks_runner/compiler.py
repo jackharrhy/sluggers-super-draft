@@ -31,29 +31,55 @@ def compile_adapter_operations(
         raise ValueError(f"Lineup is invalid: {', '.join(lineup_issues)}")
 
     operations: list[dict[str, Any]] = []
-    definitions = {
-        definition["key"]: definition for definition in profile["definitions"]
-    }
-    character_values = sorted(
-        profile["characterValues"], key=lambda assignment: assignment["characterId"]
-    )
-    for assignment in character_values:
-        for key, value in sorted(assignment["values"].items()):
-            mapping = definitions[key].get("gameplayMapping")
-            if mapping is None:
-                continue
-            operations.append(
-                {
-                    "operation": "set-character-stat",
-                    "characterId": assignment["characterId"],
-                    "statKey": key,
-                    "gameplayTarget": mapping["target"]["field"],
-                    "loadPhase": mapping["loadPhase"],
-                    "resource": mapping["target"]["resource"],
-                    "codec": mapping["target"]["codec"],
-                    "value": value,
-                }
-            )
+    tuning = profile.get("sluggersTuning")
+    if tuning is not None:
+        values_by_character = {
+            assignment["characterId"]: assignment
+            for assignment in profile["characterValues"]
+        }
+        character_ids = tuning["characterIdsByIndex"]
+        if len(set(character_ids)) != 101:
+            raise ValueError("Full Sluggers profile character slots must be unique")
+        try:
+            ordered_values = [values_by_character[item] for item in character_ids]
+        except KeyError as error:
+            raise ValueError(
+                f"Full Sluggers profile is missing character values for {error.args[0]}"
+            ) from error
+        operations.append(
+            {
+                "operation": "apply-sluggers-stat-profile",
+                "loadPhase": "build-time",
+                "resource": "main-dol",
+                "characterValues": ordered_values,
+                "tuning": tuning,
+            }
+        )
+    else:
+        definitions = {
+            definition["key"]: definition for definition in profile["definitions"]
+        }
+        character_values = sorted(
+            profile["characterValues"],
+            key=lambda assignment: assignment["characterId"],
+        )
+        for assignment in character_values:
+            for key, value in sorted(assignment["values"].items()):
+                mapping = definitions[key].get("gameplayMapping")
+                if mapping is None:
+                    continue
+                operations.append(
+                    {
+                        "operation": "set-character-stat",
+                        "characterId": assignment["characterId"],
+                        "statKey": key,
+                        "gameplayTarget": mapping["target"]["field"],
+                        "loadPhase": mapping["loadPhase"],
+                        "resource": mapping["target"]["resource"],
+                        "codec": mapping["target"]["codec"],
+                        "value": value,
+                    }
+                )
     for setting in sorted(ruleset["settings"], key=lambda item: item["key"]):
         if setting["loadPhase"] == "web-only":
             continue

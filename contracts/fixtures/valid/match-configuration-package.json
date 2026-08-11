@@ -128,5 +128,17 @@
     }
   ],
   "dynamicRuleOverrides": { "game.innings": 7 },
+  "execution": {
+    "mode": "cpu-vs-cpu",
+    "stadium": {
+      "gameStadiumId": "mario-stadium",
+      "venueId": null
+    },
+    "recovery": {
+      "allowLiveReattach": true,
+      "freshAttemptLimit": 1
+    }
+  },
+  "requiredGameBuildSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   "generatedAt": "2026-08-10T12:10:00Z"
 }

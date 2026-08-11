@@ -23,4 +23,4 @@ def test_native_capabilities_are_safe_declarative_metadata() -> None:
     assert "launch-dolphin" in capabilities["features"]
     assert capabilities["dolphinVersion"] == "2606"
     assert "capture-ffmpeg" in capabilities["features"]
-    assert "broadcast-rtmp" in capabilities["features"]
+    assert "broadcast-rtmp" not in capabilities["features"]

@@ -49,6 +49,7 @@ const dashboard: RunnerOperationsDashboard = {
   seasons: [],
   stations: [],
   statProfiles: [],
+  venues: [],
 }
 
 const leagueOperationsDashboard: LeagueOperationsDashboard = {
@@ -109,6 +110,7 @@ describe('league operations controller', () => {
         homeTeamId: '55555555-5555-4555-8555-555555555555',
         scheduledAt: new Date('2026-08-10T19:30'),
         seasonId: '66666666-6666-4666-8666-666666666666',
+        venueId: null,
       },
       leagueId: league.id,
     })
@@ -290,6 +292,7 @@ function createTelemetry(overrides: Partial<TelemetryApplication> = {}): Telemet
     async correct() { throw new Error('Unexpected correction') },
     async dashboard() { return [] },
     async derive() { throw new Error('Unexpected derivation') },
+    async finalizeHealthyAttempt() { throw new Error('Unexpected automatic finalization') },
     async ingest() { throw new Error('Unexpected telemetry upload') },
     async rebuildSeason() { return { playerTotals: {}, standings: [] } },
     ...overrides,

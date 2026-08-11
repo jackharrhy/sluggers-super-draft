@@ -18,6 +18,7 @@ import {
   TeamLineupRevisionSchema,
   type MatchConfigurationPackage,
   type RunEnvelope,
+  type RunnerCapabilities,
   type RunnerClaimRequest,
   type RunnerClaimResponse,
   type RunnerHeartbeatRequest,
@@ -48,9 +49,18 @@ import {
 import { PlatformError } from '../platform/errors.ts'
 import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
 import type { RunnerCredentialScope } from '../platform/model.ts'
-import { hashSecret } from '../platform/security.ts'
+import { createOpaqueToken, hashSecret } from '../platform/security.ts'
+import { failAttemptWithRecovery } from './recovery.ts'
 
 const RUNNER_CREDENTIAL_PATTERN = /^starworks_runner_([0-9a-f-]{36})\.([A-Za-z0-9_-]{32,128})$/i
+const PLAYABLE_ALPHA_ADAPTER = 'sluggers-rmbe01'
+const PLAYABLE_ALPHA_DOLPHIN = '2606'
+const PLAYABLE_ALPHA_FEATURES = [
+  'build-sluggers',
+  'launch-dolphin',
+  'runtime-bridge',
+  'telemetry-spool',
+] as const
 
 interface AuthenticatedRunnerCredential {
   credentialId: string
@@ -78,6 +88,7 @@ export interface RunnerControlServiceOptions {
   assetStore?: Pick<ContentAssetStore, 'get'>
   clock?: () => Date
   createId?: () => string
+  createNonce?: () => string
   heartbeatSeconds?: number
   leaseSeconds?: number
   adapterVersion?: string
@@ -89,6 +100,7 @@ export class RunnerControlService {
   readonly #clock: () => Date
   readonly #assetStore: Pick<ContentAssetStore, 'get'> | undefined
   readonly #createId: () => string
+  readonly #createNonce: () => string
   readonly #heartbeatSeconds: number
   readonly #leaseSeconds: number
   readonly #adapterVersion: string
@@ -102,6 +114,7 @@ export class RunnerControlService {
     this.#clock = options.clock ?? (() => new Date())
     this.#assetStore = options.assetStore
     this.#createId = options.createId ?? randomUUID
+    this.#createNonce = options.createNonce ?? createOpaqueToken
     this.#heartbeatSeconds = options.heartbeatSeconds ?? 15
     this.#leaseSeconds = options.leaseSeconds ?? 60
     this.#adapterVersion = options.adapterVersion ?? SLUGGERS_ADAPTER_VERSION
@@ -234,7 +247,7 @@ export class RunnerControlService {
     let now = this.#clock()
     let claimed = await this.database.transaction(async (transaction) => {
       let [station] = await transaction
-        .select({ id: runnerStations.id })
+        .select({ capabilities: runnerStations.capabilities, id: runnerStations.id })
         .from(runnerStations)
         .where(and(
           eq(runnerStations.leagueId, authenticated.leagueId),
@@ -244,6 +257,7 @@ export class RunnerControlService {
         .for('update')
         .limit(1)
       if (!station) throw new PlatformError('Runner station has been revoked', 'unauthorized')
+      requirePlayableAlphaCapabilities(station.capabilities)
 
       let expiredLeases = await transaction
         .select({
@@ -264,25 +278,16 @@ export class RunnerControlService {
           .where(and(eq(runnerLeases.id, expired.leaseId), eq(runnerLeases.status, 'active')))
           .returning({ attemptId: runnerLeases.matchAttemptId })
         if (!released.length) continue
-        let [failedAttempt] = await transaction
-          .update(matchAttempts)
-          .set({ failedAt: now, failureKind: 'runner-crash', status: 'failed' })
-          .where(and(
-            eq(matchAttempts.leagueId, authenticated.leagueId),
-            eq(matchAttempts.id, expired.attemptId),
-          ))
-          .returning({ matchId: matchAttempts.matchId })
-        if (!failedAttempt) continue
-        await transaction
-          .update(matches)
-          .set({ status: 'scheduled', updatedAt: now })
-          .where(and(eq(matches.leagueId, authenticated.leagueId), eq(matches.id, failedAttempt.matchId)))
-        await transaction.insert(attemptLifecycleEvents).values({
+        await failAttemptWithRecovery(transaction, {
+          attemptId: expired.attemptId,
+          createId: this.#createId,
+          createNonce: this.#createNonce,
           eventType: 'lease-expired',
           failureKind: 'runner-crash',
           leagueId: authenticated.leagueId,
-          matchAttemptId: expired.attemptId,
+          now,
           observedAt: now,
+          runnerStationId: null,
         })
       }
 
@@ -388,19 +393,14 @@ export class RunnerControlService {
           .update(runnerLeases)
           .set({ releasedAt: now, status: 'expired' })
           .where(eq(runnerLeases.id, request.leaseId))
-        await transaction
-          .update(matchAttempts)
-          .set({ failedAt: now, failureKind: 'runner-crash', status: 'failed' })
-          .where(eq(matchAttempts.id, request.attemptId))
-        await transaction
-          .update(matches)
-          .set({ status: 'scheduled', updatedAt: now })
-          .where(and(eq(matches.leagueId, authenticated.leagueId), eq(matches.id, record.matchId)))
-        await transaction.insert(attemptLifecycleEvents).values({
+        await failAttemptWithRecovery(transaction, {
+          attemptId: request.attemptId,
+          createId: this.#createId,
+          createNonce: this.#createNonce,
           eventType: 'lease-expired',
           failureKind: 'runner-crash',
           leagueId: authenticated.leagueId,
-          matchAttemptId: request.attemptId,
+          now,
           observedAt: now,
           runnerStationId: stationId,
         })
@@ -449,27 +449,35 @@ export class RunnerControlService {
         .update(runnerLeases)
         .set({ releasedAt: now, status: 'released' })
         .where(eq(runnerLeases.id, request.leaseId))
-      await transaction
-        .update(matchAttempts)
-        .set({
-          cancelledAt: status === 'cancelled' ? now : undefined,
-          completedAt: status === 'provisional' ? now : undefined,
-          failedAt: status === 'failed' ? now : undefined,
-          failureKind: status === 'failed' ? request.failureKind : undefined,
-          status,
+      if (status === 'failed') {
+        let recovery = await failAttemptWithRecovery(transaction, {
+          attemptId: request.attemptId,
+          createId: this.#createId,
+          createNonce: this.#createNonce,
+          eventType: 'failed',
+          failureKind: request.failureKind!,
+          leagueId: authenticated.leagueId,
+          now,
+          observedAt: new Date(request.observedAt),
+          runnerStationId: stationId,
         })
-        .where(eq(matchAttempts.id, request.attemptId))
-      await transaction
-        .update(matches)
-        .set({ status: status === 'provisional' ? 'provisional' : 'scheduled', updatedAt: now })
-        .where(and(eq(matches.leagueId, authenticated.leagueId), eq(matches.id, record.matchId)))
-      await this.#recordLifecycle(
-        transaction,
-        authenticated.leagueId,
-        request,
-        stationId,
-        status === 'provisional' ? 'completed' : status,
-      )
+        if (!recovery) throw new PlatformError('This attempt cannot fail', 'conflict')
+        return { status: recovery.status, expiresAt: null as Date | null }
+      }
+      await transaction.update(matchAttempts).set({
+        cancelledAt: status === 'cancelled' ? now : undefined,
+        completedAt: status === 'provisional' ? now : undefined,
+        status,
+      }).where(eq(matchAttempts.id, request.attemptId))
+      await transaction.update(matches).set({
+        status: status === 'provisional' ? 'provisional' : 'scheduled',
+        updatedAt: now,
+      }).where(and(
+        eq(matches.leagueId, authenticated.leagueId),
+        eq(matches.id, record.matchId),
+      ))
+      await this.#recordLifecycle(transaction, authenticated.leagueId, request, stationId,
+        status === 'provisional' ? 'completed' : status)
       return { status, expiresAt: null as Date | null }
     })
     if ('error' in result && result.error) throw new PlatformError(result.error, 'conflict')
@@ -545,49 +553,68 @@ export class RunnerControlService {
     if (!profile || !ruleset || !home || !away || (execution.attempt.contentPackRevisionId && !contentPack?.manifest)) {
       throw new PlatformError('Published attempt configuration is incomplete', 'conflict')
     }
-    return MatchConfigurationPackageSchema.parse({
+    let rulesetDocument = RulesetRevisionSchema.safeParse({
+      basedOnRevisionId: ruleset.basedOnRevisionId,
+      createdAt: ruleset.createdAt.toISOString(),
+      kind: 'ruleset-revision',
+      leagueId: ruleset.leagueId,
+      name: ruleset.name,
+      publishedAt: ruleset.publishedAt?.toISOString() ?? null,
+      revisionId: ruleset.id,
+      revisionNumber: ruleset.revisionNumber,
+      rulesetId: ruleset.rulesetId,
+      schemaVersion: 1,
+      settings: ruleset.settings,
+      status: ruleset.status,
+    })
+    let profileDocument = StatProfileRevisionSchema.safeParse({
+      basedOnRevisionId: profile.basedOnRevisionId,
+      characterValues: profile.characterValues,
+      createdAt: profile.createdAt.toISOString(),
+      definitions: profile.definitions,
+      kind: 'stat-profile-revision',
+      leagueId: profile.leagueId,
+      name: profile.name,
+      profileId: profile.profileId,
+      publishedAt: profile.publishedAt?.toISOString() ?? null,
+      revisionId: profile.id,
+      revisionNumber: profile.revisionNumber,
+      schemaVersion: 1,
+      sluggersTuning: profile.sluggersTuning ?? undefined,
+      status: profile.status,
+    })
+    if (!rulesetDocument.success || !profileDocument.success) {
+      throw new PlatformError('Published attempt configuration is invalid', 'conflict')
+    }
+    let configuration = MatchConfigurationPackageSchema.safeParse({
       adapterId: 'sluggers-rmbe01',
       adapterVersion: this.#adapterVersion,
       attemptId: execution.attempt.id,
       attemptNonce: execution.attempt.attemptNonce,
       contentPack: contentPack?.manifest ?? null,
       dynamicRuleOverrides: execution.attempt.dynamicRuleOverrides,
+      execution: {
+        mode: execution.attempt.executionMode,
+        recovery: { allowLiveReattach: true, freshAttemptLimit: 1 },
+        stadium: {
+          gameStadiumId: execution.attempt.gameStadiumId,
+          venueId: execution.match.venueId,
+        },
+      },
       generatedAt: execution.attempt.issuedAt.toISOString(),
       kind: 'match-configuration-package',
       leagueId: authenticated.leagueId,
       matchId: execution.match.id,
-      ruleset: RulesetRevisionSchema.parse({
-        basedOnRevisionId: ruleset.basedOnRevisionId,
-        createdAt: ruleset.createdAt.toISOString(),
-        kind: 'ruleset-revision',
-        leagueId: ruleset.leagueId,
-        name: ruleset.name,
-        publishedAt: ruleset.publishedAt?.toISOString() ?? null,
-        revisionId: ruleset.id,
-        revisionNumber: ruleset.revisionNumber,
-        rulesetId: ruleset.rulesetId,
-        schemaVersion: 1,
-        settings: ruleset.settings,
-        status: ruleset.status,
-      }),
+      ruleset: rulesetDocument.data,
+      requiredGameBuildSha256: execution.attempt.requiredGameBuildSha256,
       schemaVersion: 1,
-      statProfile: StatProfileRevisionSchema.parse({
-        basedOnRevisionId: profile.basedOnRevisionId,
-        characterValues: profile.characterValues,
-        createdAt: profile.createdAt.toISOString(),
-        definitions: profile.definitions,
-        kind: 'stat-profile-revision',
-        leagueId: profile.leagueId,
-        name: profile.name,
-        profileId: profile.profileId,
-        publishedAt: profile.publishedAt?.toISOString() ?? null,
-        revisionId: profile.id,
-        revisionNumber: profile.revisionNumber,
-        schemaVersion: 1,
-        status: profile.status,
-      }),
+      statProfile: profileDocument.data,
       teams: [{ side: 'home', lineup: home }, { side: 'away', lineup: away }],
     })
+    if (!configuration.success) {
+      throw new PlatformError('Published attempt configuration is invalid', 'conflict')
+    }
+    return configuration.data
   }
 
   async asset(
@@ -706,6 +733,14 @@ export class RunnerControlService {
       createdByActorId: row.attempt.createdByPersonId,
       contentPackRevisionId: row.attempt.contentPackRevisionId,
       dynamicRuleOverrides: row.attempt.dynamicRuleOverrides,
+      execution: {
+        mode: row.attempt.executionMode,
+        recovery: { allowLiveReattach: true, freshAttemptLimit: 1 },
+        stadium: {
+          gameStadiumId: row.attempt.gameStadiumId,
+          venueId: row.match.venueId,
+        },
+      },
       issuedAt: row.attempt.issuedAt.toISOString(),
       kind: 'run-envelope',
       leagueId,
@@ -753,7 +788,7 @@ export class RunnerControlService {
       ))
       .limit(1)
     if (!row) return null
-    return TeamLineupRevisionSchema.parse({
+    let parsed = TeamLineupRevisionSchema.safeParse({
       basedOnLineupRevisionId: row.lineup.basedOnRevisionId,
       createdAt: row.lineup.createdAt.toISOString(),
       kind: 'team-lineup-revision',
@@ -769,6 +804,7 @@ export class RunnerControlService {
       status: row.lineup.status,
       teamId: row.lineup.teamId,
     })
+    return parsed.success ? parsed.data : null
   }
 
   async #recordLifecycle(
@@ -799,6 +835,7 @@ export class RunnerControlService {
     if (action === 'complete' && current === 'provisional') return 'provisional' as const
     if (action === 'cancel' && current === 'cancelled') return 'cancelled' as const
     if (action === 'fail' && current === 'failed') return 'failed' as const
+    if (action === 'fail' && current === 'review') return 'review' as const
     return null
   }
 
@@ -828,6 +865,35 @@ export function runnerVersionStatus(
   if (compareVersions(installed, minimum) < 0) return 'update-required'
   if (compareVersions(installed, recommended) < 0) return 'update-available'
   return 'current'
+}
+
+export function requirePlayableAlphaCapabilities(
+  capabilities: RunnerCapabilities | null,
+): void {
+  if (!capabilities) {
+    throw new PlatformError(
+      'Runner cannot claim a playable-alpha match without a capability report',
+      'conflict',
+    )
+  }
+  let problems: string[] = []
+  if (capabilities.operatingSystem !== 'macos') problems.push('macOS')
+  if (capabilities.architecture !== 'arm64') problems.push('Apple Silicon')
+  if (capabilities.dolphinVersion !== PLAYABLE_ALPHA_DOLPHIN) {
+    problems.push(`Dolphin ${PLAYABLE_ALPHA_DOLPHIN}`)
+  }
+  if (!capabilities.adapterIds.includes(PLAYABLE_ALPHA_ADAPTER)) {
+    problems.push(`adapter ${PLAYABLE_ALPHA_ADAPTER}`)
+  }
+  for (let feature of PLAYABLE_ALPHA_FEATURES) {
+    if (!capabilities.features.includes(feature)) problems.push(`feature ${feature}`)
+  }
+  if (problems.length) {
+    throw new PlatformError(
+      `Runner cannot claim a playable-alpha match; missing or incompatible: ${problems.join(', ')}`,
+      'conflict',
+    )
+  }
 }
 
 function compareVersions(left: string, right: string): number {

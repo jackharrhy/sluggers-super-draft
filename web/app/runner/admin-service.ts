@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto'
 import { and, desc, eq, max } from 'drizzle-orm'
 import { z } from 'zod'
 
-import { Sha256Schema, TeamLineupRevisionSchema } from '@starworks/contracts'
+import {
+  RulesetRevisionSchema,
+  Sha256Schema,
+  StatProfileRevisionSchema,
+  TeamLineupRevisionSchema,
+} from '@starworks/contracts'
 
 import type { StarworksDatabase } from '../platform/database/connection.ts'
 import {
@@ -23,18 +28,21 @@ import {
   runnerStations,
   seasons,
   statProfileRevisions,
+  venues,
 } from '../platform/database/schema.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { runnerOperationRoles } from '../platform/repository.ts'
 import { createOpaqueToken } from '../platform/security.ts'
 import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
+import { failAttemptWithRecovery } from './recovery.ts'
 
 const ScheduleMatchSchema = z.strictObject({
   awayTeamId: z.uuid(),
   homeTeamId: z.uuid(),
   scheduledAt: z.date().nullable(),
   seasonId: z.uuid(),
+  venueId: z.uuid().nullable().default(null),
 })
 
 const QueueAttemptSchema = z.strictObject({
@@ -42,6 +50,8 @@ const QueueAttemptSchema = z.strictObject({
   contentPackRevisionId: z.uuid().nullable().default(null),
   dynamicRuleOverrides: z.record(z.string().min(1), z.union([z.string(), z.number().finite(), z.boolean(), z.null()])),
   homeLineupRevisionId: z.uuid(),
+  executionMode: z.literal('cpu-vs-cpu').default('cpu-vs-cpu'),
+  gameStadiumId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).default('mario-stadium'),
   requiredGameBuildSha256: Sha256Schema,
   rulesetRevisionId: z.uuid(),
   statProfileRevisionId: z.uuid(),
@@ -75,6 +85,7 @@ export interface RunnerOperationsDashboard {
   statProfiles: Array<{ id: string; name: string; revisionNumber: number }>
   rulesets: Array<{ id: string; name: string; revisionNumber: number }>
   contentPacks: Array<{ id: string; name: string; revisionNumber: number; rulesetRevisionId: string; statProfileRevisionId: string }>
+  venues: Array<{ gameVenueId: string | null; id: string; name: string }>
   matches: Array<{
     id: string
     status: string
@@ -124,13 +135,14 @@ export class RunnerAdminService {
     leagueId: string,
   ): Promise<RunnerOperationsDashboard> {
     this.#requireAdmin(identity, leagueId)
-    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, contentPackRows, matchRows, attemptRows, stationRows, auditRows] = await Promise.all([
+    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, contentPackRows, venueRows, matchRows, attemptRows, stationRows, auditRows] = await Promise.all([
       this.database.select({ id: seasons.id, name: seasons.name }).from(seasons).where(eq(seasons.leagueId, leagueId)),
       this.database.select({ id: leagueTeams.id, name: leagueTeams.name, seasonId: leagueTeams.seasonId }).from(leagueTeams).where(eq(leagueTeams.leagueId, leagueId)),
       this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))),
       this.database.select({ id: statProfileRevisions.id, name: statProfileRevisions.name, revisionNumber: statProfileRevisions.revisionNumber }).from(statProfileRevisions).where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.status, 'published'))),
       this.database.select({ id: rulesetRevisions.id, name: rulesetRevisions.name, revisionNumber: rulesetRevisions.revisionNumber }).from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.status, 'published'))),
       this.database.select({ id: contentPackRevisions.id, name: contentPacks.name, revisionNumber: contentPackRevisions.revisionNumber, rulesetRevisionId: contentPackRevisions.rulesetRevisionId, statProfileRevisionId: contentPackRevisions.statProfileRevisionId }).from(contentPackRevisions).innerJoin(contentPacks, and(eq(contentPacks.leagueId, contentPackRevisions.leagueId), eq(contentPacks.id, contentPackRevisions.contentPackId))).where(and(eq(contentPackRevisions.leagueId, leagueId), eq(contentPackRevisions.status, 'published'))),
+      this.database.select({ gameVenueId: venues.gameVenueId, id: venues.id, name: venues.name }).from(venues).where(eq(venues.leagueId, leagueId)),
       this.database.select().from(matches).where(eq(matches.leagueId, leagueId)),
       this.database.select({ attemptNumber: matchAttempts.attemptNumber, failureKind: matchAttempts.failureKind, id: matchAttempts.id, matchId: matchAttempts.matchId, status: matchAttempts.status }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
       this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
@@ -163,6 +175,7 @@ export class RunnerAdminService {
       })),
       statProfiles: profileRows,
       rulesets: rulesetRows,
+      venues: venueRows,
       matches: matchRows.map((match) => ({
         attempts: attemptRows.filter((attempt) => attempt.matchId === match.id).map(({ matchId: _, ...attempt }) => attempt),
         awayTeamName: teamNames.get(match.awayTeamId) ?? 'Unknown team',
@@ -203,6 +216,14 @@ export class RunnerAdminService {
     if (selected.length !== 2 || selected.some((team) => team.seasonId !== parsed.data.seasonId)) {
       throw new PlatformError('Both match teams must belong to the selected league season', 'invalid_input')
     }
+    if (parsed.data.venueId) {
+      let [venue] = await this.database
+        .select({ id: venues.id })
+        .from(venues)
+        .where(and(eq(venues.leagueId, leagueId), eq(venues.id, parsed.data.venueId)))
+        .limit(1)
+      if (!venue) throw new PlatformError('Match venue must belong to this league', 'invalid_input')
+    }
     let matchId = this.#createId()
     await this.database.transaction(async (transaction) => {
       await transaction.insert(matches).values({
@@ -213,6 +234,7 @@ export class RunnerAdminService {
         leagueId,
         scheduledAt: parsed.data.scheduledAt,
         seasonId: parsed.data.seasonId,
+        venueId: parsed.data.venueId,
       })
       await transaction.insert(auditRecords).values({
         action: 'match.scheduled',
@@ -252,7 +274,7 @@ export class RunnerAdminService {
     }
     let [[profile], [ruleset]] = await Promise.all([
       this.database
-        .select({ id: statProfileRevisions.id })
+        .select()
         .from(statProfileRevisions)
         .where(and(
           eq(statProfileRevisions.leagueId, leagueId),
@@ -261,7 +283,7 @@ export class RunnerAdminService {
         ))
         .limit(1),
       this.database
-        .select({ id: rulesetRevisions.id, settings: rulesetRevisions.settings })
+        .select()
         .from(rulesetRevisions)
         .where(and(
           eq(rulesetRevisions.leagueId, leagueId),
@@ -272,6 +294,39 @@ export class RunnerAdminService {
     ])
     if (!profile || !ruleset) {
       throw new PlatformError('Attempt stat profile and ruleset must be published', 'invalid_input')
+    }
+    let profileDocument = StatProfileRevisionSchema.safeParse({
+      basedOnRevisionId: profile.basedOnRevisionId,
+      characterValues: profile.characterValues,
+      createdAt: profile.createdAt.toISOString(),
+      definitions: profile.definitions,
+      kind: 'stat-profile-revision',
+      leagueId: profile.leagueId,
+      name: profile.name,
+      profileId: profile.profileId,
+      publishedAt: profile.publishedAt?.toISOString() ?? null,
+      revisionId: profile.id,
+      revisionNumber: profile.revisionNumber,
+      schemaVersion: 1,
+      sluggersTuning: profile.sluggersTuning ?? undefined,
+      status: profile.status,
+    })
+    let rulesetDocument = RulesetRevisionSchema.safeParse({
+      basedOnRevisionId: ruleset.basedOnRevisionId,
+      createdAt: ruleset.createdAt.toISOString(),
+      kind: 'ruleset-revision',
+      leagueId: ruleset.leagueId,
+      name: ruleset.name,
+      publishedAt: ruleset.publishedAt?.toISOString() ?? null,
+      revisionId: ruleset.id,
+      revisionNumber: ruleset.revisionNumber,
+      rulesetId: ruleset.rulesetId,
+      schemaVersion: 1,
+      settings: ruleset.settings,
+      status: ruleset.status,
+    })
+    if (!profileDocument.success || !rulesetDocument.success) {
+      throw new PlatformError('Attempt stat profile and ruleset must be valid published revisions', 'invalid_input')
     }
     if (parsed.data.contentPackRevisionId) {
       let [contentPack] = await this.database
@@ -300,7 +355,7 @@ export class RunnerAdminService {
       }
     }
     for (let [key, value] of Object.entries(parsed.data.dynamicRuleOverrides)) {
-      let setting = ruleset.settings.find((candidate) => candidate.key === key)
+      let setting = rulesetDocument.data.settings.find((candidate) => candidate.key === key)
       if (!setting || setting.loadPhase !== 'runtime' || !sameJsonScalarType(setting.value, value)) {
         throw new PlatformError(`Dynamic rule override ${key} is not compatible with the published ruleset`, 'invalid_input')
       }
@@ -333,6 +388,8 @@ export class RunnerAdminService {
         createdAt: now,
         createdByPersonId: identity!.personId,
         dynamicRuleOverrides: parsed.data.dynamicRuleOverrides,
+        executionMode: parsed.data.executionMode,
+        gameStadiumId: parsed.data.gameStadiumId,
         homeLineupRevisionId: home.lineupRevisionId,
         homeRosterRevisionId: home.rosterRevisionId,
         id: attemptId,
@@ -385,22 +442,14 @@ export class RunnerAdminService {
         .where(and(eq(runnerLeases.leagueId, leagueId), eq(runnerLeases.runnerStationId, stationId), eq(runnerLeases.status, 'active')))
         .returning({ attemptId: runnerLeases.matchAttemptId })
       for (let lease of leases) {
-        let [attempt] = await transaction
-          .update(matchAttempts)
-          .set({ failedAt: now, failureKind: 'runner-crash', status: 'failed' })
-          .where(and(eq(matchAttempts.leagueId, leagueId), eq(matchAttempts.id, lease.attemptId)))
-          .returning({ matchId: matchAttempts.matchId })
-        if (attempt) {
-          await transaction
-            .update(matches)
-            .set({ status: 'scheduled', updatedAt: now })
-            .where(and(eq(matches.leagueId, leagueId), eq(matches.id, attempt.matchId)))
-        }
-        await transaction.insert(attemptLifecycleEvents).values({
+        await failAttemptWithRecovery(transaction, {
+          attemptId: lease.attemptId,
+          createId: this.#createId,
+          createNonce: this.#createNonce,
           eventType: 'station-revoked',
           failureKind: 'runner-crash',
           leagueId,
-          matchAttemptId: lease.attemptId,
+          now,
           observedAt: now,
           runnerStationId: stationId,
         })
@@ -423,7 +472,7 @@ export class RunnerAdminService {
       .where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.id, revisionId), eq(lineupRevisions.status, 'published'), eq(rosterRevisions.status, 'published')))
       .limit(1)
     if (!row) return null
-    return TeamLineupRevisionSchema.parse({
+    let parsed = TeamLineupRevisionSchema.safeParse({
       basedOnLineupRevisionId: row.lineup.basedOnRevisionId,
       createdAt: row.lineup.createdAt.toISOString(),
       kind: 'team-lineup-revision',
@@ -439,6 +488,7 @@ export class RunnerAdminService {
       status: row.lineup.status,
       teamId: row.lineup.teamId,
     })
+    return parsed.success ? parsed.data : null
   }
 
   #requireAdmin(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {

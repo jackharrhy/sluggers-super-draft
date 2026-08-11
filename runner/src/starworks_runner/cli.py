@@ -21,14 +21,11 @@ from starworks_runner.contracts import (
     default_contracts_directory,
     validate_contract,
 )
-from starworks_runner.desktop import default_state_path
+from starworks_runner.control import RunnerApiError
+from starworks_runner.desktop import default_state_path, native_capabilities
 from starworks_runner.games.sluggers.adapter import AdapterManifest
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
-from starworks_runner.games.sluggers.bridge.layout import (
-    BridgeLayout,
-    BridgeProtocolError,
-    ControlBlock,
-)
+from starworks_runner.games.sluggers.bridge.layout import BridgeLayout
 from starworks_runner.games.sluggers.bridge.memory import (
     ByteArrayMemoryTransport,
     DolphinMemoryEngineTransport,
@@ -49,11 +46,21 @@ from starworks_runner.games.sluggers.patching import (
     PrecompiledPatchPlan,
     encode_ppc_branch,
 )
+from starworks_runner.games.sluggers.session import (
+    LiveSluggersSession,
+    bootstrap_live_bridge,
+    initialize_running_bridge,
+    load_game_build_manifest,
+)
 from starworks_runner.games.sluggers.tools import (
     DtkDiscTool,
     dtk_asset_for_current_platform,
     install_dtk,
     load_dtk_release,
+)
+from starworks_runner.station import (
+    SluggersStationConfig,
+    create_sluggers_station_service,
 )
 from starworks_runner.support import create_support_bundle
 
@@ -118,6 +125,11 @@ def create_parser() -> argparse.ArgumentParser:
     launch_gdb = launch_parser.add_mutually_exclusive_group()
     launch_gdb.add_argument("--gdb-socket", type=Path)
     launch_gdb.add_argument("--gdb-port", type=int)
+    launch_parser.add_argument(
+        "--save-state",
+        type=Path,
+        help="load a verified local Dolphin checkpoint at startup",
+    )
     launch_parser.add_argument("--wait", action="store_true")
 
     probe_parser = subparsers.add_parser(
@@ -137,6 +149,80 @@ def create_parser() -> argparse.ArgumentParser:
     )
     probe_parser.add_argument("--timeout-seconds", type=float, default=5.0)
     probe_parser.add_argument("--poll-seconds", type=float, default=1.0)
+
+    smoke_parser = subparsers.add_parser(
+        "smoke-sluggers",
+        help="launch a managed build and complete the real bridge acceptance slice",
+    )
+    smoke_parser.add_argument("--build-directory", type=Path, required=True)
+    smoke_parser.add_argument("--dolphin", type=Path, required=True)
+    smoke_parser.add_argument("--profile", type=Path, required=True)
+    smoke_parser.add_argument("--attempt-nonce", required=True)
+    smoke_parser.add_argument("--timeout-seconds", type=float, default=10.0)
+    smoke_parser.add_argument("--poll-seconds", type=float, default=1.0)
+
+    station_parser = subparsers.add_parser(
+        "run-sluggers-station",
+        help="claim web attempts and incrementally run them in managed Dolphin",
+    )
+    station_parser.add_argument(
+        "--url", default=os.environ.get("STARWORKS_URL", "http://127.0.0.1:3000")
+    )
+    station_parser.add_argument(
+        "--credential-environment", default="STARWORKS_RUNNER_CREDENTIAL"
+    )
+    station_parser.add_argument(
+        "--station-name",
+        default=os.environ.get("STARWORKS_RUNNER_NAME", "Sluggers station"),
+    )
+    station_parser.add_argument("--state", type=Path, default=default_state_path())
+    station_parser.add_argument("--cache", type=Path, required=True)
+    station_parser.add_argument(
+        "--image",
+        type=Path,
+        help="user-owned RMBE01 image used to build an exact cache miss",
+    )
+    station_parser.add_argument(
+        "--dtk",
+        type=Path,
+        help="pinned decomp-toolkit binary; defaults to the station cache",
+    )
+    station_parser.add_argument("--dolphin", type=Path, required=True)
+    station_parser.add_argument("--profile", type=Path, required=True)
+    station_parser.add_argument(
+        "--seed-profile",
+        type=Path,
+        required=True,
+        help="immutable Dolphin profile containing the unlocked RMBE01 save",
+    )
+    station_parser.add_argument(
+        "--checkpoint-manifest",
+        type=Path,
+        required=True,
+        help="exact-build pre-roster checkpoint manifest",
+    )
+    station_parser.add_argument("--timeout-seconds", type=float, default=10.0)
+    station_parser.add_argument("--poll-seconds", type=float, default=1.0)
+    station_parser.add_argument(
+        "--recordings",
+        type=Path,
+        help="local match artifact directory (defaults beside the runner state)",
+    )
+    station_parser.add_argument("--ffmpeg", default="ffmpeg")
+    station_parser.add_argument(
+        "--capture-video-input",
+        help="native screen-capture input; platform default when omitted",
+    )
+    station_parser.add_argument(
+        "--capture-audio-input",
+        help="optional native audio-capture input",
+    )
+    station_parser.add_argument(
+        "--max-ticks",
+        type=int,
+        default=0,
+        help="stop after this many lease ticks; zero runs until interrupted",
+    )
 
     benchmark_parser = subparsers.add_parser(
         "benchmark-bridge", help="measure the synthetic bridge polling path"
@@ -192,6 +278,8 @@ def create_parser() -> argparse.ArgumentParser:
     desktop_parser.add_argument("--image", type=Path)
     desktop_parser.add_argument("--dolphin", type=Path)
     desktop_parser.add_argument("--dtk", type=Path)
+    desktop_parser.add_argument("--seed-profile", type=Path)
+    desktop_parser.add_argument("--checkpoint-manifest", type=Path)
 
     support_parser = subparsers.add_parser(
         "support-bundle",
@@ -252,7 +340,9 @@ def run(arguments: argparse.Namespace) -> int:
                 arguments.content_pack_manifest,
                 arguments.adapter_operations,
                 assets_root=arguments.content_assets,
-                target_catalog_path=arguments.static_targets,
+                target_catalog_path=(
+                    arguments.static_targets or adapter_manifest.static_target_catalog
+                ),
             )
         result = GameBuildService(
             tool,
@@ -262,6 +352,7 @@ def run(arguments: argparse.Namespace) -> int:
             BuildRequest(
                 image_path=arguments.image,
                 cache_root=cache,
+                adapter_build_sha256=adapter_manifest.adapter_build_sha256,
                 content_pack_sha256=arguments.content_pack_sha256,
                 content_pack=content_pack,
                 adapter_version=adapter_version,
@@ -312,6 +403,7 @@ def run(arguments: argparse.Namespace) -> int:
             arguments.profile,
             gdb_socket=arguments.gdb_socket,
             gdb_port=arguments.gdb_port,
+            save_state=arguments.save_state,
         )
         print(json.dumps({"command": launch.command, "pid": launch.process.pid}))
         if arguments.wait:
@@ -329,33 +421,21 @@ def run(arguments: argparse.Namespace) -> int:
             transport = DolphinMemoryEngineTransport()
         transport.attach()
         if isinstance(transport, GdbRemoteMemoryTransport):
-            transport.continue_execution()
-            ready_deadline = time.monotonic() + arguments.timeout_seconds
-            while True:
-                try:
-                    bridge_entry = transport.read(0x80002A00, 4)
-                except BridgeProtocolError:
-                    bridge_entry = b""
-                if bridge_entry == bytes.fromhex("9421fff0"):
-                    break
-                if time.monotonic() >= ready_deadline:
-                    raise BridgeProtocolError(
-                        "Patched Sluggers bridge did not load before the probe timeout"
-                    )
-                time.sleep(0.05)
-            transport.write(
-                arguments.memory_base,
-                ControlBlock.initial(
-                    arguments.adapter_build_sha256,
-                    arguments.game_build_sha256,
-                ).pack(),
+            client = bootstrap_live_bridge(
+                transport,
+                adapter_build_sha256=arguments.adapter_build_sha256,
+                game_build_sha256=arguments.game_build_sha256,
+                layout=BridgeLayout(base_address=arguments.memory_base),
+                timeout_seconds=arguments.timeout_seconds,
             )
-        client = BridgeClient(
-            transport,
-            expected_adapter_build_sha256=arguments.adapter_build_sha256,
-            expected_game_build_sha256=arguments.game_build_sha256,
-            layout=BridgeLayout(base_address=arguments.memory_base),
-        )
+        else:
+            client = initialize_running_bridge(
+                transport,
+                adapter_build_sha256=arguments.adapter_build_sha256,
+                game_build_sha256=arguments.game_build_sha256,
+                layout=BridgeLayout(base_address=arguments.memory_base),
+                timeout_seconds=arguments.timeout_seconds,
+            )
         acknowledged = client.negotiate(
             arguments.attempt_nonce, timeout_seconds=arguments.timeout_seconds
         )
@@ -384,6 +464,117 @@ def run(arguments: argparse.Namespace) -> int:
                 sort_keys=True,
             )
         )
+        return 0
+    if arguments.command == "smoke-sluggers":
+        adapter = AdapterManifest.load()
+        game_build = load_game_build_manifest(arguments.build_directory)
+        session = LiveSluggersSession(
+            build_directory=arguments.build_directory,
+            dolphin_executable=arguments.dolphin,
+            profile_directory=arguments.profile,
+            adapter_build_sha256=adapter.adapter_build_sha256,
+            game_build_sha256=game_build["buildSha256"],
+        )
+        with session:
+            acknowledged = session.start(
+                arguments.attempt_nonce,
+                timeout_seconds=arguments.timeout_seconds,
+            )
+            deadline = time.monotonic() + arguments.poll_seconds
+            events = []
+            while time.monotonic() < deadline:
+                events.extend(session.poll_events())
+                time.sleep(0.01)
+            control = session.read_control()
+            print(
+                json.dumps(
+                    {
+                        "acknowledgedEpoch": acknowledged.acknowledged_epoch,
+                        "adapterBuildSha256": adapter.adapter_build_sha256,
+                        "gameBuildSha256": game_build["buildSha256"],
+                        "heartbeat": control.heartbeat,
+                        "events": [
+                            {
+                                "sequence": event.sequence,
+                                "frame": event.frame,
+                                "eventType": event.event_type.name.lower(),
+                                "payloadValue": event.payload_value,
+                            }
+                            for event in events
+                        ],
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+            )
+        return 0
+    if arguments.command == "run-sluggers-station":
+        if arguments.timeout_seconds <= 0 or arguments.poll_seconds <= 0:
+            raise SluggersAdapterError(
+                "timeout-seconds and poll-seconds must be positive"
+            )
+        if arguments.max_ticks < 0:
+            raise SluggersAdapterError("max-ticks must be zero or positive")
+        credential = resolve_local_secret(arguments.credential_environment)
+        recordings = (
+            arguments.recordings.expanduser().resolve()
+            if arguments.recordings
+            else arguments.state.expanduser().resolve().parent / "artifacts"
+        )
+        service = create_sluggers_station_service(
+            SluggersStationConfig(
+                base_url=arguments.url,
+                credential=credential,
+                station_name=arguments.station_name,
+                state_path=arguments.state,
+                cache_root=arguments.cache,
+                dolphin_executable=arguments.dolphin,
+                profile_root=arguments.profile,
+                capabilities=native_capabilities(dolphin_version="2606"),
+                game_image=arguments.image,
+                dtk_executable=_resolve_dtk(arguments.dtk, arguments.cache),
+                checkpoint_manifest=arguments.checkpoint_manifest,
+                seed_profile_directory=arguments.seed_profile,
+                recording_directory=recordings,
+                ffmpeg_executable=arguments.ffmpeg,
+                capture_video_input=arguments.capture_video_input,
+                capture_audio_input=arguments.capture_audio_input,
+                timeout_seconds=arguments.timeout_seconds,
+            )
+        )
+        ticks = 0
+        try:
+            with service:
+                registration, created = service.ensure_registered()
+                if created:
+                    print(
+                        json.dumps(
+                            {
+                                "runnerId": registration.runner_id,
+                                "status": "registered",
+                            },
+                            sort_keys=True,
+                        ),
+                        flush=True,
+                    )
+                while arguments.max_ticks == 0 or ticks < arguments.max_ticks:
+                    result = service.tick()
+                    ticks += 1
+                    print(
+                        json.dumps(
+                            {
+                                "attemptId": result.attempt_id,
+                                "status": result.status,
+                                "tick": ticks,
+                            },
+                            sort_keys=True,
+                        ),
+                        flush=True,
+                    )
+                    if arguments.max_ticks == 0 or ticks < arguments.max_ticks:
+                        time.sleep(arguments.poll_seconds)
+        except KeyboardInterrupt:
+            return 130
         return 0
     if arguments.command == "benchmark-bridge":
         if arguments.iterations <= 0:
@@ -533,6 +724,8 @@ def run(arguments: argparse.Namespace) -> int:
                 game_image=arguments.image,
                 dolphin_executable=arguments.dolphin,
                 dtk_executable=arguments.dtk,
+                seed_profile_directory=arguments.seed_profile,
+                checkpoint_manifest=arguments.checkpoint_manifest,
             )
         )
     if arguments.command == "support-bundle":
@@ -557,6 +750,6 @@ def main() -> None:
     arguments = parser.parse_args()
     try:
         raise SystemExit(run(arguments))
-    except SluggersAdapterError as error:
+    except (RunnerApiError, SluggersAdapterError) as error:
         print(f"starworks-runner: {error}", file=sys.stderr)
         raise SystemExit(2) from error

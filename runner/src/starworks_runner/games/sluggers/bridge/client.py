@@ -5,6 +5,11 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from starworks_runner.games.sluggers.bridge.configuration import (
+    CONFIGURATION_OFFSET,
+    CONFIGURATION_SIZE,
+    RuntimeConfigurationBlock,
+)
 from starworks_runner.games.sluggers.bridge.layout import (
     ATTEMPT_NONCE_OFFSET,
     CONSUMER_SEQUENCE_OFFSET,
@@ -132,6 +137,60 @@ class BridgeClient:
             sleep(0.01)
         raise BridgeProtocolError(
             f"Game bridge did not acknowledge nonce request epoch {request_epoch}"
+        )
+
+    def attach_existing(self, attempt_nonce: str) -> ControlBlock:
+        """Bind to a previously negotiated attempt without resetting its ring."""
+
+        control = self.read_control()
+        nonce_digest = attempt_nonce_digest(attempt_nonce)
+        if control.state not in {BridgeState.ACTIVE, BridgeState.PAUSED}:
+            raise BridgeProtocolError(
+                f"Existing bridge is not active: {control.state.name}"
+            )
+        if (
+            control.request_epoch == 0
+            or control.acknowledged_epoch != control.request_epoch
+        ):
+            raise BridgeProtocolError(
+                "Existing bridge request epoch is not acknowledged"
+            )
+        if control.attempt_nonce_digest != nonce_digest:
+            raise AttemptAttributionError(
+                "Existing bridge belongs to a different match attempt"
+            )
+        self._nonce_digest = nonce_digest
+        self._consumer_sequence = control.consumer_sequence
+        return control
+
+    def install_configuration(
+        self,
+        configuration: RuntimeConfigurationBlock,
+        *,
+        timeout_seconds: float = 5.0,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> RuntimeConfigurationBlock:
+        if self._nonce_digest is None:
+            raise BridgeProtocolError("Bridge nonce handshake has not completed")
+        address = self.layout.base_address + CONFIGURATION_OFFSET
+        self.memory.write(address, configuration.pack())
+        deadline = monotonic() + timeout_seconds
+        while monotonic() <= deadline:
+            acknowledged = self.read_configuration()
+            if acknowledged.runtime_applied_epoch == configuration.requested_epoch:
+                return acknowledged
+            sleep(0.01)
+        raise BridgeProtocolError(
+            "Game bridge did not acknowledge the runtime configuration"
+        )
+
+    def read_configuration(self) -> RuntimeConfigurationBlock:
+        return RuntimeConfigurationBlock.unpack(
+            self.memory.read(
+                self.layout.base_address + CONFIGURATION_OFFSET,
+                CONFIGURATION_SIZE,
+            )
         )
 
     def poll_events(self, *, max_events: int | None = None) -> list[BridgeEvent]:

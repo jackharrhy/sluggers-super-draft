@@ -79,6 +79,33 @@ export const CharacterStatValuesSchema = z.strictObject({
   values: z.record(StatKeySchema, JsonScalarSchema),
 });
 
+function numericMatrix(rows: number, columns: number) {
+  return z.array(z.array(z.number().finite()).length(columns)).length(rows);
+}
+
+function unsignedByteMatrix(rows: number, columns: number) {
+  return z
+    .array(z.array(z.number().int().min(0).max(255)).length(columns))
+    .length(rows);
+}
+
+export const SluggersTuningSchema = z.strictObject({
+  characterIdsByIndex: z.array(z.string().min(1).max(127)).length(101),
+  chemistry: numericMatrix(101, 101),
+  trajectoryTables: numericMatrix(24, 25),
+  trajectoryNames: z.array(z.string().trim().min(1).max(100)).length(6),
+  trajectoryActivation: z.array(z.number().finite()).length(6),
+  globalSpeedCurves: numericMatrix(43, 2),
+  teamStarEvents: numericMatrix(12, 41),
+  starBoosts: numericMatrix(16, 4),
+  starHandicaps: numericMatrix(4, 2),
+  handicapParameters: unsignedByteMatrix(2, 3),
+  importSource: z.strictObject({
+    format: z.literal("stat-editor-v4"),
+    sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  }),
+});
+
 export const StatProfileRevisionSchema = z
   .strictObject({
     schemaVersion: z.literal(1),
@@ -91,17 +118,19 @@ export const StatProfileRevisionSchema = z
     name: z.string().min(1).max(100),
     definitions: z.array(StatDefinitionSchema).min(1).max(256),
     characterValues: z.array(CharacterStatValuesSchema).max(512),
+    sluggersTuning: SluggersTuningSchema.optional(),
     basedOnRevisionId: UuidSchema.nullable(),
     createdAt: TimestampSchema,
     publishedAt: TimestampSchema.nullable(),
   })
   .meta({
-    title: "StatProfileRevision v1",
+    title: "StatProfileRevision",
     description:
-      "A versioned stat vocabulary and its independently modeled character values.",
+      "The current pre-release stat vocabulary and its independently modeled values.",
   });
 
 export type StatDefinition = z.infer<typeof StatDefinitionSchema>;
+export type SluggersTuning = z.infer<typeof SluggersTuningSchema>;
 export type StatProfileRevision = z.infer<typeof StatProfileRevisionSchema>;
 
 export const statProfileIssueCodes = [

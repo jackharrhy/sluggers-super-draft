@@ -168,6 +168,9 @@ export function deriveTelemetry(
   )) {
     issues.push(`derived score ${boxScore.teams.away.runs}-${boxScore.teams.home.runs} does not match game-ended score ${reportedRuns.away}-${reportedRuns.home}`)
   }
+  if (boxScore.endedReason === 'forfeit' || boxScore.endedReason === 'quit') {
+    issues.push(`game ended by ${boxScore.endedReason} and requires commissioner review`)
+  }
   issues = [...new Set(issues)]
   return {
     boxScore,
@@ -206,10 +209,20 @@ function structuralIssues(events: TelemetryEnvelope[]): string[] {
   }
   if (!events.some((event) => event.eventType === 'game-started')) issues.push('game-started event is missing')
   if (!events.some((event) => event.eventType === 'game-ended')) issues.push('game-ended event is missing')
+  if (!events.some((event) => event.eventType === 'inning-started')) issues.push('inning-started event is missing')
+  if (!events.some((event) => event.eventType === 'plate-appearance-ended')) {
+    issues.push('plate-appearance-ended event is missing')
+  }
   if (events.filter((event) => event.eventType === 'game-started').length > 1) issues.push('multiple game-started events were received')
   if (events.filter((event) => event.eventType === 'game-ended').length > 1) issues.push('multiple game-ended events were received')
   if (events.some((event) => event.observationSource === 'memory-observation')) {
     issues.push('provisional read-only memory observations require review')
+  }
+  if (events.some((event) => event.observationSource !== 'bridge-hook')) {
+    issues.push('automatic confirmation requires bridge-hook telemetry only')
+  }
+  if (events.some((event) => event.eventType === 'synthetic')) {
+    issues.push('synthetic telemetry cannot confirm a match')
   }
   if (events.some((event) => event.eventType === 'bridge-warning'
     && (event.payload.code === 'overflow' || event.payload.code === 'sequence-gap'))) {

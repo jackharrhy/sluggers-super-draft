@@ -36,6 +36,7 @@ export function StatProfileRevisionPage(handle: Handle<RevisionPageProps<StatPro
             <TextField label="Revision name" name="name" value={revision.name} />
             <JsonEditor label="Stat definitions" name="definitions" value={revision.definitions} />
             <JsonEditor label="Character values" name="characterValues" value={revision.characterValues} />
+            {revision.sluggersTuning ? <JsonEditor label="Sluggers global and relational tuning" name="sluggersTuning" value={revision.sluggersTuning} /> : null}
             <button type="submit" mix={buttonStyle}>Save draft</button>
           </form>
         ) : <LockedNotice />}
@@ -44,7 +45,7 @@ export function StatProfileRevisionPage(handle: Handle<RevisionPageProps<StatPro
           publishAction={routes.leagues.configuration.publishStatProfile.href(routeParams)}
           status={revision.status}
         />
-        <Comparison current={{ definitions: revision.definitions, characterValues: revision.characterValues }} previous={detail.basedOnRevision ? { definitions: detail.basedOnRevision.definitions, characterValues: detail.basedOnRevision.characterValues } : null} />
+        <Comparison current={{ definitions: revision.definitions, characterValues: revision.characterValues, sluggersTuning: revision.sluggersTuning }} previous={detail.basedOnRevision ? { definitions: detail.basedOnRevision.definitions, characterValues: detail.basedOnRevision.characterValues, sluggersTuning: detail.basedOnRevision.sluggersTuning } : null} />
         <History rows={detail.history} />
       </RevisionShell>
     )

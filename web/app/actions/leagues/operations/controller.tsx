@@ -161,6 +161,7 @@ export default createController(routes.leagues.operations, {
           homeTeamId: readString(data, 'homeTeamId'),
           scheduledAt,
           seasonId: readString(data, 'seasonId'),
+          venueId: readString(data, 'venueId', false) || null,
         })
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
@@ -177,6 +178,8 @@ export default createController(routes.leagues.operations, {
           awayLineupRevisionId: readString(data, 'awayLineupRevisionId'),
           contentPackRevisionId: readString(data, 'contentPackRevisionId', false) || null,
           dynamicRuleOverrides: readJsonObject(data, 'dynamicRuleOverrides'),
+          executionMode: 'cpu-vs-cpu',
+          gameStadiumId: readString(data, 'gameStadiumId', false) || 'mario-stadium',
           homeLineupRevisionId: readString(data, 'homeLineupRevisionId'),
           requiredGameBuildSha256: readString(data, 'requiredGameBuildSha256'),
           rulesetRevisionId: readString(data, 'rulesetRevisionId'),
@@ -358,7 +361,7 @@ async function loadDashboards(
 }
 
 function emptyRunnerDashboard(): Awaited<ReturnType<RunnerAdminApplication['dashboard']>> {
-  return { audit: [], contentPacks: [], matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [] }
+  return { audit: [], contentPacks: [], matches: [], rulesets: [], seasons: [], stations: [], statProfiles: [], venues: [] }
 }
 
 function operationsError(context: { render(node: RemixNode, init?: ResponseInit): Response }, error: unknown) {

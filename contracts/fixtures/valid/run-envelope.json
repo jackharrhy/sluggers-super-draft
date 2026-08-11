@@ -30,6 +30,17 @@
     "mercyRuleRuns": 10,
     "starSkillsEnabled": true
   },
+  "execution": {
+    "mode": "cpu-vs-cpu",
+    "stadium": {
+      "gameStadiumId": "mario-stadium",
+      "venueId": null
+    },
+    "recovery": {
+      "allowLiveReattach": true,
+      "freshAttemptLimit": 1
+    }
+  },
   "lease": {
     "leaseId": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     "runnerId": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",

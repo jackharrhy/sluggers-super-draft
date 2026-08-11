@@ -639,6 +639,164 @@
         "additionalProperties": false
       }
     },
+    "sluggersTuning": {
+      "type": "object",
+      "properties": {
+        "characterIdsByIndex": {
+          "minItems": 101,
+          "maxItems": 101,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 127
+          }
+        },
+        "chemistry": {
+          "minItems": 101,
+          "maxItems": 101,
+          "type": "array",
+          "items": {
+            "minItems": 101,
+            "maxItems": 101,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "trajectoryTables": {
+          "minItems": 24,
+          "maxItems": 24,
+          "type": "array",
+          "items": {
+            "minItems": 25,
+            "maxItems": 25,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "trajectoryNames": {
+          "minItems": 6,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "trajectoryActivation": {
+          "minItems": 6,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "globalSpeedCurves": {
+          "minItems": 43,
+          "maxItems": 43,
+          "type": "array",
+          "items": {
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "teamStarEvents": {
+          "minItems": 12,
+          "maxItems": 12,
+          "type": "array",
+          "items": {
+            "minItems": 41,
+            "maxItems": 41,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "starBoosts": {
+          "minItems": 16,
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "minItems": 4,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "starHandicaps": {
+          "minItems": 4,
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "minItems": 2,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          }
+        },
+        "handicapParameters": {
+          "minItems": 2,
+          "maxItems": 2,
+          "type": "array",
+          "items": {
+            "minItems": 3,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255
+            }
+          }
+        },
+        "importSource": {
+          "type": "object",
+          "properties": {
+            "format": {
+              "type": "string",
+              "const": "stat-editor-v4"
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "format",
+            "sha256"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "characterIdsByIndex",
+        "chemistry",
+        "trajectoryTables",
+        "trajectoryNames",
+        "trajectoryActivation",
+        "globalSpeedCurves",
+        "teamStarEvents",
+        "starBoosts",
+        "starHandicaps",
+        "handicapParameters",
+        "importSource"
+      ],
+      "additionalProperties": false
+    },
     "basedOnRevisionId": {
       "anyOf": [
         {
@@ -685,7 +843,7 @@
     "publishedAt"
   ],
   "additionalProperties": false,
-  "title": "StatProfileRevision v1",
-  "description": "A versioned stat vocabulary and its independently modeled character values.",
+  "title": "StatProfileRevision",
+  "description": "The current pre-release stat vocabulary and its independently modeled values.",
   "$id": "https://starworks.community/contracts/stat-profile-revision/v1.schema.json"
 }

@@ -600,6 +600,8 @@ export const statProfileRevisions = pgTable(
     characterValues: jsonb('character_values')
       .$type<StatProfileRevision['characterValues']>()
       .notNull(),
+    sluggersTuning: jsonb('sluggers_tuning')
+      .$type<NonNullable<StatProfileRevision['sluggersTuning']>>(),
     basedOnRevisionId: uuid('based_on_revision_id'),
     createdByPersonId: uuid('created_by_person_id')
       .notNull()
@@ -1339,6 +1341,7 @@ export const matches = pgTable(
     seasonId: uuid('season_id').notNull(),
     homeTeamId: uuid('home_team_id').notNull(),
     awayTeamId: uuid('away_team_id').notNull(),
+    venueId: uuid('venue_id'),
     status: matchStatus('status').notNull().default('scheduled'),
     scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     createdByPersonId: uuid('created_by_person_id')
@@ -1364,6 +1367,11 @@ export const matches = pgTable(
       foreignColumns: [leagueTeams.leagueId, leagueTeams.id],
       name: 'matches_away_team_fk',
     }),
+    foreignKey({
+      columns: [table.leagueId, table.venueId],
+      foreignColumns: [venues.leagueId, venues.id],
+      name: 'matches_venue_fk',
+    }),
     index('matches_league_status_scheduled_index').on(table.leagueId, table.status, table.scheduledAt),
   ],
 )
@@ -1379,6 +1387,10 @@ export const matchAttempts = pgTable(
     correlationId: uuid('correlation_id').notNull(),
     attemptNonce: text('attempt_nonce').notNull(),
     requiredGameBuildSha256: text('required_game_build_sha256').notNull(),
+    executionMode: text('execution_mode').$type<'cpu-vs-cpu'>().notNull().default('cpu-vs-cpu'),
+    gameStadiumId: text('game_stadium_id').notNull().default('mario-stadium'),
+    retryCount: integer('retry_count').notNull().default(0),
+    replacesAttemptId: uuid('replaces_attempt_id'),
     contentPackRevisionId: uuid('content_pack_revision_id'),
     statProfileRevisionId: uuid('stat_profile_revision_id').notNull(),
     rulesetRevisionId: uuid('ruleset_revision_id').notNull(),
@@ -1397,6 +1409,7 @@ export const matchAttempts = pgTable(
     failedAt: timestamp('failed_at', { withTimezone: true }),
     confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
     confirmedByPersonId: uuid('confirmed_by_person_id').references(() => people.id),
+    confirmationSource: text('confirmation_source').$type<'manual' | 'system'>(),
     issuedAt: timestamp('issued_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
@@ -1405,12 +1418,21 @@ export const matchAttempts = pgTable(
     check('match_attempts_positive_number_check', sql`${table.attemptNumber} > 0`),
     check('match_attempts_nonce_check', sql`${table.attemptNonce} ~ '^[A-Za-z0-9_-]{32,128}$'`),
     check('match_attempts_build_hash_check', sql`${table.requiredGameBuildSha256} ~ '^[a-f0-9]{64}$'`),
+    check('match_attempts_execution_mode_check', sql`${table.executionMode} = 'cpu-vs-cpu'`),
+    check('match_attempts_game_stadium_check', sql`${table.gameStadiumId} ~ '^[a-z0-9][a-z0-9-]{0,63}$'`),
+    check('match_attempts_retry_count_check', sql`${table.retryCount} >= 0 and ${table.retryCount} <= 1`),
+    check('match_attempts_confirmation_source_check', sql`${table.confirmationSource} is null or ${table.confirmationSource} in ('manual', 'system')`),
     uniqueIndex('match_attempts_match_number_unique').on(table.leagueId, table.matchId, table.attemptNumber),
     foreignKey({
       columns: [table.leagueId, table.matchId],
       foreignColumns: [matches.leagueId, matches.id],
       name: 'match_attempts_match_fk',
     }).onDelete('cascade'),
+    foreignKey({
+      columns: [table.leagueId, table.replacesAttemptId],
+      foreignColumns: [table.leagueId, table.id],
+      name: 'match_attempts_replaces_attempt_fk',
+    }),
     foreignKey({
       columns: [table.leagueId, table.homeRosterRevisionId],
       foreignColumns: [rosterRevisions.leagueId, rosterRevisions.id],

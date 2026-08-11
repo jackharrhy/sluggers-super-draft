@@ -94,11 +94,14 @@ class CaptureProfile:
         environment: Mapping[str, str] | None = None,
     ) -> CaptureRequest:
         values = os.environ if environment is None else environment
-        recording_path = (
-            self.recording_directory.expanduser().resolve() / f"{attempt_id}.mkv"
-            if self.recording_directory
-            else None
-        )
+        recording_path = None
+        if self.recording_directory:
+            directory = self.recording_directory.expanduser().resolve()
+            recording_path = directory / f"{attempt_id}.mkv"
+            segment = 1
+            while recording_path.exists():
+                recording_path = directory / f"{attempt_id}-recovery-{segment}.mkv"
+                segment += 1
         return CaptureRequest(
             source=self.source,
             recording_path=recording_path,
@@ -456,6 +459,7 @@ class CapturingAttemptExecutor:
         self.profile = profile
         self.environment = environment
         self.last_health = capture.health()
+        self.active_attempt_id: str | None = None
 
     def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.executor.prepare(envelope, configuration)
@@ -463,6 +467,20 @@ class CapturingAttemptExecutor:
     def component_health(self) -> dict[str, str]:
         self.last_health = self.capture.health()
         return self.last_health.heartbeat_value()
+
+    def supply_content_pack(self, content_pack: Any) -> None:
+        supply = getattr(self.executor, "supply_content_pack", None)
+        if callable(supply):
+            supply(content_pack)
+
+    def restore_runtime(self, metadata: dict[str, Any]) -> None:
+        restore = getattr(self.executor, "restore_runtime", None)
+        if callable(restore):
+            restore(metadata)
+
+    def runtime_metadata(self) -> dict[str, Any] | None:
+        metadata = getattr(self.executor, "runtime_metadata", None)
+        return metadata() if callable(metadata) else None
 
     def execute(
         self,
@@ -472,22 +490,47 @@ class CapturingAttemptExecutor:
         recovering: bool,
         emit_telemetry: Callable[[dict[str, Any]], None],
     ) -> Any:
+        attempt_id = envelope["attemptId"]
+        if self.active_attempt_id not in (None, attempt_id):
+            raise RuntimeError("Capture is still bound to another match attempt")
+        if self.active_attempt_id is None:
+            try:
+                request = self.profile.request_for_attempt(attempt_id, self.environment)
+                self.last_health = self.capture.start(request)
+                self.active_attempt_id = attempt_id
+            except Exception:  # noqa: BLE001 - capture must not lose telemetry
+                self.last_health = self.capture.health()
         try:
-            request = self.profile.request_for_attempt(
-                envelope["attemptId"], self.environment
-            )
-            self.last_health = self.capture.start(request)
-        except Exception:  # noqa: BLE001 - a bad capture profile must not lose telemetry
-            self.last_health = self.capture.health()
-        try:
-            return self.executor.execute(
+            outcome = self.executor.execute(
                 envelope,
                 configuration,
                 recovering=recovering,
                 emit_telemetry=emit_telemetry,
             )
-        finally:
+        except Exception:
             try:
                 self.last_health = self.capture.stop()
             except Exception:  # noqa: BLE001 - game outcome remains authoritative
                 self.last_health = self.capture.health()
+            self.active_attempt_id = None
+            raise
+        if outcome.action != "continue":
+            try:
+                self.last_health = self.capture.stop()
+            except Exception:  # noqa: BLE001 - game outcome remains authoritative
+                self.last_health = self.capture.health()
+            self.active_attempt_id = None
+        else:
+            self.last_health = self.capture.health()
+        return outcome
+
+    def stop(self) -> None:
+        """Release both wrapped execution resources from one owner."""
+
+        stop_executor = getattr(self.executor, "stop", None)
+        try:
+            if callable(stop_executor):
+                stop_executor()
+        finally:
+            self.last_health = self.capture.stop()
+            self.active_attempt_id = None

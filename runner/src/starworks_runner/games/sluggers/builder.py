@@ -43,6 +43,7 @@ OUTPUT_PATHS = ("sys/main.dol", "files/dt_na.dat", "sys/fst.bin")
 class BuildRequest:
     image_path: Path
     cache_root: Path
+    adapter_build_sha256: str
     content_pack_sha256: str = EMPTY_CONTENT_PACK_SHA256
     content_pack: ContentPackInput | None = None
     adapter_version: str = "0.1.0"
@@ -111,13 +112,8 @@ class GameBuildService:
         cache_root = request.cache_root.expanduser().resolve()
         if not image.is_file():
             raise DiscImageError(f"Selected game image is not a regular file: {image}")
-        if len(request.content_pack_sha256) != 64 or any(
-            character not in "0123456789abcdef"
-            for character in request.content_pack_sha256
-        ):
-            raise BuildIntegrityError(
-                "content-pack SHA-256 must be 64 lowercase hex digits"
-            )
+        self._require_sha256("adapter-build", request.adapter_build_sha256)
+        self._require_sha256("content-pack", request.content_pack_sha256)
         if (
             request.content_pack is None
             and request.content_pack_sha256 != EMPTY_CONTENT_PACK_SHA256
@@ -233,6 +229,7 @@ class GameBuildService:
                     "dtkVersion": self.disc_tool.release.version,
                     "dtkSha256": tool_sha256,
                     "adapterVersion": request.adapter_version,
+                    "adapterBuildSha256": request.adapter_build_sha256,
                     "compilerVersion": request.compiler_version,
                 },
                 "cacheKeySha256": cache_key,
@@ -276,6 +273,7 @@ class GameBuildService:
             {
                 "baseGame": base.manifest_value(),
                 "adapterVersion": request.adapter_version,
+                "adapterBuildSha256": request.adapter_build_sha256,
                 "compilerVersion": request.compiler_version,
                 "contentPackSha256": content_pack_sha256,
             }
@@ -295,6 +293,7 @@ class GameBuildService:
             "kind": "game-build-manifest",
             "baseGame": base.manifest_value(),
             "adapterVersion": request.adapter_version,
+            "adapterBuildSha256": request.adapter_build_sha256,
             "compilerVersion": request.compiler_version,
             "contentPackSha256": content_pack_sha256,
             "gameTreeSha256": game_tree_sha256,
@@ -307,6 +306,15 @@ class GameBuildService:
             **deterministic_receipt,
             "buildSha256": sha256_json(deterministic_receipt),
         }
+
+    @staticmethod
+    def _require_sha256(label: str, value: str) -> None:
+        if len(value) != 64 or any(
+            character not in "0123456789abcdef" for character in value
+        ):
+            raise BuildIntegrityError(
+                f"{label} SHA-256 must be 64 lowercase hex digits"
+            )
 
     @staticmethod
     def _warnings(

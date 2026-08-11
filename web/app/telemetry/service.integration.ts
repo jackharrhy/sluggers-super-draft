@@ -34,6 +34,7 @@ import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { hashSecret } from '../platform/security.ts'
 import { BroadcastService } from '../broadcast/service.ts'
+import { SLUGGERS_ADAPTER_VERSION } from '../runner/adapter-version.ts'
 import { TelemetryService } from './service.ts'
 
 let databaseUrl = process.env.STARWORKS_TEST_DATABASE_URL
@@ -148,6 +149,55 @@ test(
 )
 
 test(
+  'healthy bridge telemetry auto-confirms with a system audit actor',
+  { skip: databaseUrl ? false : 'STARWORKS_TEST_DATABASE_URL is not set' },
+  async () => {
+    let connection = createDatabase(databaseUrl!, { max: 4 })
+    let fixture = await createFixture(connection.database)
+    let service = new TelemetryService(connection.database, {
+      clock: () => new Date('2026-08-10T15:00:00Z'),
+    })
+    try {
+      await service.ingest(
+        fixture.credential,
+        upload(fixture, representativeGame(fixture)),
+      )
+      let finalized = await service.finalizeHealthyAttempt(
+        fixture.credential,
+        fixture.attemptId,
+      )
+      assert.deepEqual(finalized, {
+        leagueId: fixture.leagueId,
+        matchId: fixture.matchId,
+        status: 'confirmed',
+      })
+      assert.equal(
+        (await service.finalizeHealthyAttempt(fixture.credential, fixture.attemptId)).status,
+        'confirmed',
+      )
+      let [attempt] = await connection.database.select().from(matchAttempts)
+        .where(eq(matchAttempts.id, fixture.attemptId))
+      let [match] = await connection.database.select().from(matches)
+        .where(eq(matches.id, fixture.matchId))
+      let [audit] = await connection.database.select().from(auditRecords).where(and(
+        eq(auditRecords.leagueId, fixture.leagueId),
+        eq(auditRecords.action, 'telemetry.auto_confirmed'),
+      ))
+      assert.equal(attempt?.status, 'confirmed')
+      assert.equal(attempt?.confirmationSource, 'system')
+      assert.equal(attempt?.confirmedByPersonId, null)
+      assert.equal(match?.status, 'confirmed')
+      assert.equal(audit?.actorPersonId, null)
+      assert.match(String(audit?.metadata.inputDigest), /^[a-f0-9]{64}$/)
+      assert.equal(audit?.metadata.observationSource, 'bridge-hook')
+    } finally {
+      await cleanupFixture(connection, fixture.leagueId, fixture.admin.personId)
+      await connection.close()
+    }
+  },
+)
+
+test(
   'missing or overflowing telemetry is visible and blocks confirmation',
   { skip: databaseUrl ? false : 'STARWORKS_TEST_DATABASE_URL is not set' },
   async () => {
@@ -170,9 +220,15 @@ test(
       assert.ok(uploaded.issues.some((issue) => issue.includes('overflowing')))
       let derived = await service.derive(fixture.admin, fixture.leagueId, fixture.attemptId)
       assert.equal(derived.health.requiresReview, true)
+      assert.ok(derived.health.issues.includes('inning-started event is missing'))
+      assert.ok(derived.health.issues.includes('plate-appearance-ended event is missing'))
       await assert.rejects(
         service.confirm(fixture.admin, fixture.leagueId, fixture.attemptId),
         (error: unknown) => error instanceof PlatformError && error.code === 'conflict',
+      )
+      assert.equal(
+        (await service.finalizeHealthyAttempt(fixture.credential, fixture.attemptId)).status,
+        'review',
       )
       let [attempt] = await connection.database.select().from(matchAttempts).where(eq(matchAttempts.id, fixture.attemptId))
       assert.equal(attempt?.status, 'review')
@@ -185,7 +241,7 @@ test(
 
 function representativeGame(fixture: Awaited<ReturnType<typeof createFixture>>): TelemetryEnvelope[] {
   let base = (sequence: number, frame: number): Omit<TelemetryEnvelope, 'eventType' | 'payload'> => ({
-    adapterVersion: '0.1.0',
+    adapterVersion: SLUGGERS_ADAPTER_VERSION,
     attemptId: fixture.attemptId,
     attemptNonce: fixture.attemptNonce,
     correlationId: fixture.correlationId,
@@ -295,7 +351,7 @@ async function createFixture(database: ReturnType<typeof createDatabase>['databa
   })
   await database.insert(runnerStations).values({ capabilities: {
     adapterIds: ['sluggers-rmbe01'], architecture: 'arm64', dolphinVersion: null,
-    features: ['telemetry-spool-v1'], operatingSystem: 'macos', runnerVersion: '0.1.0',
+    features: ['telemetry-spool'], operatingSystem: 'macos', runnerVersion: '0.1.0',
   }, id: stationId, leagueId, name: 'Telemetry Station' })
   await database.insert(runnerCredentials).values({ createdByPersonId: adminPersonId, id: credentialId, leagueId, name: 'Telemetry credential', scopes: ['telemetry:write'], secretHash: hashSecret(credentialSecret), stationId })
   await database.insert(runnerLeases).values({ expiresAt: new Date('2026-08-10T16:00:00Z'), id: leaseId, lastRenewedAt: new Date('2026-08-10T14:00:00Z'), leagueId, matchAttemptId: attemptId, releasedAt: new Date('2026-08-10T14:59:00Z'), runnerStationId: stationId, status: 'released' })

@@ -5,8 +5,8 @@ import { RunEnvelopeSchema } from "./run-envelope.ts";
 export const RunnerFeatureSchema = z.enum([
   "build-sluggers",
   "launch-dolphin",
-  "runtime-bridge-v1",
-  "telemetry-spool-v1",
+  "runtime-bridge",
+  "telemetry-spool",
   "capture-ffmpeg",
   "broadcast-rtmp",
 ]);
@@ -112,7 +112,7 @@ export const RunnerLeaseUpdateRequestSchema = z.strictObject({
 export const RunnerLeaseUpdateResponseSchema = z.strictObject({
   schemaVersion: z.literal(1),
   kind: z.literal("runner-lease-update-response"),
-  attemptStatus: z.enum(["leased", "running", "provisional", "cancelled", "failed"]),
+  attemptStatus: z.enum(["leased", "running", "provisional", "confirmed", "cancelled", "failed", "review"]),
   expiresAt: TimestampSchema.nullable(),
 });
 
@@ -126,8 +126,8 @@ export const RunnerControlMessageSchema = z.union([
   RunnerLeaseUpdateRequestSchema,
   RunnerLeaseUpdateResponseSchema,
 ]).meta({
-  title: "RunnerControlMessage v1",
-  description: "Versioned registration, heartbeat, claim, and lease messages shared by Remix and the native runner.",
+  title: "RunnerControlMessage",
+  description: "Registration, heartbeat, claim, and lease messages shared by Remix and the native runner.",
 });
 
 export type RunnerCapabilities = z.infer<typeof RunnerCapabilitiesSchema>;

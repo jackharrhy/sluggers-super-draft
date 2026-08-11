@@ -76,7 +76,7 @@ export function ConfigurationDashboardPage(
             <details mix={[cardStyle, importStyle]}>
               <summary>Import Sluggers Stat Editor v4</summary>
               <form action={routes.leagues.configuration.importStatEditor.href({ leagueSlug: league.slug })} method="post" mix={nestedFormStyle}>
-                <p mix={emptyStyle}>Paste a 507-line v4 save. Starworks imports character-shaped data and reports the unsupported relational/global sections in its migration boundary.</p>
+                <p mix={emptyStyle}>Paste a 507-line v4 save. Starworks preserves all character, chemistry, trajectory, speed-curve, team-star, boost, and handicap sections in one typed draft.</p>
                 <Field label="Profile name" name="name" defaultValue="Imported Stat Editor profile" />
                 <Field label="Slug" name="slug" defaultValue="imported-stat-editor" />
                 <label mix={fieldStyle}>

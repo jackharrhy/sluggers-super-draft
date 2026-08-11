@@ -35,6 +35,7 @@ class ActiveRun:
     stage: RunStage
     last_captured_sequence: int | None
     pending_outcome: Literal["complete", "cancel"] | None
+    runtime_metadata: dict[str, Any] | None
 
 
 @dataclass(frozen=True)
@@ -147,7 +148,7 @@ class RunnerStateStore:
             row = self._connection.execute(
                 """
                 select envelope_json, configuration_json, stage, last_captured_sequence,
-                       pending_outcome
+                       pending_outcome, runtime_metadata_json
                 from active_run where singleton = 1
                 """
             ).fetchone()
@@ -166,6 +167,11 @@ class RunnerStateStore:
             last_captured_sequence=row["last_captured_sequence"],
             pending_outcome=cast(
                 Literal["complete", "cancel"] | None, row["pending_outcome"]
+            ),
+            runtime_metadata=(
+                cast(dict[str, Any], json.loads(row["runtime_metadata_json"]))
+                if row["runtime_metadata_json"]
+                else None
             ),
         )
 
@@ -220,6 +226,27 @@ class RunnerStateStore:
             if updated.rowcount != 1:
                 raise ActiveRunConflict(
                     "Active attempt changed before its stage update"
+                )
+
+    def save_runtime_metadata(
+        self, attempt_id: str, metadata: dict[str, Any] | None
+    ) -> None:
+        encoded = (
+            json.dumps(metadata, separators=(",", ":"), sort_keys=True)
+            if metadata is not None
+            else None
+        )
+        with self._lock, self._connection:
+            updated = self._connection.execute(
+                """
+                update active_run set runtime_metadata_json = ?
+                where singleton = 1 and attempt_id = ?
+                """,
+                (encoded, attempt_id),
+            )
+            if updated.rowcount != 1:
+                raise ActiveRunConflict(
+                    "Attempt changed before runtime metadata was persisted"
                 )
 
     def queue_update(self, event_id: str, message: dict[str, Any]) -> None:
@@ -388,7 +415,8 @@ class RunnerStateStore:
                   configuration_json text,
                   stage text not null check (stage in ('claimed', 'preparing', 'running')),
                   last_captured_sequence integer
-                  ,pending_outcome text check (pending_outcome in ('complete', 'cancel'))
+                  ,pending_outcome text check (pending_outcome in ('complete', 'cancel')),
+                  runtime_metadata_json text
                 );
                 create table if not exists pending_updates (
                   event_id text primary key,
@@ -423,4 +451,8 @@ class RunnerStateStore:
             if "pending_outcome" not in columns:
                 self._connection.execute(
                     "alter table active_run add column pending_outcome text"
+                )
+            if "runtime_metadata_json" not in columns:
+                self._connection.execute(
+                    "alter table active_run add column runtime_metadata_json text"
                 )

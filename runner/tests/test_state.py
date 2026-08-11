@@ -78,6 +78,12 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         state.accept_run(envelope)
         state.save_configuration(envelope["attemptId"], configuration)
         state.update_stage(envelope["attemptId"], "running")
+        runtime_metadata = {
+            "kind": "sluggers-live-session",
+            "processId": 4242,
+            "processIdentitySha256": "c" * 64,
+        }
+        state.save_runtime_metadata(envelope["attemptId"], runtime_metadata)
         telemetry = {
             "schemaVersion": 1,
             "kind": "telemetry-envelope",
@@ -105,6 +111,7 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         assert recovered.load_active_run().stage == "running"  # type: ignore[union-attr]
         assert recovered.load_active_run().configuration == configuration  # type: ignore[union-attr]
         assert recovered.load_active_run().pending_outcome == "complete"  # type: ignore[union-attr]
+        assert recovered.load_active_run().runtime_metadata == runtime_metadata  # type: ignore[union-attr]
         spooled = recovered.list_pending_telemetry(envelope["attemptId"])
         assert spooled[0].envelope == telemetry
         recovered.acknowledge_telemetry(envelope["attemptId"], [1])

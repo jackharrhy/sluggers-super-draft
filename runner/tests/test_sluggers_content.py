@@ -12,6 +12,7 @@ from starworks_runner.games.sluggers.content import (
     StaticAssetTarget,
     StaticTargetCatalog,
     StaticValueTarget,
+    _compile_profile_patterns,
 )
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 
@@ -210,3 +211,64 @@ def test_exact_local_asset_replacement_is_hash_size_and_media_checked(
             ),
             main_dol_sha256="a" * 64,
         )
+
+
+def test_full_profile_catalog_compiles_all_cells_and_custom_handicap_parameters() -> (
+    None
+):
+    catalog = StaticTargetCatalog.load()
+    operation = full_profile_operation()
+    operation["tuning"]["handicapParameters"] = [[3, 9, 2], [4, 20, 5]]
+
+    writes, guards = _compile_profile_patterns(operation, catalog)
+
+    assert len(writes) == 16_406
+    assert len(guards) == 16
+    handicap = {
+        write.target_offset: write.replacement_bytes
+        for write in writes
+        if write.target_id.startswith("handicap-parameter-")
+    }
+    assert handicap == {
+        0x1205EF: b"\x03",
+        0x1205FB: b"\x09",
+        0x120603: b"\x02",
+        0x120677: b"\x04",
+        0x120683: b"\x14",
+        0x12068B: b"\x05",
+    }
+
+    operation["tuning"]["handicapParameters"][1][2] = 256
+    with pytest.raises(BuildIntegrityError, match="cannot be encoded as u8"):
+        _compile_profile_patterns(operation, catalog)
+
+
+def full_profile_operation() -> dict[str, object]:
+    characters = []
+    for index in range(101):
+        values = {
+            **{f"legacy.stat-editor.stat-{column:02d}": 0 for column in range(30)},
+            **{f"legacy.stat-editor.size-{column:02d}": 0 for column in range(14)},
+            **{f"legacy.stat-editor.pitching-{column:02d}": 0 for column in range(5)},
+        }
+        characters.append(
+            {"characterId": f"rmbe01-character-{index:03d}", "values": values}
+        )
+
+    def matrix(rows: int, columns: int) -> list[list[int]]:
+        return [[0 for _ in range(columns)] for _ in range(rows)]
+
+    return {
+        "operation": "apply-sluggers-stat-profile",
+        "characterValues": characters,
+        "tuning": {
+            "chemistry": matrix(101, 101),
+            "trajectoryTables": matrix(24, 25),
+            "trajectoryActivation": [1, 1, 1, 1, 1, 1],
+            "globalSpeedCurves": matrix(43, 2),
+            "teamStarEvents": matrix(12, 41),
+            "starBoosts": matrix(16, 4),
+            "starHandicaps": matrix(4, 2),
+            "handicapParameters": [[2, 8, 1], [2, 24, 3]],
+        },
+    }

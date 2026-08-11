@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import os
 import platform
+from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from starworks_runner.control import RunnerControlClient
 from starworks_runner.diagnostics import inspect_local_prerequisites
-from starworks_runner.orchestrator import RunnerStation
-from starworks_runner.state import RunnerStateStore
+from starworks_runner.station import (
+    SluggersStationConfig,
+    StationService,
+    create_sluggers_station_service,
+)
 
 
 @dataclass(frozen=True)
@@ -22,6 +25,8 @@ class DesktopDefaults:
     game_image: Path | None = None
     dolphin_executable: Path | None = None
     dtk_executable: Path | None = None
+    seed_profile_directory: Path | None = None
+    checkpoint_manifest: Path | None = None
 
 
 def default_state_path() -> Path:
@@ -68,10 +73,9 @@ def native_capabilities(*, dolphin_version: str | None = None) -> dict[str, Any]
         "features": [
             "build-sluggers",
             "launch-dolphin",
-            "runtime-bridge-v1",
-            "telemetry-spool-v1",
+            "runtime-bridge",
+            "telemetry-spool",
             "capture-ffmpeg",
-            "broadcast-rtmp",
         ],
         "dolphinVersion": dolphin_version,
     }
@@ -109,15 +113,15 @@ def launch_desktop(
         failed = Signal(str)
 
     class Worker(QRunnable):
-        def __init__(self, operation: object) -> None:
+        def __init__(self, operation: Callable[[], object]) -> None:
             super().__init__()
             self.operation = operation
             self.signals = WorkerSignals()
 
         def run(self) -> None:
             try:
-                result = self.operation()  # type: ignore[operator]
-            except Exception as error:  # noqa: BLE001 - report worker failures in Qt
+                result = self.operation()
+            except Exception as error:  # noqa: BLE001 - surface failures in Qt
                 self.signals.failed.emit(str(error))
             else:
                 self.signals.completed.emit(result)
@@ -126,13 +130,18 @@ def launch_desktop(
         def __init__(self) -> None:
             super().__init__()
             self.pool = QThreadPool.globalInstance()
+            self.service: StationService | None = None
+            self.service_config: SluggersStationConfig | None = None
+            self.station_running = False
+            self.tick_in_flight = False
             self.setWindowTitle("Starworks Runner")
-            self.setMinimumSize(680, 720)
+            self.setMinimumSize(760, 900)
 
             heading = QLabel("Starworks Runner")
             heading.setObjectName("heading")
             subtitle = QLabel(
-                "Register this computer as a private Mario Super Sluggers station."
+                "Configure this computer once, then let it claim and run scheduled "
+                "Mario Super Sluggers matches."
             )
             subtitle.setWordWrap(True)
 
@@ -140,7 +149,7 @@ def launch_desktop(
             self.url.setPlaceholderText("https://starworks.example")
             self.credential = QLineEdit(defaults.credential)
             self.credential.setEchoMode(QLineEdit.EchoMode.Password)
-            self.credential.setPlaceholderText("One-time runner credential")
+            self.credential.setPlaceholderText("Runner credential from a site admin")
             self.station_name = QLineEdit(defaults.station_name)
             self.game_image = QLineEdit(
                 str(defaults.game_image) if defaults.game_image else ""
@@ -151,6 +160,16 @@ def launch_desktop(
             self.dtk_executable = QLineEdit(
                 str(defaults.dtk_executable) if defaults.dtk_executable else ""
             )
+            self.seed_profile = QLineEdit(
+                str(defaults.seed_profile_directory)
+                if defaults.seed_profile_directory
+                else ""
+            )
+            self.checkpoint_manifest = QLineEdit(
+                str(defaults.checkpoint_manifest)
+                if defaults.checkpoint_manifest
+                else ""
+            )
 
             form = QFormLayout()
             form.addRow("Starworks URL", self.url)
@@ -158,7 +177,7 @@ def launch_desktop(
             form.addRow("Station name", self.station_name)
             form.addRow(
                 "Game dump",
-                self.path_selector(
+                self.file_selector(
                     self.game_image,
                     "Select a user-owned Mario Super Sluggers dump",
                     "Wii images (*.rvz *.iso *.wbfs);;All files (*)",
@@ -166,28 +185,47 @@ def launch_desktop(
             )
             form.addRow(
                 "Dolphin",
-                self.path_selector(
+                self.file_selector(
                     self.dolphin_executable,
-                    "Select the pinned Dolphin executable",
+                    "Select Dolphin 2606",
                     "All files (*)",
                 ),
             )
             form.addRow(
                 "decomp-toolkit",
-                self.path_selector(
+                self.file_selector(
                     self.dtk_executable,
-                    "Select the pinned decomp-toolkit executable",
+                    "Select decomp-toolkit",
                     "All files (*)",
                 ),
             )
+            form.addRow(
+                "Unlocked seed profile",
+                self.directory_selector(
+                    self.seed_profile,
+                    "Select the immutable Dolphin seed profile",
+                ),
+            )
+            form.addRow(
+                "Pre-roster checkpoint",
+                self.file_selector(
+                    self.checkpoint_manifest,
+                    "Select the reviewed checkpoint manifest",
+                    "JSON (*.json);;All files (*)",
+                ),
+            )
 
-            self.register_button = QPushButton("Register station")
-            self.register_button.clicked.connect(self.register_station)
-            self.heartbeat_button = QPushButton("Send heartbeat")
-            self.heartbeat_button.clicked.connect(self.send_heartbeat)
+            self.connect_button = QPushButton("Connect station")
+            self.connect_button.clicked.connect(self.connect_station)
+            self.start_button = QPushButton("Start station")
+            self.start_button.clicked.connect(self.start_station)
+            self.stop_button = QPushButton("Stop while idle")
+            self.stop_button.clicked.connect(self.stop_station)
+            self.stop_button.setDisabled(True)
             buttons = QHBoxLayout()
-            buttons.addWidget(self.register_button)
-            buttons.addWidget(self.heartbeat_button)
+            buttons.addWidget(self.connect_button)
+            buttons.addWidget(self.start_button)
+            buttons.addWidget(self.stop_button)
             buttons.addStretch()
 
             status_card = QFrame()
@@ -195,19 +233,32 @@ def launch_desktop(
             status_layout = QVBoxLayout(status_card)
             status_label = QLabel("Station status")
             status_label.setObjectName("statusLabel")
-            self.status = QLabel("Not registered on this computer")
-            self.status.setWordWrap(True)
+            self.status = QLabel("Not connected on this computer")
             self.active_run = QLabel("No locally journaled match attempt")
-            self.active_run.setWordWrap(True)
+            self.lease_status = QLabel("No active lease")
+            self.telemetry_status = QLabel("Telemetry spool is idle")
+            self.recovery_status = QLabel("No live Dolphin session")
+            self.artifact_status = QLabel("Managed build cache has not been inspected")
+            self.last_error = QLabel("No operator action is required")
+            self.last_error.setObjectName("operatorError")
             self.prerequisites = QLabel()
-            self.prerequisites.setWordWrap(True)
-            status_layout.addWidget(status_label)
-            status_layout.addWidget(self.status)
-            status_layout.addWidget(self.active_run)
-            status_layout.addWidget(self.prerequisites)
+            for label in (
+                self.status,
+                self.active_run,
+                self.lease_status,
+                self.telemetry_status,
+                self.recovery_status,
+                self.artifact_status,
+                self.last_error,
+                self.prerequisites,
+            ):
+                label.setWordWrap(True)
+                status_layout.addWidget(label)
+            status_layout.insertWidget(0, status_label)
 
             privacy = QLabel(
-                "The credential is held only in this window. It is never saved to the local runner database."
+                "The runner credential stays in this process. The local database "
+                "contains match recovery state, not the credential."
             )
             privacy.setObjectName("privacy")
             privacy.setWordWrap(True)
@@ -229,8 +280,7 @@ def launch_desktop(
                 QWidget { background: #11141a; color: #f4f1e8; font-size: 14px; }
                 #heading { font-size: 28px; font-weight: 700; color: #ffd45c; }
                 QLineEdit { background: #202631; border: 1px solid #465064;
-                            min-height: 22px;
-                            border-radius: 7px; padding: 9px; }
+                            min-height: 22px; border-radius: 7px; padding: 9px; }
                 QPushButton { background: #f4b942; color: #17130a; border: 0;
                               border-radius: 7px; font-weight: 700; min-height: 22px;
                               padding: 10px 15px; }
@@ -239,95 +289,162 @@ def launch_desktop(
                               border-radius: 10px; padding: 8px; }
                 #statusCard QLabel { background: transparent; }
                 #statusLabel { color: #9eb5d7; font-weight: 700; }
+                #operatorError { color: #f5a3a3; }
                 #privacy { color: #9aa3b1; font-size: 12px; }
                 """
             )
             self.refresh_local_status()
+            self.status_timer = QTimer(self)
+            self.status_timer.timeout.connect(self.refresh_local_status)
+            self.status_timer.start(2_000)
 
-        def path_selector(
+        def file_selector(
             self, field: QLineEdit, caption: str, file_filter: str
         ) -> QWidget:
+            return self.path_selector(
+                field,
+                lambda: QFileDialog.getOpenFileName(
+                    self, caption, field.text(), file_filter
+                )[0],
+            )
+
+        def directory_selector(self, field: QLineEdit, caption: str) -> QWidget:
+            return self.path_selector(
+                field,
+                lambda: QFileDialog.getExistingDirectory(self, caption, field.text()),
+            )
+
+        def path_selector(self, field: QLineEdit, choose: Callable[[], str]) -> QWidget:
             container = QWidget()
             container.setMinimumHeight(44)
             layout = QHBoxLayout(container)
             layout.setContentsMargins(0, 0, 0, 0)
             layout.setSpacing(8)
             browse = QPushButton("Browse…")
-            browse.clicked.connect(
-                lambda: self.select_file(field, caption, file_filter)
-            )
+
+            def select() -> None:
+                selected = choose()
+                if selected:
+                    field.setText(selected)
+                    self.refresh_local_status()
+
+            browse.clicked.connect(select)
             layout.addWidget(field)
             layout.addWidget(browse)
             return container
 
-        def select_file(self, field: QLineEdit, caption: str, file_filter: str) -> None:
-            selected, _ = QFileDialog.getOpenFileName(
-                self, caption, field.text(), file_filter
-            )
-            if selected:
-                field.setText(selected)
-                self.refresh_local_status()
-
-        def runner_station(self) -> tuple[RunnerStation, RunnerStateStore]:
+        def desired_config(self) -> SluggersStationConfig:
             credential = self.credential.text().strip()
             if not credential:
                 raise RuntimeError("Paste a runner credential before connecting")
-            state = RunnerStateStore(defaults.state_path)
-            client = RunnerControlClient(self.url.text().strip(), credential)
-            station = RunnerStation(
-                client,
-                state,
+            dolphin = self.required_path(self.dolphin_executable.text(), "Dolphin")
+            seed_profile = self.optional_path(self.seed_profile.text())
+            checkpoint = self.optional_path(self.checkpoint_manifest.text())
+            if (seed_profile is None) != (checkpoint is None):
+                raise RuntimeError(
+                    "Select both the unlocked seed profile and pre-roster checkpoint"
+                )
+            data_root = defaults.state_path.expanduser().resolve().parent
+            return SluggersStationConfig(
+                base_url=self.url.text().strip(),
+                credential=credential,
                 station_name=self.station_name.text().strip(),
-                capabilities=native_capabilities(),
-                content_cache=defaults.state_path.parent / "cache",
+                state_path=defaults.state_path,
+                cache_root=data_root / "cache",
+                dolphin_executable=dolphin,
+                profile_root=data_root / "profiles",
+                capabilities=native_capabilities(dolphin_version="2606"),
+                game_image=self.optional_path(self.game_image.text()),
+                dtk_executable=self.optional_path(self.dtk_executable.text()),
+                seed_profile_directory=seed_profile,
+                checkpoint_manifest=checkpoint,
+                recording_directory=data_root / "artifacts",
             )
-            return station, state
 
-        def register_station(self) -> None:
+        def runner_service(self) -> StationService:
+            config = self.desired_config()
+            if self.service is not None and config != self.service_config:
+                if self.station_running or self.tick_in_flight:
+                    raise RuntimeError("Stop the station before changing its setup")
+                self.service.close()
+                self.service = None
+            if self.service is None:
+                self.service = create_sluggers_station_service(config)
+                self.service_config = config
+            return self.service
+
+        def connect_station(self) -> None:
             try:
-                station, state = self.runner_station()
-            except Exception as error:  # noqa: BLE001 - surface setup failures in UI
+                service = self.runner_service()
+            except Exception as error:  # noqa: BLE001 - show setup failure
                 self.show_error(str(error))
                 return
-
-            def operation() -> object:
-                try:
-                    return station.register()
-                finally:
-                    state.close()
-
             self.start_work(
-                operation,
+                lambda: service.ensure_registered()[0],
                 lambda registration: self.status.setText(
-                    f"Registered as {registration.runner_id} · heartbeat every "
-                    f"{registration.heartbeat_seconds}s · "
-                    f"runner update {registration.version_status}"
+                    f"Connected as {registration.runner_id}"
                 ),
             )
 
-        def send_heartbeat(self) -> None:
+        def start_station(self) -> None:
             try:
-                station, state = self.runner_station()
-            except Exception as error:  # noqa: BLE001 - surface setup failures in UI
+                service = self.runner_service()
+                service.ensure_registered()
+            except Exception as error:  # noqa: BLE001 - show setup failure
                 self.show_error(str(error))
                 return
+            self.station_running = True
+            self.last_error.setText("No operator action is required")
+            self.update_buttons()
+            self.run_station_tick()
 
-            def operation() -> object:
-                try:
-                    return station.heartbeat("idle")
-                finally:
-                    state.close()
+        def run_station_tick(self) -> None:
+            if not self.station_running or self.tick_in_flight:
+                return
+            assert self.service is not None
+            self.tick_in_flight = True
+            self.update_buttons()
+            worker = Worker(self.service.tick)
+            worker.signals.completed.connect(self.tick_completed)
+            worker.signals.failed.connect(self.tick_failed)
+            self.pool.start(worker)
 
-            self.start_work(
-                operation,
-                lambda response: self.status.setText(
-                    f"Heartbeat accepted · server time {response['serverTime']}"
-                ),
-            )
+        def tick_completed(self, result: object) -> None:
+            self.tick_in_flight = False
+            self.refresh_local_status()
+            self.update_buttons()
+            if self.station_running:
+                QTimer.singleShot(1_000, self.run_station_tick)
 
-        def start_work(self, operation: object, completed: object) -> None:
-            self.register_button.setDisabled(True)
-            self.heartbeat_button.setDisabled(True)
+        def tick_failed(self, message: str) -> None:
+            self.tick_in_flight = False
+            self.station_running = False
+            self.update_buttons()
+            self.show_error(message)
+
+        def stop_station(self) -> None:
+            if self.service is None:
+                return
+            snapshot = self.service.snapshot()
+            if snapshot.attempt_id is not None:
+                self.show_error(
+                    "An attempt is active. Let it finish; abort semantics are not "
+                    "implemented yet."
+                )
+                return
+            self.station_running = False
+            self.service.close()
+            self.service = None
+            self.service_config = None
+            self.status.setText("Station stopped while idle")
+            self.update_buttons()
+            self.refresh_local_status()
+
+        def start_work(
+            self, operation: Callable[[], object], completed: Callable[[Any], None]
+        ) -> None:
+            self.connect_button.setDisabled(True)
+            self.start_button.setDisabled(True)
             worker = Worker(operation)
             worker.signals.completed.connect(completed)
             worker.signals.completed.connect(lambda _: self.finish_work())
@@ -335,34 +452,86 @@ def launch_desktop(
             self.pool.start(worker)
 
         def finish_work(self) -> None:
-            self.register_button.setDisabled(False)
-            self.heartbeat_button.setDisabled(False)
+            self.update_buttons()
             self.refresh_local_status()
 
+        def update_buttons(self) -> None:
+            busy = self.tick_in_flight
+            self.connect_button.setDisabled(busy or self.station_running)
+            self.start_button.setDisabled(busy or self.station_running)
+            self.stop_button.setDisabled(
+                busy or (not self.station_running and self.service is None)
+            )
+
         def show_error(self, message: str) -> None:
-            self.finish_work()
-            QMessageBox.critical(self, "Runner connection failed", message)
+            self.update_buttons()
+            self.last_error.setText(f"Action required: {message}")
+            QMessageBox.critical(self, "Starworks Runner", message)
 
         def refresh_local_status(self) -> None:
-            with RunnerStateStore(defaults.state_path) as state:
-                registration = state.load_registration()
-                active = state.load_active_run()
-            if registration:
-                update_detail = registration.version_status
-                if registration.recommended_runner_version:
-                    update_detail += (
-                        f" (recommended {registration.recommended_runner_version})"
-                    )
+            snapshot = self.service.snapshot() if self.service is not None else None
+            if snapshot is not None and snapshot.registered:
+                state = "running" if self.station_running else "connected"
                 self.status.setText(
-                    f"Registered locally as {registration.runner_id} · "
-                    f"runner update {update_detail}"
+                    f"Station {state} as {snapshot.runner_id}"
+                    + (
+                        f" · last tick {snapshot.last_tick_status}"
+                        if snapshot.last_tick_status
+                        else ""
+                    )
                 )
-            if active:
+            if snapshot is not None and snapshot.attempt_id is not None:
+                live_stage = (
+                    f" · game {snapshot.live_stage}" if snapshot.live_stage else ""
+                )
                 self.active_run.setText(
-                    f"Attempt {active.envelope['attemptId']} · stage {active.stage}"
+                    f"Attempt {snapshot.attempt_id} · match {snapshot.match_id} · "
+                    f"stage {snapshot.stage}{live_stage}"
+                )
+                self.lease_status.setText(
+                    f"Lease expires {snapshot.lease_expires_at} · "
+                    f"fresh retries allowed {snapshot.fresh_attempt_limit}"
+                )
+                self.telemetry_status.setText(
+                    f"Telemetry · last captured {snapshot.last_captured_sequence} · "
+                    f"{snapshot.pending_telemetry} waiting to upload · "
+                    f"{snapshot.pending_updates} control updates waiting"
+                )
+                self.recovery_status.setText(
+                    f"Dolphin PID {snapshot.process_id} is journaled"
+                    if snapshot.process_id is not None
+                    else "No verified live Dolphin identity yet"
                 )
             else:
                 self.active_run.setText("No locally journaled match attempt")
+                self.lease_status.setText("No active lease")
+                self.telemetry_status.setText(
+                    "Telemetry spool is idle"
+                    + (
+                        f" · {snapshot.pending_updates} control updates waiting"
+                        if snapshot and snapshot.pending_updates
+                        else ""
+                    )
+                )
+                self.recovery_status.setText("No live Dolphin session")
+
+            cache = defaults.state_path.expanduser().resolve().parent / "cache"
+            builds = cache / "builds"
+            build_count = (
+                sum(1 for item in builds.iterdir() if item.is_dir())
+                if builds.is_dir()
+                else 0
+            )
+            recordings = defaults.state_path.expanduser().resolve().parent / "artifacts"
+            recording_count = (
+                sum(1 for item in recordings.glob("*.mkv") if item.is_file())
+                if recordings.is_dir()
+                else 0
+            )
+            self.artifact_status.setText(
+                f"Managed artifacts · {build_count} game builds · "
+                f"{recording_count} local recordings"
+            )
             checks = inspect_local_prerequisites(
                 game_image=self.optional_path(self.game_image.text()),
                 dolphin_executable=self.optional_path(self.dolphin_executable.text()),
@@ -376,9 +545,44 @@ def launch_desktop(
                 )
             )
 
+        def closeEvent(self, event: Any) -> None:
+            if self.tick_in_flight:
+                QMessageBox.information(
+                    self,
+                    "Starworks Runner",
+                    "The station is finishing a control tick. Try closing again in a moment.",
+                )
+                event.ignore()
+                return
+            if self.service is not None:
+                snapshot = self.service.snapshot()
+                if snapshot.attempt_id is not None:
+                    QMessageBox.warning(
+                        self,
+                        "Starworks Runner",
+                        "A match attempt is active. Leave the runner open until the "
+                        "match finishes; safe operator abort is not implemented yet.",
+                    )
+                    event.ignore()
+                    return
+            self.station_running = False
+            if self.service is not None:
+                try:
+                    self.service.close()
+                except Exception as error:  # noqa: BLE001 - app is closing
+                    self.last_error.setText(f"Shutdown warning: {error}")
+            event.accept()
+
         @staticmethod
         def optional_path(value: str) -> Path | None:
             return Path(value.strip()) if value.strip() else None
+
+        @staticmethod
+        def required_path(value: str, label: str) -> Path:
+            path = RunnerWindow.optional_path(value)
+            if path is None:
+                raise RuntimeError(f"Select {label} before connecting")
+            return path
 
     application = QApplication.instance() or QApplication([])
     application.setApplicationName("Starworks Runner")

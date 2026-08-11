@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import socket
 import time
+from collections import deque
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -90,6 +91,7 @@ class GdbRemoteMemoryTransport:
         self.port = port
         self.timeout_seconds = timeout_seconds
         self._socket = connection
+        self._pending_stop_replies: deque[bytes] = deque()
 
     def attach(self) -> None:
         if self._socket is not None:
@@ -180,6 +182,66 @@ class GdbRemoteMemoryTransport:
         self._send_packet(b"c")
         self._require_ack()
 
+    def interrupt_execution(self) -> bytes:
+        """Pause the emulated CPU and return Dolphin's stop-reply packet."""
+
+        connection = self._require_socket()
+        try:
+            connection.sendall(b"\x03")
+        except OSError as error:
+            raise BridgeProtocolError(
+                f"Dolphin GDB interrupt failed: {error}"
+            ) from error
+        return self.wait_for_stop()
+
+    def wait_for_stop(self) -> bytes:
+        """Wait for an interrupt or breakpoint stop reply from Dolphin."""
+
+        if self._pending_stop_replies:
+            reply = self._pending_stop_replies.popleft()
+        else:
+            reply = self._receive_packet()
+        if not reply.startswith((b"S", b"T")):
+            raise BridgeProtocolError("Dolphin GDB returned an invalid CPU stop reply")
+        return reply
+
+    def read_register(self, register: int) -> int:
+        if not 0 <= register <= 0xFF:
+            raise BridgeProtocolError("Dolphin GDB register index is invalid")
+        reply = self._request(f"p{register:x}".encode("ascii"))
+        if reply.startswith(b"E"):
+            raise BridgeProtocolError(
+                f"Dolphin GDB register {register} read failed: "
+                f"{reply.decode('ascii', errors='replace')}"
+            )
+        try:
+            value = int(reply, 16)
+        except ValueError as error:
+            raise BridgeProtocolError(
+                f"Dolphin GDB returned a malformed register {register} value"
+            ) from error
+        if not reply or len(reply) > 16:
+            raise BridgeProtocolError(
+                f"Dolphin GDB returned a malformed register {register} width"
+            )
+        return value
+
+    def add_execute_breakpoint(self, address: int, *, size: int = 4) -> None:
+        self._execute_breakpoint("Z", address, size)
+
+    def remove_execute_breakpoint(self, address: int, *, size: int = 4) -> None:
+        self._execute_breakpoint("z", address, size)
+
+    def _execute_breakpoint(self, operation: str, address: int, size: int) -> None:
+        if address < 0 or address > 0xFFFFFFFF or size <= 0:
+            raise BridgeProtocolError("Dolphin GDB breakpoint range is invalid")
+        reply = self._request(f"{operation}0,{address:x},{size:x}".encode("ascii"))
+        if reply != b"OK":
+            raise BridgeProtocolError(
+                "Dolphin GDB refused an execute breakpoint at "
+                f"0x{address:08X}: {reply.decode('ascii', errors='replace')}"
+            )
+
     def _request(self, payload: bytes) -> bytes:
         self._send_packet(payload)
         self._require_ack()
@@ -194,8 +256,26 @@ class GdbRemoteMemoryTransport:
             raise BridgeProtocolError(f"Dolphin GDB send failed: {error}") from error
 
     def _require_ack(self) -> None:
-        acknowledgement = self._receive_byte()
-        if acknowledgement != b"+":
+        while True:
+            acknowledgement = self._receive_byte()
+            if acknowledgement == b"+":
+                return
+            if acknowledgement == b"$":
+                # A stop can race the ACK for an unrelated command. Preserve
+                # it for wait_for_stop() instead of losing the only notification
+                # that the emulated CPU is paused. Dolphin 2606 also emits an
+                # empty follow-up packet after handling an interrupt; that one
+                # carries no state and is safe to discard.
+                payload = self._receive_packet_body()
+                if not payload:
+                    continue
+                if payload.startswith((b"S", b"T")):
+                    self._pending_stop_replies.append(payload)
+                    continue
+                raise BridgeProtocolError(
+                    "Dolphin GDB sent an unexpected packet while acknowledging "
+                    f"a command: {payload!r}"
+                )
             raise BridgeProtocolError(
                 f"Dolphin GDB rejected a command with {acknowledgement!r}"
             )
@@ -203,6 +283,9 @@ class GdbRemoteMemoryTransport:
     def _receive_packet(self) -> bytes:
         while self._receive_byte() != b"$":
             pass
+        return self._receive_packet_body()
+
+    def _receive_packet_body(self) -> bytes:
         payload = bytearray()
         while True:
             value = self._receive_byte()
@@ -246,7 +329,7 @@ class GdbRemoteMemoryTransport:
 
 
 class DolphinMemoryEngineTransport:
-    """Optional Windows/Linux DME backend kept behind the adapter boundary."""
+    """Primary runtime transport using Dolphin's emulated-RAM process mapping."""
 
     def __init__(self, backend: Any | None = None) -> None:
         if backend is None:
@@ -270,6 +353,13 @@ class DolphinMemoryEngineTransport:
             raise BridgeProtocolError(
                 "No compatible running Dolphin process with an active Wii game was found"
             )
+
+    def close(self) -> None:
+        try:
+            if self._backend.is_hooked():
+                self._backend.un_hook()
+        except Exception as error:
+            raise BridgeProtocolError(f"Dolphin detach failed: {error}") from error
 
     def read(self, address: int, size: int) -> bytes:
         try:

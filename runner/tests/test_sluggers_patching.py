@@ -244,13 +244,20 @@ def test_schema_v2_append_must_start_at_eof(tmp_path: Path) -> None:
 
 def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> None:
     manifest = AdapterManifest.load()
-    assert manifest.adapter_version == "0.2.0"
+    assert manifest.adapter_version == "0.3.3"
     assert manifest.protocol_version == 1
     assert manifest.bridge_source.name == "bridge_v1.c"
     assert len(manifest.artifacts) == 1
     assert len(manifest.patch_plans) == 1
     assert len(manifest.trusted_patch_set().plans) == 1
-    assert manifest.release_gates == ()
+    assert manifest.static_target_catalog.name == "static_targets.v1.json"
+    assert any(
+        "Live Dolphin 2606 acceptance" in gate for gate in manifest.release_gates
+    )
+    assert any(
+        "Profile table and handicap instruction mappings" in gate
+        for gate in manifest.release_gates
+    )
 
 
 def test_patch_set_rejects_cross_plan_conflicts_before_touching_the_tree(

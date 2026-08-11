@@ -1,20 +1,24 @@
-# Starworks delivery completion audit
+# Starworks delivery evidence audit
 
 **Date:** 2026-08-10  
 **Branch:** `codex/starworks-platform`  
 **Source plan:** [`2026-08-10-starworks-platform.md`](2026-08-10-starworks-platform.md)
 
-This is the acceptance record for the delivery plan. It separates work that
-can be completed from a public source checkout from work that requires private
-game material, physical runner hardware, an external service, or a project
-owner's legal/operational action.
+This is an evidence ledger for the delivery plan. It does not declare Starworks
+complete: [`PLAN.md`](../../PLAN.md) owns product status and the current
+critical path. This ledger separates repository implementation, exact-game
+live proof, and complete product workflows from external or owner-operated
+gates.
 
 Status meanings:
 
-- **Verified** — implemented and exercised in this repository.
-- **Software verified; external acceptance pending** — the safe implementation,
-  contracts, and synthetic tests exist, but the criterion itself requires a
-  lawful game dump, actual Dolphin/game process, hardware, or RTMP endpoint.
+- **Implemented** — code and automated tests exist in this repository.
+- **Live proven** — exercised against the exact supported game and Dolphin
+  build on the named platform.
+- **Product complete** — connected through the real user workflow with recovery
+  and acceptance coverage.
+- **Partial** — useful implementation or evidence exists but the stated
+  criterion is not satisfied.
 - **Owner action** — Codex cannot perform the action without the project owner
   or an external maintainer.
 - **Decision-gated** — deliberately excluded from the first release until the
@@ -36,8 +40,13 @@ uv run --project runner --group test pytest runner/tests
 docker compose config --quiet
 ```
 
-The branch currently passes 32 contract tests, 42 Remix tests (including three
-Chromium workflows), 14 PostgreSQL integration tests, and 89 runner tests.
+The 2026-08-10 baseline passed 35 contract tests, 46 Remix tests (including
+three Chromium workflows), 15 PostgreSQL integration tests, and 114 Python
+runner tests. Web type checking, Ruff formatting/lint, the exact-DOL profile
+target verifier, and `git diff --check` also passed. The system `mise` Node
+installer still has a local GPG keybox problem, so verification used the
+workspace's bundled Node runtime; that environment issue is not a repository
+test failure.
 Production image, wheel, Compose, backup/restore, metrics, FFmpeg, and Linux
 runner checks are also represented in CI or the production runbook.
 
@@ -59,16 +68,23 @@ The new Remix application lives in `web/`; the original site is preserved in
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A supported dump becomes a separate managed build that boots in Dolphin. | **Verified on macOS arm64** | A maintainer-owned lossless `RMBE01` Rev 0 ISO produced an exact Redump match. The runner applied the reviewed bridge artifact to a fresh extraction, produced patched `main.dol` SHA-256 `077211c0…72e2`, and launched it in Dolphin 2606; the emulator identified `RMBE01` and visibly continued through the opening sequence. |
-| Rebuilding the same inputs produces the same manifest and hashes. | **Verified with generated fixtures and real base** | Builder tests cover deterministic manifests, cache hits, interrupted staging, source immutability, and tamper rejection. The bridge-enabled real build has cache key `13018c5a…bbe0`, build hash `bf5e0908…330c`, a guarded patch receipt, and no warnings; the report records `sourceMutated: false`. |
-| Python completes a versioned nonce handshake with the game. | **Verified on macOS arm64** | Dolphin 2606's built-in GDB socket initialized protocol v1 in the real patched game. Attempt epoch 1 was acknowledged, synthetic event sequence 1 was consumed, heartbeat 121 was observed, and the opening sequence continued normally. |
+| A supported dump becomes a separate managed build that boots in Dolphin. | **Live proven on macOS arm64** | A maintainer-owned lossless `RMBE01` Rev 0 ISO produced an exact Redump match. The current reviewed bridge artifact (`b5a9a75c…9161`) deterministically produces patched `main.dol` SHA-256 `c7af12d0…bcc6` and game-build identity `1016a240…3d00`; that exact build restored the managed pre-roster checkpoint in Dolphin 2606 and entered CPU gameplay. |
+| Rebuilding the same inputs produces the same manifest and hashes. | **Verified with generated fixtures and exact base** | Builder tests cover deterministic manifests, cache hits, interrupted staging, source immutability, and tamper rejection. The current patch plan pins the exact input and output DOL hashes and every guarded hook write; the builder records source immutability. |
+| Python completes a nonce-bound handshake with the game. | **Live proven on macOS arm64** | Python DME 1.3.1 attached to the runner-managed Dolphin 2606 copy, verified the exact adapter and game-build digests, negotiated the attempt nonce, and observed an advancing heartbeat. GDB is no longer part of the supported match path. |
 | A synthetic event survives pause/recovery and cannot cross attempts. | **Verified** | Bridge, execution binding, event-spool, lease-recovery, and synthetic executor tests cover attribution, duplicates, overflow, and interrupted uploads. |
 | Unsupported dumps and modified hooks fail closed. | **Verified** | The provisioned exact fingerprint registry, expected-byte patch guards, target hash checks, and launch-time whole-tree verification reject unknown inputs. The real supported base completed the positive path. |
 | Bridge build approach is selected from evidence. | **Verified** | [`patch-toolchain-spike.md`](../game-adapter/patch-toolchain-spike.md) records the pinned LLVM 22.1.8 build, reviewed symbols, low-memory reservation, exact-byte/EOF guards, artifact hashes, and live acceptance; end users need no compiler. |
 
-The adapter manifest's bridge release gates are now empty and its evidence is
-machine-readable. This completes the minimal synthetic-event boundary; team
-loading and semantic gameplay telemetry remain separate vertical-slice work.
+The adapter evidence is machine-readable. The configuration handshake, both
+roster hook calls, and adapter-owned CPU-control receipt are live proven.
+Independent reads of the initialized game structures then disproved the stronger
+claim that batting order and fielding positions survived the remaining menus;
+the runner now fails closed on that mismatch. An unattended seven-inning
+adapter-owned CPU game then completed 4–11 in 1,153.9 seconds and emitted 96
+ordered DME events, including one terminal `game-ended`. Because its scheduled
+formation failed the new read-back gate, it is full-game execution evidence
+rather than a valid scheduled-match result. Representative profile mutation
+and a complete valid adapter-owned game remain separate gates.
 
 ### Milestone 2 — Multi-tenant web foundation
 
@@ -83,7 +99,7 @@ Roles now distinguish `league_admin`, `commissioner`, `manager`,
 `scorekeeper`, `runner_operator`, and `member`; legacy owner/administrator
 values remain only for migrated compatibility.
 
-### Milestone 3 — Versioned rules, stats, and teams
+### Milestone 3 — Immutable rules, stats, and teams
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
@@ -111,9 +127,9 @@ not required.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| An authorized station claims and executes a scheduled match. | **Software verified; real execution pending** | Registration, scoped credentials, claim, lease, match configuration, `RunnerStation.run_once`, and a synthetic Sluggers executor are tested. The real bridge is now available, but a production executor must still load teams, drive the complete game, and decide completion from semantic game events. |
+| An authorized station claims and executes a scheduled match. | **Implemented; live acceptance pending** | One `StationService` owns registration, lease ticks, the local spool, capture, and the real Sluggers executor for both the headless command and PySide6 UI. It selects or builds the exact image, starts/reattaches Dolphin, installs runtime configuration, drives setup, reads DME telemetry, records locally, and tears down. Exact lineup application and healthy full-game acceptance remain open. |
 | A second station cannot claim the active lease. | **Verified** | PostgreSQL integration exercises two stations, recovery claims, expiry, replacement attempts, and revocation. |
-| Correct build, teams, lineup, and nonce reach the bridge. | **Partially verified on real game** | Run/configuration binding rejects every mismatch; the real game handshake validated adapter/build/nonce. Team and lineup injection still needs independently reviewed game mappings and hooks. |
+| Correct build, teams, lineup, and nonce reach the game. | **Partial live proof on macOS arm64** | Run/configuration binding rejects every mismatch. On exact game build `1016a240…3d00`, DME validated adapter/build/nonce; runtime rules, stadium, captains, both roster sets, and adapter-owned CPU control reached the game without foreground input. The receipt mask proved hook execution, not final formation: live game-owned structures showed randomized batting order and fielding. A new independent read-back gate rejects that run. |
 | Web disconnection does not lose captured events. | **Verified with synthetic execution** | SQLite persists active work, configuration, lifecycle updates, and telemetry; retry acknowledgements are idempotent. Real full-game disconnect is an external matrix gate. |
 | Cancellation and retry are separate auditable attempts. | **Verified** | Attempt numbers/nonces are immutable and lifecycle/audit records distinguish cancel, fail, expire, replace, and revoke. |
 
@@ -127,17 +143,17 @@ materialized builds never use this API.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A representative full game produces ordered, duplicate-free events. | **Software verified; external acceptance pending** | The real minimal bridge proves ordered attributed event delivery, while semantic contracts, monotonic sequence checks, nonce/build binding, synthetic streams, and the discovery inventory cover the pipeline. Gameplay event hooks and a full-game capture remain. |
+| A representative full game produces ordered, duplicate-free events. | **Partial with complete live DME trace** | An unattended seven-inning adapter-owned CPU game completed 4–11 in 1,153.9 seconds and emitted 96 ordered DME events, including game start/end, inning transitions, batter/pitcher changes, and replay-safe cumulative score/hits. Its formation did not pass game-owned read-back, so it is not a healthy scheduled-match stream. Resolved plate appearances and scorer attribution also remain open. |
 | Disconnect/retry does not double count. | **Verified** | Attempt/sequence uniqueness, duplicate acknowledgement, SQLite spooling, and retry tests cover it. |
-| Box scores regenerate from raw events. | **Verified** | Accepted raw events are immutable; derivation version 1, box scores, standings, and player totals rebuild deterministically. |
-| Missing/overflowing telemetry blocks automatic finalization. | **Verified** | Health issues put attempts into review and confirmation refuses incomplete streams. |
+| Box scores regenerate from raw events. | **Verified** | Accepted raw events are immutable; the current derivation, box scores, standings, and player totals rebuild deterministically. |
+| Missing/overflowing telemetry blocks automatic finalization. | **Verified** | Sequence gaps, overflow, non-hook observations, missing lifecycle/inning/plate-appearance events, score conflicts, corrections, quits, and forfeits enter review. The final transaction rejects a stream that changes during confirmation. |
 | Corrections preserve actor, reason, before, and after. | **Verified** | Correction receipts are separate audited rows and the Chromium workflow exercises the scorer UI. |
 
 ### Milestone 7 — Local content-pack compiler
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A published stat profile creates a deterministic local build. | **Software verified; real targets pending** | Manifest delivery, operation compilation, guarded writes, asset hashes, deterministic builder/cache, and generated fixtures are complete. Real `main.dol`/DAT target mappings require a lawful base. |
+| A published stat profile creates a deterministic local build. | **Implemented; live acceptance pending** | The complete 507-line Stat Editor v4 profile is typed and losslessly round-trippable. Its 16,406 scalar cells compile through 24 guarded mappings against the exact supported `main.dol`; deterministic builder/cache, overlap checks, and generated fixtures pass. A representative live mutation still needs acceptance in Dolphin. |
 | The server stores only manifest and allowed source assets. | **Verified** | PostgreSQL stores immutable manifests/hashes; Garage accepts bounded PNG/WebP user inputs. No game-build upload exists. |
 | Conflicting/unsupported patches fail before launch. | **Verified** | Static target selection, base hashes, expected bytes, overlapping write detection, patch-set preflight, and launch revalidation fail closed. |
 | Removing a pack returns to the clean cache without unpatching. | **Verified** | Builds are fresh, immutable, and content-addressed; runtime-only/stock attempts select no pack. |
@@ -150,13 +166,14 @@ tool code was copied.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A native runner publishes a complete test match to RTMP. | **Partially verified on real game** | The runner recorded six seconds of the live Dolphin 2606 Sluggers window to a valid H.264 Matroska file and cleanly stopped the worker. Audio, a complete match, and a disposable external RTMP publish remain. |
+| A native runner publishes a complete test match to RTMP. | **Partial and post-alpha** | The runner recorded six seconds of the live Dolphin 2606 Sluggers window to a valid H.264 Matroska file. The production attempt executor now owns one non-overwriting recording for the full attempt lifecycle and reports independent component health. Audio, a complete-match recording, and disposable external RTMP acceptance remain. |
 | Overlay data follows accepted events. | **Verified** | Public read-only overlay contract, JSON endpoint, and browser-source page derive from accepted/derived match data. |
 | Capture failure cannot corrupt telemetry. | **Verified** | Capture is an independent controller and component health channel; failure tests leave execution/spooling untouched. |
-| Linux container boots a supported build and completes the bridge handshake. | **Software image verified; hardware pending** | The pinned `linux/amd64` image, virtual display/audio/capture stack, health command, and synthetic H.264 smoke pass. GPU/input/audio and real bridge validation remain hardware gates. |
+| Linux container boots a supported build and completes the bridge handshake. | **Partial and post-alpha** | The pinned `linux/amd64` image, virtual display/audio/capture stack, health command, and synthetic H.264 smoke pass. GPU/input/audio and real bridge validation remain hardware gates. |
 
-Headless OBS and a custom Dolphin fork remain decision-gated; FFmpeg plus stock
-Dolphin is the implemented first path.
+Headless OBS and a Dolphin fork remain decision-gated. FFmpeg plus Dolphin's
+native frame path is the implemented first capture path, while DME supplies the
+stock-emulator runtime memory boundary.
 
 ### Milestone 9 — Production hardening and release engineering
 
@@ -169,14 +186,17 @@ Dolphin is the implemented first path.
 | A clean wheel validates bundled contracts. | **Verified** | Wheel build/install smoke passed; tagged releases publish the wheel and `SHA256SUMS`. |
 | Production is gated on restore/revocation and supported runner hardware. | **Verified as policy; deployment acceptance pending** | [`production-runbook.md`](../operations/production-runbook.md), [`runner-support.md`](../runner-support.md), and release workflow encode the gates. |
 
-## Irreducible open gates
+## Open acceptance gates
 
-These are not missing ordinary repository code and must not be replaced with
-guessed hashes, offsets, binaries, or claims:
+These require exact-game research, live acceptance, owner infrastructure, or
+external permission and must not be replaced with guessed hashes, offsets,
+binaries, or claims:
 
-1. **Real game vertical slice:** load teams/stats/rules, capture a complete
-   representative game, prove ordered telemetry across disconnect/restart, and
-   validate cancellation/retry with physical or equivalent input.
+1. **Real game vertical slice:** make batting order and fielding positions pass
+   the game-owned read-back gate, live-accept a representative stat mutation,
+   finish resolved plate-appearance observation, capture a complete valid
+   adapter-owned CPU game, prove ordered telemetry across disconnect/restart,
+   and validate the one-retry policy.
 2. **Platform hardware matrix:** repeat boot, bridge, telemetry, capture, RTMP,
    recovery, and revocation gates on every platform advertised as supported.
 3. **Deployment acceptance:** push the branch, observe hosted CI, deploy to the
@@ -193,7 +213,7 @@ completed.
 
 ## Decision-gated work, not release blockers
 
-- A custom Dolphin fork is considered only after a measured stock-Dolphin
+- A Dolphin fork is considered only after a measured DME/stock-Dolphin product
   limitation.
 - A separate web worker is considered only after measured contention or
   reliability problems.

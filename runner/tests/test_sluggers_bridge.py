@@ -10,6 +10,8 @@ from starworks_runner.games.sluggers.bridge.client import (
     EventOverflowError,
 )
 from starworks_runner.games.sluggers.bridge.layout import (
+    BRIDGE_ENTRY_ADDRESS,
+    BRIDGE_ENTRY_SIGNATURE,
     CONTROL_BLOCK_SIZE,
     EVENT_SIZE,
     BridgeEvent,
@@ -28,6 +30,10 @@ from starworks_runner.games.sluggers.bridge.memory import (
 from starworks_runner.games.sluggers.bridge.synthetic import SyntheticGameBridge
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 from starworks_runner.games.sluggers.memory_map import MemoryMap
+from starworks_runner.games.sluggers.session import (
+    bootstrap_live_bridge,
+    wait_for_restored_bridge,
+)
 
 ADAPTER_BUILD = "a" * 64
 GAME_BUILD = "b" * 64
@@ -97,6 +103,67 @@ def test_nonce_handshake_and_event_survive_pause_resume_without_duplicate() -> N
     assert duplicate_poll == []
     assert client.metrics.events == 2
     assert client.metrics.polls == 4
+
+
+class RestoringMemoryTransport(ByteArrayMemoryTransport):
+    def __init__(self, layout: BridgeLayout, restored: bytes) -> None:
+        super().__init__(layout)
+        self.restored = restored
+        self.reads = 0
+
+    def read(self, address: int, size: int) -> bytes:
+        if address == self.layout.base_address and size == CONTROL_BLOCK_SIZE:
+            self.reads += 1
+            if self.reads == 1:
+                return bytes(size)
+            control = ControlBlock.unpack(self.restored)
+            return ControlBlock(
+                **{**control.__dict__, "heartbeat": control.heartbeat + self.reads}
+            ).pack()
+        return super().read(address, size)
+
+
+def test_checkpoint_gate_waits_for_an_advancing_restored_bridge() -> None:
+    layout = BridgeLayout()
+    checkpoint = ControlBlock.initial(ADAPTER_BUILD, GAME_BUILD)
+    checkpoint = ControlBlock(
+        **{**checkpoint.__dict__, "state": BridgeState.ACTIVE, "heartbeat": 40}
+    )
+    transport = RestoringMemoryTransport(layout, checkpoint.pack())
+    ticks = iter(range(20))
+
+    restored = wait_for_restored_bridge(
+        transport,
+        adapter_build_sha256=ADAPTER_BUILD,
+        game_build_sha256=GAME_BUILD,
+        monotonic=lambda: next(ticks) / 100,
+        sleep=lambda _: None,
+    )
+
+    assert restored.heartbeat > checkpoint.heartbeat
+    assert transport.reads == 3
+
+
+def test_client_reattaches_to_existing_nonce_without_resetting_the_ring() -> None:
+    transport, game, client = create_pair()
+    negotiate(game, client)
+    game.tick(emit_synthetic=True, payload_value=41)
+
+    recovered = BridgeClient(
+        transport,
+        expected_adapter_build_sha256=ADAPTER_BUILD,
+        expected_game_build_sha256=GAME_BUILD,
+    )
+    control = recovered.attach_existing(ATTEMPT_NONCE)
+
+    assert control.producer_sequence == 1
+    assert [event.payload_value for event in recovered.poll_events()] == [41]
+    with pytest.raises(AttemptAttributionError, match="different match attempt"):
+        BridgeClient(
+            transport,
+            expected_adapter_build_sha256=ADAPTER_BUILD,
+            expected_game_build_sha256=GAME_BUILD,
+        ).attach_existing("different_attempt_nonce_0123456789")
 
 
 def test_event_from_another_attempt_is_never_attributed() -> None:
@@ -187,6 +254,9 @@ class FakeDmeBackend:
     def hook(self) -> None:
         self.hooked = True
 
+    def un_hook(self) -> None:
+        self.hooked = False
+
     def read_bytes(self, address: int, size: int) -> bytes:
         return self.memory.get((address, size), bytes(size))
 
@@ -203,11 +273,18 @@ def test_dme_process_backend_attaches_and_is_hidden_behind_transport() -> None:
 
     assert backend.hooked is True
     assert transport.read(address, 4) == b"SWB1"
+    transport.close()
+    assert backend.hooked is False
 
 
 def rsp_reply(payload: bytes) -> bytes:
     checksum = sum(payload) & 0xFF
     return b"+" + b"$" + payload + f"#{checksum:02x}".encode("ascii")
+
+
+def rsp_packet(payload: bytes) -> bytes:
+    checksum = sum(payload) & 0xFF
+    return b"$" + payload + f"#{checksum:02x}".encode("ascii")
 
 
 class FakeRspSocket:
@@ -227,18 +304,88 @@ class FakeRspSocket:
         pass
 
 
-def test_gdb_remote_transport_reads_writes_and_continues() -> None:
-    backend = FakeRspSocket(rsp_reply(b"53574231") + rsp_reply(b"OK") + b"+")
+def test_gdb_remote_transport_reads_writes_interrupts_and_breakpoints() -> None:
+    backend = FakeRspSocket(
+        rsp_reply(b"53574231")
+        + rsp_reply(b"OK")
+        + b"+"
+        + rsp_packet(b"T05")
+        + rsp_packet(b"")
+        + rsp_reply(b"OK")
+        + rsp_reply(b"OK")
+        + rsp_reply(b"00000001")
+    )
     transport = GdbRemoteMemoryTransport(connection=backend)  # type: ignore[arg-type]
 
     assert transport.read(BridgeLayout().base_address, 4) == b"SWB1"
     transport.write(BridgeLayout().base_address + 4, b"test")
     transport.continue_execution()
+    assert transport.interrupt_execution() == b"T05"
+    transport.add_execute_breakpoint(0x8006AED4)
+    transport.remove_execute_breakpoint(0x8006AED4)
+    assert transport.read_register(14) == 1
 
     sent = b"".join(backend.sent)
     assert b"$m80001900,4#" in sent
     assert b"$M80001904,4:74657374#" in sent
     assert b"$c#63" in sent
+    assert b"\x03" in sent
+    assert b"$Z0,8006aed4,4#" in sent
+    assert b"$z0,8006aed4,4#" in sent
+    assert b"$pe#" in sent
+
+
+def test_gdb_remote_transport_preserves_stop_reply_that_races_command_ack() -> None:
+    backend = FakeRspSocket(
+        rsp_packet(b"T0540:8006aed4;01:9008e158;") + b"+" + rsp_packet(b"OK")
+    )
+    transport = GdbRemoteMemoryTransport(connection=backend)  # type: ignore[arg-type]
+
+    transport.add_execute_breakpoint(0x8006AED4)
+
+    assert transport.wait_for_stop() == b"T0540:8006aed4;01:9008e158;"
+
+
+class FakeBootableTransport(ByteArrayMemoryTransport):
+    def __init__(self) -> None:
+        super().__init__(BridgeLayout())
+        self.continued = False
+
+    def continue_execution(self) -> None:
+        self.continued = True
+        self.write(BRIDGE_ENTRY_ADDRESS, BRIDGE_ENTRY_SIGNATURE)
+
+
+def test_live_bridge_bootstrap_waits_for_code_and_initializes_control() -> None:
+    transport = FakeBootableTransport()
+
+    client = bootstrap_live_bridge(  # type: ignore[arg-type]
+        transport,
+        adapter_build_sha256=ADAPTER_BUILD,
+        game_build_sha256=GAME_BUILD,
+        sleep=lambda _: None,
+    )
+
+    control = client.read_control()
+    assert transport.continued is True
+    assert control.adapter_build_digest == bytes.fromhex(ADAPTER_BUILD)
+    assert control.game_build_digest == bytes.fromhex(GAME_BUILD)
+
+
+def test_live_bridge_bootstrap_fails_closed() -> None:
+    transport = FakeBootableTransport()
+    transport.continue_execution = lambda: None  # type: ignore[method-assign]
+    ticks = iter((0.0, 1.0))
+
+    with pytest.raises(BridgeProtocolError, match="did not load"):
+        bootstrap_live_bridge(  # type: ignore[arg-type]
+            transport,
+            adapter_build_sha256=ADAPTER_BUILD,
+            game_build_sha256=GAME_BUILD,
+            timeout_seconds=0.5,
+            monotonic=lambda: next(ticks),
+            sleep=lambda _: None,
+        )
 
 
 def test_polling_overhead_is_measured() -> None:

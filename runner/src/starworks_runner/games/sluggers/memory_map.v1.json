@@ -52,6 +52,20 @@
       "targetAddress": "0x8050B2E4",
       "originalBytesHex": "48170c5d",
       "source": "RMBE01 main at mss-decomp fdd3cb8; reversible Dolphin 2606 probe counted 61 calls during a three-second startup window and restored the original instruction before the game reached the Wii Remote safety screen."
+    },
+    {
+      "id": "starworks-team-selection-v1",
+      "address": "0x8006AED4",
+      "targetAddress": "0x8006AED8",
+      "originalBytesHex": "38a00000",
+      "source": "MSS-AutoTeam identified the selection routine; the exact Redump-matched RMBE01 DOL independently confirmed the instruction and Starworks uses a separate expected-byte-guarded hook with an original-path fallback."
+    },
+    {
+      "id": "starworks-cpu-control-v1",
+      "address": "0x80063D4C",
+      "targetAddress": "0x80063D50",
+      "originalBytesHex": "88080018",
+      "source": "The resource-folder Gecko lead was reproduced on Dolphin 2606; the exact Redump-matched DOL independently confirms the original instruction. Starworks uses a configuration-gated implementation rather than the legacy input chord or Gecko code."
     }
   ]
 }

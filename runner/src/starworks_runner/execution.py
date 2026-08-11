@@ -25,6 +25,12 @@ def bind_match_execution(
     for field in ("leagueId", "matchId", "attemptId", "attemptNonce"):
         if envelope[field] != configuration[field]:
             raise ValueError(f"Match configuration {field} does not match its lease")
+    if envelope["requiredGameBuildSha256"] != configuration["requiredGameBuildSha256"]:
+        raise ValueError("Match configuration game build does not match its lease")
+    if envelope["execution"] != configuration["execution"]:
+        raise ValueError(
+            "Match configuration execution policy does not match its lease"
+        )
     if envelope["statProfileRevisionId"] != configuration["statProfile"]["revisionId"]:
         raise ValueError("Match configuration stat profile does not match its lease")
     if envelope["rulesetRevisionId"] != configuration["ruleset"]["revisionId"]:

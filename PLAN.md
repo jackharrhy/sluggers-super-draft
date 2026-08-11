@@ -4,12 +4,67 @@ Starworks is a multi-league platform for running Mario Super Sluggers leagues fr
 
 The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, MSS AutoTeam, Project Rio, Sluggies DAT Tools, and public Sluggers reverse-engineering projects are research and implementation inputs. None of their current architectures, file formats, or boundaries are automatically part of Starworks.
 
+## Current state
+
+**Last verified:** 2026-08-10 on `codex/starworks-platform`
+
+Starworks has a substantial platform and runner foundation, but it is not yet a
+playable alpha. Status claims use three separate meanings:
+
+- **Implemented** — code and automated tests exist.
+- **Live proven** — exercised against the exact supported game and Dolphin build.
+- **Product complete** — connected through the real workflow with recovery and
+  acceptance coverage.
+
+| Area | Status | Next gate |
+| --- | --- | --- |
+| Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, and schedules | Implemented | End-to-end alpha workflow |
+| Runner registration, leases, attempts, build verification, and local event spool | Implemented | Real scheduled-match recovery exercise |
+| Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
+| Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat after scheduled formation passes game-owned read-back |
+| Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Partial live proof | Rules/stadium/captains, both roster sets, and CPU activation are live; game-owned read-back disproved the current batting-order/fielding receipt |
+| Full Stat Editor v4 profile | Implemented; live proof pending | Representative live-mutation acceptance |
+| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, and game-end detection exist; resolved plate appearances remain open |
+| Health-gated automatic result confirmation and one-retry recovery | Implemented | Full live server/runner fault matrix |
+| Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
+| RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
+
+### Playable-alpha definition
+
+The first supported alpha is macOS arm64, stock Dolphin 2606 through a
+runner-managed DME-enabled copy, and an exact North American `RMBE01` Rev 0
+dump. From a site-admin-provisioned league, Starworks
+must publish a complete Stat Editor v4-equivalent profile, draft and schedule a
+match, claim it on one runner, build and launch the correct local game,
+configure both teams and CPU play without manual input, capture core semantic
+events through completion, and automatically confirm only a healthy result.
+
+The runner may reattach to the same valid live process. Otherwise it fails the
+attempt and the web queues exactly one fresh attempt; a second failure or any
+telemetry inconsistency enters commissioner review. Extended legacy tracker
+metrics may be deferred only in the
+[tracked parity ledger](docs/game-adapter/tracker-parity-ledger.md) and must
+appear as unavailable rather than zero.
+
+### Current critical path
+
+1. Make the scheduled batting order and fielding positions survive the final
+   setup menus, and pass the independent game-owned read-back gate. Then repeat
+   the already-proven adapter-owned full-game path with the valid formation.
+2. Finish the DME snapshot reducer for resolved plate appearances and capture a
+   complete healthy event stream. Add a game hook only where a measured field
+   cannot be observed reliably; keep unavailable metrics explicit in the parity
+   ledger.
+3. Pass the clean-station happy path, network outage, reattach, one-retry, and
+   commissioner-review matrix repeatedly on macOS arm64.
+
 ## Product principles
 
 - Build one platform with two user-facing programs: the web application and the local runner.
 - Keep league management, drafting, configuration, results, and public views on the web.
 - Keep copyrighted game material, Dolphin, hardware access, game building, capture, and runtime memory access on the runner.
-- Treat all cross-program messages as versioned, validated API contracts.
+- Treat all cross-program messages as one validated, evolving v0 contract. Add
+  compatibility versions only when Starworks reaches its first release boundary.
 - Make every league-scoped record explicitly tenant-scoped from the beginning.
 - Use immutable revisions for rules, stats, rosters, lineups, content packs, and game builds so completed matches remain reproducible.
 - Prefer a modular monolith and ordinary background work in the web process until a separate worker is justified by measured load.
@@ -24,7 +79,7 @@ The web application owns:
 - Site administration and league provisioning.
 - Discord-first authentication and invitation-based account activation.
 - League membership, roles, seasons, schedules, and permissions.
-- Versioned stat profiles and rulesets.
+- Immutable stat-profile and ruleset revisions.
 - Draft rooms, pick clocks, queues, and draft history.
 - Teams, rosters, lineups, field positions, captains, and trades.
 - Match scheduling, runner assignment, attempts, and lifecycle state.
@@ -47,7 +102,7 @@ The runner is a Python 3.12 native application with a PySide6 interface. It owns
 - Runtime communication with the game adapter.
 - Stat/event capture, validation, persistence queues, and retry.
 - Save states and recovery where they can be used safely.
-- Video/audio capture and optional RTMP publishing.
+- Local video/audio capture. RTMP and broadcast automation remain post-alpha.
 - Local diagnostics, logs, build reports, and support bundles.
 
 The runner is not a second league-management UI. It presents the controls and diagnostics needed to operate a station and run assigned matches.
@@ -59,7 +114,7 @@ The Sluggers adapter lives inside the runner repository and is not another deplo
 - Supported game fingerprints and region/revision metadata.
 - Static content compilers and guarded binary patch definitions.
 - A shared symbol/address catalogue.
-- A versioned runtime protocol.
+- The current pre-release runtime protocol.
 - The small game-side Starworks bridge and its build artifacts.
 - Adapter compatibility tests and Dolphin boot fixtures that contain no game data.
 
@@ -85,7 +140,9 @@ The matching decompilation project remains an upstream research project. Starwor
 - PySide6 for the native UI.
 - Pydantic or JSON Schema validation generated from the web-owned contracts.
 - A pinned Dolphin release initially.
-- Dolphin Memory Engine and process APIs only behind a game-adapter interface.
+- Dolphin Memory Engine 1.3.1 as the primary runtime-memory transport, kept
+  behind the game-adapter interface; direct process APIs do not leak into match
+  orchestration.
 - Pinned external binaries where they solve a narrow problem well, including `decomp-toolkit` for game identification and extraction.
 
 Using a Rust implementation of a pinned CLI does not make the runner a Rust application. Python remains responsible for the runner, orchestration, UI, and product behavior.
@@ -125,7 +182,7 @@ Production deployment lives under a dedicated deployment directory and uses:
 - Database uniqueness constraints include the tenant key whenever the concept is tenant-owned.
 - Cross-league public views use explicit publication settings rather than accidental data exposure.
 
-## Versioned domain model
+## Domain model
 
 The important aggregate roots are:
 
@@ -150,7 +207,7 @@ The first cross-program contracts are:
 
 Describes high-level, distributable inputs:
 
-- Schema version.
+- Contract kind and current pre-release discriminator.
 - Target game ID and supported revisions.
 - Stat-profile and ruleset revisions.
 - Trusted adapter version.
@@ -214,18 +271,25 @@ The `.sluggie` format may be supported as a local Blender import/export boundary
 
 ### Runtime bridge
 
-The game-side bridge is a small, trusted PowerPC module. Its responsibilities are limited to:
+The game-side bridge is a small, trusted PowerPC module. Its current
+responsibilities are limited to:
 
 - Protocol and build handshake.
 - Match-attempt nonce validation.
 - Reading dynamic team, lineup, stat, and ruleset configuration.
-- Exposing explicit lifecycle state.
-- Writing structured events to a bounded ring buffer.
+- Exposing an explicit heartbeat and configuration receipts.
 - Reporting overflow, incompatibility, and fatal adapter errors.
 
-The Python runner communicates through a documented control block and event ring. The server sends declarative match data, never arbitrary Gecko or executable code.
+The Python runner communicates through a documented control block and reads
+game-owned match state through the same DME adapter boundary. The server sends
+declarative match data, never arbitrary Gecko or executable code. The reserved
+event ring remains available for a future measured need; it is not evidence
+that semantic game hooks are installed today.
 
-The initial implementation may use guarded Gecko/ASM and Dolphin Memory Engine. The target implementation compiles maintainable C/C++ using a reviewed Wii injection toolchain such as Kamek.
+The current game-side adapter compiles maintainable C and small reviewed
+PowerPC trampolines. Dolphin Memory Engine is the host-side transport. Semantic
+hooks are added only when a concrete DME observation cannot be made reliable;
+replacing or extending game code does not imply replacing DME.
 
 ### Targeted decompilation
 
@@ -264,12 +328,13 @@ A match attempt follows this lifecycle:
 2. An authorized runner station claims a short-lived lease.
 3. The runner verifies or builds the required game-build hash.
 4. The runner starts Dolphin in an isolated profile.
-5. The bridge completes its version/nonce handshake.
+5. The bridge completes its build/nonce handshake.
 6. The runner loads the teams and starts the game flow.
 7. Telemetry is buffered locally and uploaded idempotently.
 8. Capture can publish an RTMP stream and overlay data.
-9. The game ends and the web derives a provisional result.
-10. An authorized user confirms or corrects the result through an auditable workflow.
+9. The game ends and the web derives a provisional result from immutable events.
+10. A healthy result auto-confirms with a system audit actor; corrections or
+    unhealthy telemetry require commissioner review.
 
 Retries create a new match attempt and nonce. Events from separate attempts can never be silently combined.
 
@@ -293,7 +358,8 @@ Retries create a new match attempt and nonce. Events from separate attempts can 
 - `mss-decomp` is CC0.
 - Sluggies DAT Tools and its upstream currently lack a declared license. Obtain permission from all relevant copyright holders or implement the required behavior independently.
 - Do not relicense the existing GPL-derived Mii library merely by changing its license file. Obtain upstream permission or perform a clean implementation.
-- A future Dolphin fork remains GPLv2+ and must be distributed and isolated accordingly.
+- Any future Dolphin fork remains GPLv2+ and must be distributed independently
+  from the MIT Starworks applications with corresponding source and notices.
 
 ## Deliberate non-goals for the first release
 
@@ -304,14 +370,20 @@ Retries create a new match attempt and nonce. Events from separate attempts can 
 - A custom Dolphin fork.
 - Full matching decompilation.
 - A native PC port.
-- Fully autonomous unattended tournament operation.
+- Large-scale multi-station unattended tournament orchestration. A single
+  scheduled match must run unattended for playable alpha.
 - A separate queue/worker service without measured need.
 
 ## Decision gates
 
 ### Custom Dolphin fork
 
-Create a minimal fork only when a measured requirement cannot be met reliably through pinned stock Dolphin, its supported command-line/configuration interfaces, the game-side bridge, and the runner. Candidate reasons include thread-safe memory IPC, deterministic lifecycle control, or headless capture integration. General convenience is insufficient.
+This gate is not met. Dolphin Memory Engine 1.3.1 attached to a runner-managed,
+DME-enabled copy of stock Dolphin 2606 on macOS arm64 and completed the real
+bridge handshake without GDB. GDB remains reverse-engineering tooling for
+breakpoints and registers, so its save-state lifecycle defect does not justify a
+production fork. Reconsider a fork only if DME, the game bridge, Pipe input, and
+native capture fail a measured product requirement.
 
 ### Separate web worker
 
@@ -327,4 +399,8 @@ Adopt it after a prototype proves that the game can reliably load replacement re
 
 ## Delivery roadmap
 
-The detailed sequence, acceptance criteria, and risk gates live in [`docs/plans/2026-08-10-starworks-platform.md`](docs/plans/2026-08-10-starworks-platform.md).
+The detailed sequence, acceptance criteria, and risk gates live in
+[`docs/plans/2026-08-10-starworks-platform.md`](docs/plans/2026-08-10-starworks-platform.md).
+The evidence ledger is
+[`docs/plans/2026-08-10-starworks-completion-audit.md`](docs/plans/2026-08-10-starworks-completion-audit.md);
+it may demonstrate a gate but cannot redefine the status in this file.

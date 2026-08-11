@@ -1,0 +1,1 @@
+ALTER TABLE "stat_profile_revisions" ADD COLUMN "sluggers_tuning" jsonb;

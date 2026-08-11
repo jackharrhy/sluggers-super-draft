@@ -6,6 +6,18 @@ import {
   VersionSchema,
 } from "./common.ts";
 import { FieldingPositionSchema } from "./team-lineup-revision.ts";
+import {
+  CharacterStatValuesSchema,
+  SluggersTuningSchema,
+} from "./stat-profile-revision.ts";
+
+const ApplySluggersStatProfileOperationSchema = z.strictObject({
+  operation: z.literal("apply-sluggers-stat-profile"),
+  loadPhase: z.literal("build-time"),
+  resource: z.literal("main-dol"),
+  characterValues: z.array(CharacterStatValuesSchema).length(101),
+  tuning: SluggersTuningSchema,
+});
 
 const SetCharacterStatOperationSchema = z.strictObject({
   operation: z.literal("set-character-stat"),
@@ -50,6 +62,7 @@ const SetFieldingPositionOperationSchema = z.strictObject({
 });
 
 export const AdapterOperationSchema = z.discriminatedUnion("operation", [
+  ApplySluggersStatProfileOperationSchema,
   SetCharacterStatOperationSchema,
   SetGameRuleOperationSchema,
   SelectRosterSlotOperationSchema,
@@ -74,9 +87,9 @@ export const AdapterOperationBundleSchema = z
     generatedAt: TimestampSchema,
   })
   .meta({
-    title: "AdapterOperationBundle v1",
+    title: "AdapterOperationBundle",
     description:
-      "Symbolic, bounded operations translated by a versioned game adapter; never raw memory writes.",
+      "Symbolic, bounded operations translated by the current game adapter; never raw memory writes.",
   });
 
 export type AdapterOperation = z.infer<typeof AdapterOperationSchema>;
