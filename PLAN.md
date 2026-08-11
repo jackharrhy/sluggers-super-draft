@@ -2,7 +2,7 @@
 
 Starworks is a multi-league platform for running Mario Super Sluggers leagues from league creation through draft, game execution, stat tracking, and broadcast.
 
-The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, MSS AutoTeam, Project Rio, Sluggies DAT Tools, and public Sluggers reverse-engineering projects are research and implementation inputs. None of their current architectures, file formats, or boundaries are automatically part of Starworks.
+The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, MSS AutoTeam, Project Rio, Sluggies DAT Tools, and public Sluggers reverse-engineering projects are research and implementation inputs. Stat Editor, Stat Tracker, and AutoTeam are trusted direct code references through active contributor and maintainer collaboration; reuse their proven implementation knowledge with attribution. None of these projects' current architectures, file formats, or boundaries are automatically part of Starworks.
 
 ## Current state
 
@@ -18,12 +18,12 @@ playable alpha. Status claims use three separate meanings:
 
 | Area | Status | Next gate |
 | --- | --- | --- |
-| Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, and schedules | Implemented | End-to-end alpha workflow |
-| Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, classified failure, and one fresh retry are live proven | Reconcile the reviewed checkpoint package, expose exact local failure detail, and complete a scheduled match |
+| Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, and schedules | Application/data layer implemented; the former operations super-page is split into focused Matches, Teams, and Admin routes | Extract the remaining shared page implementation, add the Results view, and accept the end-to-end alpha workflow |
+| Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
-| Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat after scheduled formation passes game-owned read-back |
-| Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Partial live proof | Rules/stadium/captains, both roster sets, and CPU activation are live; game-owned read-back disproved the current batting-order/fielding receipt |
-| Full Stat Editor v4 profile | Implemented; live proof pending | Representative live-mutation acceptance |
+| Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat to completion with the now-proven scheduled formation path |
+| Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through game start | Exact server-backed teams and active defense passed game-owned read-back; complete a full accepted run |
+| Full Stat Editor v4 profile | Lossless 507-line import/export and typed per-character web editing implemented; relational/global web editing and live proof remain | Chemistry, trajectory, curve, star-event, boost, and handicap editors; then representative live-mutation acceptance |
 | Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, and game-end detection exist; resolved plate appearances remain open |
 | Health-gated automatic result confirmation and one-retry recovery | Implemented | Full live server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
@@ -48,31 +48,52 @@ appear as unavailable rather than zero.
 
 ### Current critical path
 
-1. Make the scheduled batting order and fielding positions survive the final
-   setup menus, and pass the independent game-owned read-back gate. Then repeat
-   the already-proven adapter-owned full-game path with the valid formation.
+1. Repeat the already-proven adapter-owned full-game path to completion using
+   the now-proven server-backed formation and game-owned read-back gate.
 2. Finish the DME snapshot reducer for resolved plate appearances and capture a
    complete healthy event stream. Add a game hook only where a measured field
    cannot be observed reliably; keep unavailable metrics explicit in the parity
    ledger.
 3. Pass the clean-station happy path, network outage, reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
+4. Complete the focused Stat Editor screens for every v4 section, extract the
+   remaining shared implementation behind the now-separated Matches, Teams,
+   and Admin routes, and add the Results view. Continue following the legacy
+   application's navigation and player-first visual language.
 
 ### Latest acceptance evidence
 
 On 2026-08-11, the local-only Mushroom League fixture exercised the real Remix,
-PostgreSQL, and Python runner path. The native station registered, claimed the
-queued immutable attempt, fetched its configuration, reported a classified
-`build-failure`, and the server queued exactly one fresh attempt. The station did
-not launch Dolphin because the checkpoint package failed its integrity gate: the
-manifest records seed-profile SHA-256 `2d7ddf…`, while the packaged immutable
-profile currently hashes to `5cb34a…`. Attempt 2 remains queued and must not be
-consumed until that mismatch is reviewed.
+PostgreSQL, and Python runner path. The checkpoint package integrity mismatch
+was reconciled, and CLI failures now include their actionable detail. A friendly
+JSON match definition was published as normal immutable lineup revisions and
+queued as a normal server attempt. Attempt
+`438f39a0-b4ca-41cd-93fd-95d2ad80a7da` was leased by the native runner, launched
+Dolphin, applied both exact teams at the final formation boundary, passed the
+game-owned batting-order and active-defense verifier, and entered live
+CPU-vs-CPU play. It remained healthy for 140 station ticks before an intentional
+operator stop. This proves the scheduled team path through gameplay, but not a
+completed healthy result or automatic confirmation.
 
-The exercise also exposed an operator-diagnostics gap: the CLI printed only the
-classified `failed` result, while the exact checkpoint error required a separate
-local probe. The Qt/CLI station should surface the persisted actionable failure
-detail before clean-station acceptance can pass.
+The local demo now also includes a full 101-character, 49-field Stat Editor v4
+profile: an immutable published revision supplies the seeded two-team draft
+room while an editable next revision remains the Stat Editor sandbox. The
+Remix application accepts real v4 file uploads, edits one character through
+typed controls, preserves every global and relational section, and exports the
+original 507-line representation losslessly. Stat Editor and AutoTeam numeric
+roster slots now resolve through one readable character catalogue, with legacy
+player portraits used in the new roster, trade, and draft UI. The remaining v4
+sections are represented and round-tripped but do not yet have focused web
+editors. The local seed is idempotent and prints a direct draft-room URL.
+
+The league workspace now exposes separate Matches, Teams, and Admin routes.
+The Teams route uses readable character names and the legacy portrait assets
+for rosters and trade selection; raw game IDs are no longer the manager-facing
+interaction. On 2026-08-11 a normal-speed live smoke test also forced a seed
+profile that had disabled throttling back to `EmulationSpeed = 1.0`, restored
+the managed checkpoint, passed scheduled formation read-back, entered inning
+one, and advanced DME telemetry. That is live synchronization evidence, not a
+completed-game acceptance result.
 
 ## Product principles
 
@@ -142,7 +163,8 @@ The matching decompilation project remains an upstream research project. Starwor
 
 - Remix 3, initialized in `web/` with `npx remix@next new web` rather than
   repurposing the original single-tenant React Router application.
-- TypeScript and React.
+- TypeScript and Remix's `remix/ui` rendering model; the new application does
+  not introduce React as a parallel UI layer.
 - PostgreSQL with Drizzle ORM.
 - Zod as the source of truth for API and manifest validation.
 - JSON Schema generated from Zod for validation in Python.
@@ -204,7 +226,7 @@ The important aggregate roots are:
 
 - Site, person, identity, invite, and runner station.
 - League, membership, season, conference/division, and venue.
-- Character catalogue and game-version compatibility.
+- Character catalogue and exact game-build compatibility.
 - Stat definition, stat profile, and stat-profile revision.
 - Ruleset and ruleset revision.
 - Draft, draft slot, pick, queue, and clock state.
@@ -226,7 +248,7 @@ Describes high-level, distributable inputs:
 - Contract kind and current pre-release discriminator.
 - Target game ID and supported revisions.
 - Stat-profile and ruleset revisions.
-- Trusted adapter version.
+- Trusted adapter build identity.
 - User-created assets by content hash.
 - Declarative target assignments.
 
@@ -237,7 +259,7 @@ It does not contain original game buffers or absolute offsets into one user's du
 Produced locally by the runner:
 
 - Base-game fingerprint.
-- Adapter and compiler versions.
+- Adapter and compiler build identities.
 - Content-pack hash.
 - Output hashes.
 - Applied patch receipts.
@@ -258,7 +280,8 @@ Describes one match attempt:
 
 Carries ordered game events:
 
-- Protocol version.
+- Current v0 contract discriminator; no compatibility matrix exists before the
+  first release boundary.
 - Match and attempt identity.
 - Monotonic sequence number and game frame.
 - Event type and validated payload.

@@ -2,6 +2,7 @@ import { TeamLineupRevisionSchema, validateTeamLineupRevision, type TeamLineupRe
 import { z } from 'zod'
 
 import { PlatformError } from '../platform/errors.ts'
+import { sluggersCharacterIdAt } from '../sluggers/characters.ts'
 
 const LegacyPlayerSchema = z.tuple([
   z.number().int().nonnegative(),
@@ -46,7 +47,7 @@ export function importAutoTeamSnapshot(input: unknown, teamName: string): AutoTe
 
   let players = source.map(([characterIndex, battingSlot, fieldingSlot]) => ({
     battingSlot,
-    characterId: `rmbe01-character-${String(characterIndex).padStart(3, '0')}`,
+    characterId: sluggersCharacterIdAt(characterIndex),
     fieldingSlot,
   }))
   if (new Set(players.map((player) => player.characterId)).size !== 9) {
@@ -70,7 +71,7 @@ export function importAutoTeamSnapshot(input: unknown, teamName: string): AutoTe
     sourceTeamIndex,
     warnings: [
       'AutoTeam keyboard macros, raw Dolphin addresses, and Gecko assembly were intentionally not imported.',
-      'Character IDs preserve stable RMBe01 numeric slots and can be remapped independently of this source format.',
+      'AutoTeam numeric slots were translated to stable Starworks character IDs.',
     ],
   }
   let semanticFixture = TeamLineupRevisionSchema.parse({

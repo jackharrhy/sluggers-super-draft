@@ -133,6 +133,13 @@ class DolphinPipeController:
             dolphin.add_section("Interface")
         dolphin.set("Interface", "UsePanicHandlers", "False")
         dolphin.set("Interface", "ConfirmStop", "False")
+        if not dolphin.has_section("Core"):
+            dolphin.add_section("Core")
+        # Menu timing, bridge polling, and telemetry frame deadlines are all
+        # defined against real-time 100% emulation. Research seed profiles may
+        # have disabled throttling, but an application-managed match must not
+        # inherit that operator setting.
+        dolphin.set("Core", "EmulationSpeed", "1.0")
         if not dolphin.has_section("General"):
             dolphin.add_section("General")
         dolphin.set(

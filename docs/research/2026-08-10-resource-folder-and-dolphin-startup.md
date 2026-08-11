@@ -11,7 +11,7 @@ teams, or started gameplay.
 ## Local research corpus
 
 The three supplied archives are preserved byte-for-byte under the ignored
-`.starworks/research/mario-sluggers-resource-folder/` directory. A small review
+`research/mario-sluggers-resource-folder/` directory. A small review
 set was extracted under `review/`; the bundled WBFS and other large copyrighted
 game material were neither selected as a Starworks base nor copied into a
 tracked path.
@@ -230,7 +230,7 @@ reviewed `RMBE01` image:
   D-pad and Nunchuk stick to the same Pipe buttons produces duplicate moves.
 
 A local, ignored pre-Begin checkpoint was captured at
-`.starworks/profiles/rmbe01-seed-dolphin-2606/StateSaves/starworks-pre-begin.sav`.
+`research/dolphin-profiles/rmbe01-seed-dolphin-2606/StateSaves/starworks-pre-begin.sav`.
 It is 30,423,407 bytes with SHA-256
 `166d07f811823844f444a2bbe5c6891ee957782cddbbb75be8a56eafab48118a`.
 Dolphin restored it directly to the rules screen, and the runner launcher now
@@ -252,7 +252,7 @@ unattended gameplay activation.
 The same checkpoint-backed process subsequently completed the game without
 further gameplay input and reached the stable final score screen at `1–3`.
 Local evidence is retained at
-`.starworks/research/live-full-game-result-2026-08-10.png` (91,923 bytes,
+`research/live-full-game-result-2026-08-10.png` (91,923 bytes,
 SHA-256 `37e996b75483c0f95f463c6b46f38542e1e937677e4294fe1f7284a0343f3686`).
 This is live proof that the exact image, Dolphin 2606, validated save, Pipe
 controller path, and research Gecko CPU mode can finish a game. It is not proof
@@ -271,24 +271,35 @@ From that state, the observed runner flow selected Level 4, moved the known Dixi
 Kong cursor four positions right to Random Fill, filled both rosters, and advanced
 through the reviewed team-selection hook, then reached Begin and activated the
 adapter-owned CPU path with the reviewed Minus+A chord. Receipt mask `0x07`
-proves both roster hook calls and CPU activation. It does not prove final lineup
-state: reads from the initialized game structures showed both configured roster
-sets but randomized batting order and fielding positions. Starworks now checks
-those independent structures and rejects the run.
+proves both roster hook calls and CPU activation. The first acceptance run then
+showed that Sluggers retained both configured roster sets but randomized batting
+order and fielding positions after the hook. That run was correctly rejected by
+the independent game-owned read-back gate.
 
-The same adapter-owned CPU path completed a seven-inning game without further
+On 2026-08-11, attempt `438f39a0-b4ca-41cd-93fd-95d2ad80a7da` exercised the
+complete server-backed configuration path using `demo/sluggers-match.json`.
+Starworks retained Random Fill only as the game's reliable allocation step, then
+used DME at the final formation screen to locate the two adjacent initialized
+team buffers, replace only each slot's character and position bytes, and read
+the writes back before Begin. The subsequent live-game verifier accepted both
+scheduled batting orders and the active defense positions. The CPU-vs-CPU game
+then remained live for 140 station ticks before the operator intentionally
+stopped the acceptance run. This proves exact scheduled team creation through
+live gameplay, but not a newly completed or auto-confirmed scheduled result.
+
+An earlier adapter-owned CPU path completed a seven-inning game without further
 input. It finished 4–11 in 1,153.9 seconds and the DME reducer emitted 96
 ordered events, ending once with `game-ended` at frame 87,033. This proves the
 adapter-owned CPU path and read-only DME lifecycle through completion. It is
-not an accepted scheduled match because the formation mismatch above was
-observed before the read-back gate was added to that long-running process.
+not an accepted scheduled match because it predates the successful final
+formation write and read-back described above.
 
 ## Next experiment
 
-1. Reapply or preserve batting order and fielding at the final formation
-   boundary, then pass the new game-owned read-back gate for both sides.
-2. Repeat the proven full-game adapter-owned CPU path with a formation that
+1. Repeat the proven full-game adapter-owned CPU path with a formation that
    passes game-owned read-back.
+2. Replace the bounded MEM2 formation discovery with a stable reviewed pointer
+   or adapter hook if profiling shows the one-time scan is an operational cost.
 3. Extend the live DME reducer from lifecycle, innings, players, score, and hits
    to resolved plate appearances; add a hook only for a measured missing value.
 4. Prove the complete event stream, outage spool, result review, and retry path.

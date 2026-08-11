@@ -13,7 +13,7 @@ export function LeaguePage(
     let { identity, league } = handle.props
     let mayAdminister = identity?.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
     return (
-      <AppShell identity={identity} title={`${league.name} · Starworks`}>
+      <AppShell identity={identity} league={league} title={`${league.name} · Starworks`}>
         <section>
           <p mix={eyebrowStyle}>{league.publication.leagueVisible ? 'Public league' : 'Private league'}</p>
           <h1 mix={headingStyle}>{league.name}</h1>

@@ -46,6 +46,7 @@ class FakeLiveSession:
         self.tapped: list[str] = []
         self.chords: list[tuple[str, str, float]] = []
         self.bridge_frame_waits: list[tuple[int, float]] = []
+        self.final_formations: list[RuntimeConfigurationBlock] = []
         self.screenshots: list[Path] = []
         self.snapshot = GameSnapshot(
             frame=0,
@@ -187,6 +188,11 @@ class FakeLiveSession:
 
     def wait_for_bridge_frames(self, frames: int, *, timeout_seconds: float) -> None:
         self.bridge_frame_waits.append((frames, timeout_seconds))
+
+    def apply_final_formation(
+        self, configuration: RuntimeConfigurationBlock
+    ) -> None:
+        self.final_formations.append(configuration)
 
     def stop(self) -> None:
         self.stopped += 1
@@ -333,6 +339,9 @@ def test_live_executor_materializes_and_loads_the_exact_seed_checkpoint(
     ]
     assert FakeLiveSession.instances[0].chords == [("Z", "A", 0.08)]
     assert FakeLiveSession.instances[0].bridge_frame_waits == [(120, 10.0)]
+    assert len(FakeLiveSession.instances[0].final_formations) == 1
+    assert FakeLiveSession.instances[0].final_formations[0].away.entries[0][0] == 10
+    assert FakeLiveSession.instances[0].final_formations[0].home.entries[0][0] == 0
 
 
 def test_live_executor_fails_closed_when_process_ownership_was_lost(

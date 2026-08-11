@@ -1,0 +1,59 @@
+{
+  "league": "mushroom-league",
+  "statProfile": "competitive-demo-stats",
+  "ruleset": "seven-inning-cpu-rules",
+  "stadium": "mario-stadium",
+  "innings": 7,
+  "home": {
+    "team": "mario-fireballs",
+    "captain": "mario",
+    "battingOrder": [
+      "mario",
+      "luigi",
+      "peach",
+      "daisy",
+      "yoshi",
+      "birdo",
+      "toad",
+      "toadette",
+      "bowser"
+    ],
+    "fielding": {
+      "P": "luigi",
+      "C": "mario",
+      "1B": "bowser",
+      "2B": "toad",
+      "3B": "daisy",
+      "SS": "peach",
+      "LF": "birdo",
+      "CF": "yoshi",
+      "RF": "toadette"
+    }
+  },
+  "away": {
+    "team": "wario-muscles",
+    "captain": "wario",
+    "battingOrder": [
+      "wario",
+      "waluigi",
+      "donkey-kong",
+      "diddy-kong",
+      "bowser-jr",
+      "boo",
+      "king-boo",
+      "petey-piranha",
+      "dixie-kong"
+    ],
+    "fielding": {
+      "P": "waluigi",
+      "C": "boo",
+      "1B": "king-boo",
+      "2B": "diddy-kong",
+      "3B": "wario",
+      "SS": "bowser-jr",
+      "LF": "dixie-kong",
+      "CF": "donkey-kong",
+      "RF": "petey-piranha"
+    }
+  }
+}

@@ -20,5 +20,6 @@ public/images
 
 backups
 .starworks/
+/research/
 deploy/prod/.env
 deploy/prod/garage.toml

@@ -31,7 +31,29 @@ export default createController(routes.leagues.operations, {
           context.get(Notifications),
           context.get(Telemetry),
         )
-        return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} />)
+        return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} page="matches" />)
+      } catch (error) {
+        return operationsError(context, error)
+      }
+    },
+    async teams(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let dashboards = await loadDashboards(identity, league, context.get(RunnerAdmin), context.get(LeagueOperations), context.get(Notifications), context.get(Telemetry))
+        return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} page="teams" />)
+      } catch (error) {
+        return operationsError(context, error)
+      }
+    },
+    async admin(context) {
+      let identity = context.get(Identity)
+      let league = await context.get(Platform).viewLeague(context.params.leagueSlug, identity)
+      if (!league) return notFound(context)
+      try {
+        let dashboards = await loadDashboards(identity, league, context.get(RunnerAdmin), context.get(LeagueOperations), context.get(Notifications), context.get(Telemetry))
+        return context.render(<LeagueOperationsPage {...dashboards} identity={identity!} league={league} page="admin" />)
       } catch (error) {
         return operationsError(context, error)
       }
@@ -52,9 +74,9 @@ export default createController(routes.leagues.operations, {
           note: readString(data, 'note', false) || null,
           seasonId: readString(data, 'seasonId'),
         })
-        return operationsRedirect(league)
+        return pageRedirect(league, 'teams')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'teams')
       }
     },
     async configureDiscord(context) {
@@ -68,9 +90,9 @@ export default createController(routes.leagues.operations, {
         }
         let channelId = readString(context.get(FormData), 'channelId', false)
         await notifications.configure(identity, league.id, { channelId: channelId || null })
-        return operationsRedirect(league)
+        return pageRedirect(league, 'admin')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'admin')
       }
     },
     async retryDiscord(context) {
@@ -83,9 +105,9 @@ export default createController(routes.leagues.operations, {
           throw new PlatformError('Discord notifications are unavailable', 'external_service')
         }
         await notifications.retry(identity, league.id)
-        return operationsRedirect(league)
+        return pageRedirect(league, 'admin')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'admin')
       }
     },
     async proposeTrade(context) {
@@ -107,9 +129,9 @@ export default createController(routes.leagues.operations, {
           eventType: 'trade.proposed',
           message: `🔄 ${league.name} received a trade proposal between teams ${readString(data, 'proposerTeamId')} and ${readString(data, 'counterpartyTeamId')}.`,
         })
-        return operationsRedirect(league)
+        return pageRedirect(league, 'teams')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'teams')
       }
     },
     async reviewTrade(context) {
@@ -131,9 +153,9 @@ export default createController(routes.leagues.operations, {
             message: `✅ ${league.name} applied trade ${context.params.proposalId}. New roster revisions are now published.`,
           })
         }
-        return operationsRedirect(league)
+        return pageRedirect(league, 'teams')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'teams')
       }
     },
     async cancelTrade(context) {
@@ -142,9 +164,9 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       try {
         await context.get(LeagueOperations).cancelTrade(identity, league.id, context.params.proposalId)
-        return operationsRedirect(league)
+        return pageRedirect(league, 'teams')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'teams')
       }
     },
     async scheduleMatch(context) {
@@ -165,7 +187,7 @@ export default createController(routes.leagues.operations, {
         })
         return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'matches')
       }
     },
     async queueAttempt(context) {
@@ -190,9 +212,9 @@ export default createController(routes.leagues.operations, {
           eventType: 'match.attempt_queued',
           message: `⚾ ${league.name} queued match attempt #${queued.attemptNumber} for ${context.params.matchId}.`,
         })
-        return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
+        return pageRedirect(league, 'matches')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'matches')
       }
     },
     async issueCredential(context) {
@@ -213,11 +235,11 @@ export default createController(routes.leagues.operations, {
           context.get(Telemetry),
         )
         return context.render(
-          <LeagueOperationsPage {...dashboards} identity={identity!} league={league} oneTimeCredential={issued.credential} />,
+          <LeagueOperationsPage {...dashboards} identity={identity!} league={league} oneTimeCredential={issued.credential} page="admin" />,
           { status: 201 },
         )
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'admin')
       }
     },
     async revokeStation(context) {
@@ -226,9 +248,9 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       try {
         await context.get(RunnerAdmin).revokeStation(identity, league.id, context.params.stationId)
-        return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
+        return pageRedirect(league, 'admin')
       } catch (error) {
-        return renderDashboardError(renderContext(context), identity, league, error)
+        return renderDashboardError(renderContext(context), identity, league, error, 'admin')
       }
     },
     async deriveTelemetry(context) {
@@ -237,7 +259,7 @@ export default createController(routes.leagues.operations, {
       if (!league) return notFound(context)
       try {
         await context.get(Telemetry).derive(identity, league.id, context.params.attemptId)
-        return operationsRedirect(league)
+        return pageRedirect(league, 'matches')
       } catch (error) {
         return renderDashboardError(renderContext(context), identity, league, error)
       }
@@ -265,7 +287,7 @@ export default createController(routes.leagues.operations, {
           reason: readString(data, 'reason'),
           statPath: readString(data, 'statPath'),
         })
-        return operationsRedirect(league)
+        return pageRedirect(league, 'matches')
       } catch (error) {
         return renderDashboardError(renderContext(context), identity, league, error)
       }
@@ -281,7 +303,7 @@ export default createController(routes.leagues.operations, {
           eventType: 'match.result_confirmed',
           message: `✅ ${league.name} confirmed the official result for attempt ${context.params.attemptId}.`,
         })
-        return operationsRedirect(league)
+        return pageRedirect(league, 'matches')
       } catch (error) {
         return renderDashboardError(renderContext(context), identity, league, error)
       }
@@ -294,6 +316,7 @@ async function renderDashboardError(
   identity: SessionIdentity | null,
   league: LeagueDetail,
   error: unknown,
+  page: 'admin' | 'matches' | 'teams' = 'matches',
 ) {
   let dashboards = await loadDashboards(
     identity,
@@ -305,7 +328,7 @@ async function renderDashboardError(
   )
   let message = error instanceof PlatformError ? error.message : 'The league operation could not be completed.'
   let status = error instanceof PlatformError && error.code === 'forbidden' ? 403 : 400
-  return context.render(<LeagueOperationsPage {...dashboards} error={message} identity={identity!} league={league} />, { status })
+  return context.render(<LeagueOperationsPage {...dashboards} error={message} identity={identity!} league={league} page={page} />, { status })
 }
 
 function readString(data: FormData, name: string, required = true): string {
@@ -325,14 +348,21 @@ function readJsonObject(data: FormData, name: string): Record<string, string | n
 }
 
 function readCharacterList(data: FormData, name: string): string[] {
-  return readString(data, name)
-    .split(/[\n,]/)
+  let values = data.getAll(name)
+    .flatMap((value) => String(value).split(/[\n,]/))
     .map((value) => value.trim())
     .filter(Boolean)
+  if (!values.length) throw new PlatformError(`${name} is required`, 'invalid_input')
+  return values
 }
 
-function operationsRedirect(league: LeagueDetail) {
-  return redirect(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }), 303)
+function pageRedirect(league: LeagueDetail, page: 'admin' | 'matches' | 'teams') {
+  let href = page === 'admin'
+    ? routes.leagues.operations.admin.href({ leagueSlug: league.slug })
+    : page === 'teams'
+      ? routes.leagues.operations.teams.href({ leagueSlug: league.slug })
+      : routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })
+  return redirect(href, 303)
 }
 
 async function loadDashboards(

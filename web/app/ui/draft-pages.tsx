@@ -1,10 +1,11 @@
 import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { DraftRoom, DraftSetupOptions } from '../draft/service.ts'
+import type { DraftCharacter, DraftRoom, DraftSetupOptions } from '../draft/service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { administrativeRoles } from '../platform/repository.ts'
 import { routes } from '../routes.ts'
+import { characterHeadshotPath } from '../sluggers/characters.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
 
 interface DraftDashboardPageProps {
@@ -19,21 +20,17 @@ export function DraftDashboardPage(handle: Handle<DraftDashboardPageProps>) {
     let { dashboard, error, identity, league } = handle.props
     let mayAdminister = identity.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
     return (
-      <AppShell identity={identity} title={`${league.name} drafts · Starworks`}>
+      <AppShell identity={identity} league={league} title={`${league.name} drafts · Starworks`}>
         <header mix={heroStyle}>
-          <div>
-            <p mix={eyebrowStyle}>League draft room</p>
-            <h1 mix={headingStyle}>{league.name} drafts</h1>
-            <p mix={ledeStyle}>Configure the order once, then let the server own every turn, clock, pick, recovery action, and final roster.</p>
-          </div>
-          <WorkspaceLinks league={league} />
+          <h1 mix={headingStyle}>Drafts</h1>
+          <span>{league.name}</span>
         </header>
 
         {error ? <p role="alert" mix={errorStyle}>{error}</p> : null}
 
         <section mix={sectionStyle} aria-labelledby="drafts-heading">
           <div mix={sectionHeadingStyle}>
-            <div><p mix={eyebrowStyle}>Rooms</p><h2 id="drafts-heading">Drafts</h2></div>
+            <h2 id="drafts-heading">Draft rooms</h2>
             <span mix={countStyle}>{dashboard.drafts.length} total</span>
           </div>
           <div mix={cardGridStyle}>
@@ -52,7 +49,7 @@ export function DraftDashboardPage(handle: Handle<DraftDashboardPageProps>) {
         {mayAdminister ? (
           <section mix={sectionStyle} aria-labelledby="create-heading">
             <div mix={sectionHeadingStyle}>
-              <div><p mix={eyebrowStyle}>Commissioner setup</p><h2 id="create-heading">Create a draft</h2></div>
+              <h2 id="create-heading">Create a draft</h2>
             </div>
             {!dashboard.statProfiles.length ? (
               <p mix={emptyStyle}>Publish a stat profile before creating a draft. Its exact character set becomes the eligible pool.</p>
@@ -112,29 +109,27 @@ export function DraftRoomPage(handle: Handle<DraftRoomPageProps>) {
     let mayPick = room.draft.status === 'active' && (mayAdminister || currentTeam?.managerPersonId === identity.personId)
     let activePicks = room.picks.filter((pick) => pick.status === 'active')
     return (
-      <AppShell identity={identity} title={`${room.draft.name} · Starworks`}>
+      <AppShell identity={identity} league={league} title={`${room.draft.name} · Starworks`}>
         <header mix={heroStyle}>
-          <div>
-            <p mix={eyebrowStyle}>{room.draft.status} · {room.draft.orderMode} order</p>
-            <h1 mix={headingStyle}>{room.draft.name}</h1>
-            <p mix={ledeStyle}>{currentTeam ? `${currentTeam.teamName} owns pick ${room.draft.currentPickNumber}.` : `${activePicks.length} picks are locked into published rosters.`}</p>
-          </div>
-          <WorkspaceLinks league={league} />
+          <h1 mix={headingStyle}>{room.draft.name}</h1>
+          <span>{room.draft.status} · {room.draft.orderMode} order</span>
         </header>
 
         {error ? <p role="alert" mix={errorStyle}>{error}</p> : null}
 
         <section mix={[cardStyle, clockCardStyle]} aria-labelledby="clock-heading">
           <div>
-            <p mix={eyebrowStyle}>Draft clock</p>
             <h2 id="clock-heading">{currentTeam?.teamName ?? 'Draft complete'}</h2>
-            <p mix={mutedStyle}>{room.draft.deadline ? `Deadline ${room.draft.deadline.toLocaleTimeString()}` : room.draft.status === 'paused' ? 'Clock paused' : `${activePicks.length} of ${room.draft.totalPicks} selections`}</p>
+            <p mix={mutedStyle}>
+              {currentTeam ? `${currentTeam.teamName} owns pick ${room.draft.currentPickNumber}` : `${activePicks.length} of ${room.draft.totalPicks} selections`}
+              {room.draft.deadline ? ` · deadline ${room.draft.deadline.toLocaleTimeString()}` : room.draft.status === 'paused' ? ' · clock paused' : ''}
+            </p>
           </div>
           {mayAdminister ? <CommissionerControls league={league} room={room} /> : null}
         </section>
 
         <section mix={sectionStyle} aria-labelledby="order-heading">
-          <div mix={sectionHeadingStyle}><div><p mix={eyebrowStyle}>Order</p><h2 id="order-heading">Team slots</h2></div><span mix={countStyle}>{room.draft.rounds} rounds</span></div>
+          <div mix={sectionHeadingStyle}><h2 id="order-heading">Team slots</h2><span mix={countStyle}>{room.draft.rounds} rounds</span></div>
           <ol mix={slotListStyle}>
             {room.slots.map((slot) => {
               let count = activePicks.filter((pick) => pick.teamId === slot.teamId).length
@@ -145,7 +140,7 @@ export function DraftRoomPage(handle: Handle<DraftRoomPageProps>) {
 
         {managedTeam && !['completed', 'cancelled'].includes(room.draft.status) ? (
           <section mix={[cardStyle, queueStyle]} aria-labelledby="queue-heading">
-            <div><p mix={eyebrowStyle}>Private to your team</p><h2 id="queue-heading">{managedTeam.teamName} queue</h2></div>
+            <div><h2 id="queue-heading">{managedTeam.teamName} queue</h2><p mix={mutedStyle}>Private to your team</p></div>
             {room.queue.length ? <ol mix={queueListStyle}>{room.queue.map((characterId, index) => {
               let character = room.characters.find((candidate) => candidate.characterId === characterId)
               return <li><span>{index + 1}. {character?.displayName ?? characterId}</span><QueueForm action="remove" characterId={characterId} league={league} room={room} teamId={managedTeam.teamId} /></li>
@@ -155,17 +150,20 @@ export function DraftRoomPage(handle: Handle<DraftRoomPageProps>) {
 
         <section mix={sectionStyle} aria-labelledby="available-heading">
           <div mix={sectionHeadingStyle}>
-            <div><p mix={eyebrowStyle}>Published stat profile</p><h2 id="available-heading">Available characters</h2></div>
+            <h2 id="available-heading">Available characters</h2>
             <span mix={countStyle}>{room.characters.length} remaining</span>
           </div>
           <div mix={characterGridStyle}>
             {room.characters.map((character) => (
               <article mix={[cardStyle, characterCardStyle]}>
                 <div mix={characterHeadingStyle}>
-                  <h3>{character.displayName}</h3>
+                  <div mix={characterIdentityStyle}>
+                    <img src={characterHeadshotPath(character.characterId)} alt="" />
+                    <h3>{character.displayName}</h3>
+                  </div>
                   {character.isCaptain ? <span mix={captainStyle}>Captain</span> : null}
                 </div>
-                <dl mix={statsStyle}>{Object.entries(character.values).slice(0, 6).map(([key, value]) => <div><dt>{formatKey(key)}</dt><dd>{String(value ?? '—')}</dd></div>)}</dl>
+                <dl mix={statsStyle}>{visibleStats(character).map(({ label, value }) => <div><dt>{label}</dt><dd>{String(value ?? '—')}</dd></div>)}</dl>
                 {character.chemistry.length ? <div mix={chemistryStyle}>{character.chemistry.slice(0, 5).map((relationship) => <span data-relationship={relationship.relationship}>{relationship.relationship === 'positive' ? '+' : '−'} {relationship.displayName}</span>)}</div> : <p mix={mutedStyle}>No catalogued chemistry links.</p>}
                 <div mix={characterActionsStyle}>
                   {mayPick ? <form action={routes.leagues.drafts.pick.href({ draftId: room.draft.id, leagueSlug: league.slug })} method="post">
@@ -184,7 +182,7 @@ export function DraftRoomPage(handle: Handle<DraftRoomPageProps>) {
         </section>
 
         <section mix={sectionStyle} aria-labelledby="history-heading">
-          <div mix={sectionHeadingStyle}><div><p mix={eyebrowStyle}>Append-only record</p><h2 id="history-heading">Pick history</h2></div><span mix={countStyle}>{room.picks.length} records</span></div>
+          <div mix={sectionHeadingStyle}><h2 id="history-heading">Pick history</h2><span mix={countStyle}>{room.picks.length} records</span></div>
           <ol reversed mix={historyStyle}>
             {[...room.picks].reverse().map((pick) => <li data-status={pick.status}><span>#{pick.pickNumber}</span><strong>{pick.characterName}</strong><span>{pick.teamName}</span><small>{pick.source}{pick.status === 'reversed' ? ` · reversed: ${pick.reason}` : ''}</small></li>)}
           </ol>
@@ -233,23 +231,28 @@ function QueueForm(handle: Handle<{
   }
 }
 
-function WorkspaceLinks(handle: Handle<{ league: LeagueDetail }>) {
-  return () => <nav mix={linkRowStyle} aria-label="League workspaces">
-    <a href={routes.leagues.show.href({ leagueSlug: handle.props.league.slug })}>League home</a>
-    <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: handle.props.league.slug })}>Configuration</a>
-    <a href={routes.leagues.operations.dashboard.href({ leagueSlug: handle.props.league.slug })}>Match operations</a>
-  </nav>
+const draftStatLabels = [
+  'Displayed batting',
+  'Displayed pitching',
+  'Displayed fielding',
+  'Displayed speed',
+  'Slap power',
+  'Charge power',
+] as const
+
+function visibleStats(character: DraftCharacter) {
+  if (character.stats?.length) {
+    let byLabel = new Map(character.stats.map((stat) => [stat.label, stat]))
+    return draftStatLabels.flatMap((label) => byLabel.get(label) ?? [])
+  }
+  return Object.entries(character.values).slice(0, 6).map(([key, value]) => ({
+    label: key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    value,
+  }))
 }
 
-function formatKey(key: string): string {
-  return key.replaceAll('-', ' ').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase())
-}
-
-const heroStyle = css({ display: 'grid', gap: '24px' })
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
+const heroStyle = css({ alignItems: 'baseline', display: 'flex', gap: '16px', '& span': { color: 'var(--text-muted)' } })
 const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
-const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.6, maxWidth: '780px' })
-const linkRowStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '18px' })
 const errorStyle = css({ background: 'var(--danger-surface)', border: '1px solid var(--danger-border)', borderRadius: '12px', marginTop: '28px', padding: '14px 18px' })
 const mutedStyle = css({ color: 'var(--text-muted)', lineHeight: 1.5, margin: 0 })
 const sectionStyle = css({ marginTop: '56px' })
@@ -276,6 +279,7 @@ const queueButtonStyle = css({ background: 'transparent', border: '1px solid var
 const characterGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' })
 const characterCardStyle = css({ display: 'grid', gap: '18px' })
 const characterHeadingStyle = css({ alignItems: 'center', display: 'flex', gap: '10px', justifyContent: 'space-between', '& h3': { fontSize: '25px', margin: 0 } })
+const characterIdentityStyle = css({ alignItems: 'center', display: 'flex', gap: '10px', minWidth: 0, '& img': { height: '42px', objectFit: 'contain', width: '42px' } })
 const captainStyle = css({ background: 'var(--warning-surface)', border: '1px solid var(--warning-border)', borderRadius: '999px', color: 'var(--warning-text)', fontSize: '11px', fontWeight: 900, padding: '5px 8px', textTransform: 'uppercase' })
 const statsStyle = css({ display: 'grid', gap: '8px', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', margin: 0, '& div': { background: 'var(--surface-deep)', borderRadius: '8px', padding: '9px' }, '& dt': { color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }, '& dd': { fontSize: '18px', fontWeight: 900, margin: '3px 0 0' } })
 const chemistryStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '7px', '& span': { borderRadius: '999px', fontSize: '12px', padding: '5px 8px' }, '& [data-relationship="positive"]': { background: 'var(--success-surface)', color: 'var(--success-text)' }, '& [data-relationship="negative"]': { background: 'var(--danger-surface)', color: 'var(--danger-text)' } })

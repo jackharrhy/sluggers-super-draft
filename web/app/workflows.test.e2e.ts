@@ -126,7 +126,8 @@ describe('critical Starworks browser workflows', () => {
       teamId: lineup.teamId,
     }))
     await page.getByRole('button', { name: 'Publish and lock revision' }).click()
-    await page.getByText('This snapshot is immutable. Clone it to make the next revision.').waitFor()
+    await page.getByRole('button', { name: 'Clone into new draft' }).waitFor()
+    await page.getByText('Published revision', { exact: true }).waitFor()
     assert.equal(lineup.status, 'published')
   })
 

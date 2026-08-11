@@ -367,6 +367,40 @@ class RunnerStateStore:
             if updated.rowcount != 1:
                 raise ActiveRunConflict("Attempt changed before outcome was persisted")
 
+    def archive_lost_lease(self, attempt_id: str) -> None:
+        """Release a local run after the server rejects its expired lease.
+
+        The server has already failed the attempt and applied its retry policy
+        before returning the conflict. Keeping it in ``active_run`` would make
+        every subsequent station start retry the same impossible renewal.
+        """
+
+        with self._lock, self._connection:
+            active = self._connection.execute(
+                "select envelope_json from active_run where singleton = 1 and attempt_id = ?",
+                (attempt_id,),
+            ).fetchone()
+            if not active:
+                return
+            self._connection.execute(
+                """
+                insert into run_history (attempt_id, outcome, envelope_json)
+                values (?, 'lease-lost', ?)
+                on conflict (attempt_id) do nothing
+                """,
+                (attempt_id, active["envelope_json"]),
+            )
+            self._connection.execute(
+                "delete from telemetry_spool where attempt_id = ?", (attempt_id,)
+            )
+            self._connection.execute(
+                "delete from pending_updates where attempt_id = ?", (attempt_id,)
+            )
+            self._connection.execute(
+                "delete from active_run where singleton = 1 and attempt_id = ?",
+                (attempt_id,),
+            )
+
     def list_pending_telemetry(
         self, attempt_id: str, *, limit: int = 256
     ) -> list[PendingTelemetry]:

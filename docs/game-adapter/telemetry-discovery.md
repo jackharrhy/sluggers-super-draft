@@ -61,8 +61,11 @@ live-observed:
 
 The first complete adapter-owned trace covered seven innings, finished 4–11 in
 1,153.9 seconds, and emitted 96 ordered events through `game-ended`. It remains
-ineligible for result acceptance because the independently read game formation
-did not match the scheduled batting order and fielding positions.
+ineligible for result acceptance because that trace predates the final-formation
+fix. A later server-backed attempt passed the game-owned batting-order and active
+defense read-back and entered live CPU-vs-CPU gameplay, but was intentionally
+stopped before completion. A single run has therefore not yet proven both the
+correct formation and a healthy terminal event.
 
 Two trace findings constrain the reducer:
 

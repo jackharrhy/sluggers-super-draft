@@ -9,6 +9,7 @@ import {
 import { z } from 'zod'
 
 import { PlatformError } from '../platform/errors.ts'
+import { SLUGGERS_CHARACTER_IDS } from '../sluggers/characters.ts'
 
 export const StatEditorV4ImportRequestSchema = z.strictObject({
   characterIdsByIndex: z.array(z.string().min(1).max(127)).length(101).optional(),
@@ -123,10 +124,7 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
   cursor += 4
   let handicapParameters = readNumericRows(lines, cursor, 2, 3, 'handicap parameters')
 
-  let characterIds = request.characterIdsByIndex ?? Array.from(
-    { length: 101 },
-    (_, index) => `rmbe01-character-${String(index).padStart(3, '0')}`,
-  )
+  let characterIds = request.characterIdsByIndex ?? [...SLUGGERS_CHARACTER_IDS]
   let sluggersTuning = SluggersTuningSchema.parse({
     characterIdsByIndex: characterIds,
     chemistry: parsed.get('chemistry'),
@@ -173,7 +171,7 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
     sluggersTuning,
     sourceVersion: 'v4',
     warnings: [
-      'Default character IDs preserve RMBe01 numeric slots; replace them with canonical roster IDs when a verified mapping is available.',
+      'Character slots were translated from the Stat Editor roster order to stable Starworks character IDs.',
     ],
   }
 }
@@ -190,7 +188,7 @@ function buildDefinitions(
     let key = `legacy.stat-editor.${group}-${String(column).padStart(2, '0')}`
     let base = {
       definitionId: deterministicUuid(key),
-      display: { group: `Imported ${titleCase(group)}`, label, order: orderOffset + column },
+      display: { group: groupLabel(group), label, order: orderOffset + column },
       gameplayMapping: {
         adapterId: 'sluggers-rmbe01' as const,
         loadPhase: 'build-time' as const,
@@ -322,6 +320,8 @@ function deterministicUuid(value: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-function titleCase(value: string): string {
-  return value[0]!.toUpperCase() + value.slice(1)
+function groupLabel(group: string): string {
+  if (group === 'stat') return 'Core stats'
+  if (group === 'size') return 'Character size'
+  return 'Pitching'
 }

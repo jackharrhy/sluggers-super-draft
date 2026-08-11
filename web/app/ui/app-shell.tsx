@@ -9,16 +9,28 @@ export function AppShell(
   handle: Handle<{
     children?: RemixNode
     identity?: SessionIdentity | null
+    league?: { name: string; slug: string }
     title?: string
   }>,
 ) {
   return () => {
-    let { children, identity = null, title } = handle.props
+    let { children, identity = null, league, title } = handle.props
     return (
       <Document title={title}>
         <div mix={pageStyle}>
           <header mix={headerStyle}>
             <a href={routes.home.href()} mix={brandStyle}>Starworks</a>
+            {league ? (
+              <nav mix={leagueNavStyle} aria-label={`${league.name} navigation`}>
+                <a href={routes.leagues.show.href({ leagueSlug: league.slug })}>Home</a>
+                <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Drafts</a>
+                <a href={routes.leagues.operations.teams.href({ leagueSlug: league.slug })}>Teams</a>
+                <a href={routes.leagues.configuration.statProfiles.href({ leagueSlug: league.slug })}>Stats</a>
+                <a href={routes.leagues.configuration.rulesets.href({ leagueSlug: league.slug })}>Rules</a>
+                <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Matches</a>
+                <a href={routes.leagues.operations.admin.href({ leagueSlug: league.slug })}>Admin</a>
+              </nav>
+            ) : null}
             <nav mix={navStyle} aria-label="Account">
               {identity ? (
                 <>
@@ -84,16 +96,32 @@ const pageStyle = css({
 const headerStyle = css({
   alignItems: 'center',
   borderBottom: '1px solid rgb(229 231 235 / 0.72)',
-  display: 'flex',
+  display: 'grid',
   gap: '24px',
-  justifyContent: 'space-between',
+  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
   margin: '0 auto',
   maxWidth: '1280px',
   padding: '16px 24px',
+  width: '100%',
+  '@media (max-width: 1050px)': {
+    gridTemplateColumns: 'auto minmax(0, 1fr)',
+    '& nav[aria-label="Account"]': { gridColumn: '2' },
+  },
   '@media (max-width: 680px)': {
     alignItems: 'flex-start',
-    flexDirection: 'column',
+    gridTemplateColumns: '1fr',
+    '& nav[aria-label="Account"]': { gridColumn: '1' },
   },
+})
+
+const leagueNavStyle = css({
+  alignItems: 'center',
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '10px 20px',
+  minWidth: 0,
+  '& a': { color: 'var(--text-soft)', textDecoration: 'none' },
+  '& a:hover': { color: 'var(--text-primary)', textDecoration: 'underline' },
 })
 
 const brandStyle = css({
@@ -111,6 +139,7 @@ const navStyle = css({
   flexWrap: 'wrap',
   gap: '16px',
   justifyContent: 'flex-end',
+  '& > span': { maxWidth: '190px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
 })
 
 const linkButtonStyle = css({
@@ -127,4 +156,5 @@ const mainStyle = css({
   margin: '0 auto',
   maxWidth: '1280px',
   padding: '36px 24px 80px',
+  width: '100%',
 })

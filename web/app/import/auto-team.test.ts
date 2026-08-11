@@ -21,11 +21,11 @@ describe('AutoTeam importer', () => {
       ]],
     }, 'Mario Fireballs')
 
-    assert.equal(result.lineup.captainCharacterId, 'rmbe01-character-000')
-    assert.equal(result.lineup.pitcherCharacterId, 'rmbe01-character-001')
-    assert.equal(result.lineup.battingOrder[0], 'rmbe01-character-001')
+    assert.equal(result.lineup.captainCharacterId, 'mario')
+    assert.equal(result.lineup.pitcherCharacterId, 'luigi')
+    assert.equal(result.lineup.battingOrder[0], 'luigi')
     assert.deepEqual(result.lineup.fielding[0], {
-      characterId: 'rmbe01-character-001',
+      characterId: 'luigi',
       position: 'P',
     })
     assert.equal(result.rosterCharacterIds.length, 9)

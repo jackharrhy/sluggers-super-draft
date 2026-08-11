@@ -8,6 +8,7 @@ import type {
 } from '../configuration/service.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { routes } from '../routes.ts'
+import { characterHeadshotPath, displayCharacterName } from '../sluggers/characters.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
 
 interface RevisionPageProps<TDetail> {
@@ -27,25 +28,53 @@ export function StatProfileRevisionPage(handle: Handle<RevisionPageProps<StatPro
         league={league}
         heading={revision.name}
         kind="Stat profile"
+        returnHref={routes.leagues.configuration.statProfiles.href({ leagueSlug: league.slug })}
+        returnLabel="Back to stats"
         revisionNumber={revision.revisionNumber}
         status={revision.status}
       >
         <IssueList issues={detail.issues.map((issue) => `${issue.code} · ${issue.path}`)} />
-        {revision.status === 'draft' ? (
-          <form action={routes.leagues.configuration.updateStatProfile.href(routeParams)} method="post" mix={[cardStyle, formStyle]}>
-            <TextField label="Revision name" name="name" value={revision.name} />
-            <JsonEditor label="Stat definitions" name="definitions" value={revision.definitions} />
-            <JsonEditor label="Character values" name="characterValues" value={revision.characterValues} />
-            {revision.sluggersTuning ? <JsonEditor label="Sluggers global and relational tuning" name="sluggersTuning" value={revision.sluggersTuning} /> : null}
-            <button type="submit" mix={buttonStyle}>Save draft</button>
-          </form>
-        ) : <LockedNotice />}
+        <section aria-labelledby="characters-heading" mix={formStyle}>
+          <div mix={sectionTitleStyle}>
+            <h2 id="characters-heading" mix={sectionHeadingStyle}>Characters</h2>
+            <span>{revision.characterValues.length}</span>
+          </div>
+          <div mix={characterGridStyle}>
+            {revision.characterValues.map((character) => (
+              <a
+                href={routes.leagues.configuration.editStatProfileCharacter.href({
+                  characterId: character.characterId,
+                  leagueSlug: league.slug,
+                  revisionId: revision.revisionId,
+                })}
+                mix={[cardStyle, characterLinkStyle]}
+              >
+                <img src={characterHeadshotPath(character.characterId)} alt="" />
+                <span>
+                  <strong>{displayCharacterName(character.characterId)}</strong>
+                  <small>{Object.keys(character.values).length} values</small>
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+        <section mix={[cardStyle, summaryStyle]} aria-labelledby="profile-shape-heading">
+          <div mix={sectionTitleStyle}>
+            <h2 id="profile-shape-heading" mix={sectionHeadingStyle}>Profile contents</h2>
+            {revision.sluggersTuning ? <a href={routes.leagues.configuration.exportStatProfile.href(routeParams)}>Export Stat Editor v4</a> : null}
+          </div>
+          <dl mix={summaryGridStyle}>
+            <div><dt>Character fields</dt><dd>{revision.definitions.length}</dd></div>
+            <div><dt>Characters</dt><dd>{revision.characterValues.length}</dd></div>
+            <div><dt>Chemistry cells</dt><dd>{revision.sluggersTuning ? 101 * 101 : 0}</dd></div>
+            <div><dt>Trajectory tables</dt><dd>{revision.sluggersTuning?.trajectoryTables.length ?? 0}</dd></div>
+          </dl>
+        </section>
         <RevisionActions
           cloneAction={routes.leagues.configuration.cloneStatProfile.href(routeParams)}
           publishAction={routes.leagues.configuration.publishStatProfile.href(routeParams)}
           status={revision.status}
         />
-        <Comparison current={{ definitions: revision.definitions, characterValues: revision.characterValues, sluggersTuning: revision.sluggersTuning }} previous={detail.basedOnRevision ? { definitions: detail.basedOnRevision.definitions, characterValues: detail.basedOnRevision.characterValues, sluggersTuning: detail.basedOnRevision.sluggersTuning } : null} />
         <History rows={detail.history} />
       </RevisionShell>
     )
@@ -66,6 +95,8 @@ export function RulesetRevisionPage(handle: Handle<RevisionPageProps<RulesetRevi
         league={league}
         heading={revision.name}
         kind="Ruleset"
+        returnHref={routes.leagues.configuration.rulesets.href({ leagueSlug: league.slug })}
+        returnLabel="Back to rules"
         revisionNumber={revision.revisionNumber}
         status={revision.status}
       >
@@ -76,7 +107,7 @@ export function RulesetRevisionPage(handle: Handle<RevisionPageProps<RulesetRevi
             <JsonEditor label="Rule settings" name="settings" value={revision.settings} />
             <button type="submit" mix={buttonStyle}>Save draft</button>
           </form>
-        ) : <LockedNotice />}
+        ) : null}
         <RevisionActions
           cloneAction={routes.leagues.configuration.cloneRuleset.href(routeParams)}
           publishAction={routes.leagues.configuration.publishRuleset.href(routeParams)}
@@ -104,6 +135,8 @@ export function TeamLineupRevisionPage(handle: Handle<RevisionPageProps<TeamLine
         league={league}
         heading={`Team lineup r${revision.lineupRevisionNumber}`}
         kind="Roster and lineup"
+        returnHref={routes.leagues.configuration.teams.href({ leagueSlug: league.slug })}
+        returnLabel="Back to teams"
         revisionNumber={revision.lineupRevisionNumber}
         status={revision.status}
       >
@@ -114,7 +147,7 @@ export function TeamLineupRevisionPage(handle: Handle<RevisionPageProps<TeamLine
             <JsonEditor label="Effective lineup" name="lineup" value={revision.lineup} />
             <button type="submit" mix={buttonStyle}>Save draft</button>
           </form>
-        ) : <LockedNotice />}
+        ) : null}
         <RevisionActions
           cloneAction={routes.leagues.configuration.cloneLineup.href(routeParams)}
           publishAction={routes.leagues.configuration.publishLineup.href(routeParams)}
@@ -136,20 +169,21 @@ function RevisionShell(handle: Handle<{
   identity: SessionIdentity
   kind: string
   league: LeagueDetail
+  returnHref: string
+  returnLabel: string
   revisionNumber: number
   status: 'draft' | 'published'
 }>) {
   return () => {
-    let { children, heading, identity, kind, league, revisionNumber, status } = handle.props
+    let { children, heading, identity, kind, league, returnHref, returnLabel, revisionNumber, status } = handle.props
     return (
-      <AppShell identity={identity} title={`${heading} · ${league.name} · Starworks`}>
+      <AppShell identity={identity} league={league} title={`${heading} · ${league.name} · Starworks`}>
         <header mix={heroStyle}>
           <div>
-            <p mix={eyebrowStyle}>{kind} · revision {revisionNumber}</p>
             <h1 mix={headingStyle}>{heading}</h1>
-            <span mix={status === 'published' ? publishedStyle : draftStyle}>{status}</span>
+            <p mix={revisionMetaStyle}>{kind} · Revision {revisionNumber} · {status}</p>
           </div>
-          <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>All configuration</a>
+          <a href={returnHref}>{returnLabel}</a>
         </header>
         <div mix={contentStyle}>{children}</div>
       </AppShell>
@@ -163,7 +197,11 @@ function RevisionActions(handle: Handle<{
   status: 'draft' | 'published'
 }>) {
   return () => (
-    <section mix={actionsStyle} aria-label="Revision actions">
+    <section mix={[cardStyle, actionsStyle]} aria-label="Revision actions">
+      <div>
+        <strong>{handle.props.status === 'draft' ? 'Draft revision' : 'Published revision'}</strong>
+        <p>{handle.props.status === 'draft' ? 'Publish when every change is ready for league use.' : 'Published revisions are immutable. Clone this one to make changes.'}</p>
+      </div>
       {handle.props.status === 'draft' ? (
         <form action={handle.props.publishAction} method="post">
           <button type="submit" mix={buttonStyle}>Publish and lock revision</button>
@@ -177,24 +215,13 @@ function RevisionActions(handle: Handle<{
   )
 }
 
-function LockedNotice() {
-  return () => (
-    <section mix={[cardStyle, lockedStyle]}>
-      <strong>Published revision</strong>
-      <span>This snapshot is immutable. Clone it to make the next revision.</span>
-    </section>
-  )
-}
-
 function IssueList(handle: Handle<{ issues: string[] }>) {
   return () => handle.props.issues.length ? (
     <section mix={[cardStyle, issueStyle]} aria-labelledby="issues-heading">
       <h2 id="issues-heading" mix={sectionHeadingStyle}>Validation issues</h2>
       <ul>{handle.props.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
     </section>
-  ) : (
-    <p mix={validStyle}>This revision passes semantic validation.</p>
-  )
+  ) : null
 }
 
 function Comparison(handle: Handle<{ current: unknown; previous: unknown | null }>) {
@@ -231,14 +258,18 @@ function History(handle: Handle<{ rows: Array<{ id: string; revisionNumber: numb
             <tr key={row.id}>
               <td>{row.revisionNumber}</td>
               <td>{row.status}</td>
-              <td>{row.createdAt.toISOString()}</td>
-              <td>{row.publishedAt?.toISOString() ?? '—'}</td>
+              <td>{formatDate(row.createdAt)}</td>
+              <td>{row.publishedAt ? formatDate(row.publishedAt) : '—'}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </section>
   )
+}
+
+function formatDate(value: Date): string {
+  return new Intl.DateTimeFormat('en', { dateStyle: 'medium', timeStyle: 'short' }).format(value)
 }
 
 function TextField(handle: Handle<{ label: string; name: string; value: string }>) {
@@ -259,23 +290,24 @@ function JsonEditor(handle: Handle<{ label: string; name: string; value: unknown
   )
 }
 
-const heroStyle = css({ alignItems: 'start', display: 'flex', gap: '32px', justifyContent: 'space-between' })
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
-const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(32px, 5vw, 46px)', lineHeight: 1.08, margin: '0 0 16px' })
-const contentStyle = css({ display: 'grid', gap: '28px', marginTop: '44px' })
+const heroStyle = css({ alignItems: 'end', display: 'flex', flexWrap: 'wrap', gap: '18px', justifyContent: 'space-between' })
+const headingStyle = css({ fontFamily: 'var(--font-happiness)', fontSize: 'clamp(34px, 6vw, 52px)', lineHeight: 1.08, margin: 0 })
+const revisionMetaStyle = css({ color: 'var(--text-muted)', margin: '8px 0 0', textTransform: 'capitalize' })
+const contentStyle = css({ display: 'grid', gap: '28px', marginTop: '34px' })
 const formStyle = css({ display: 'grid', gap: '18px' })
 const fieldStyle = css({ display: 'grid', fontSize: '14px', fontWeight: 700, gap: '7px' })
 const textareaStyle = css({ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: '12px', lineHeight: 1.5, resize: 'vertical' })
 const sectionHeadingStyle = css({ fontSize: '24px', margin: 0 })
 const panelHeadingStyle = css({ fontSize: '17px', margin: '0 0 14px' })
-const actionsStyle = css({ display: 'flex', gap: '14px' })
-const lockedStyle = css({ display: 'grid', gap: '6px', '& span': { color: 'var(--text-soft)' } })
+const actionsStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '18px', justifyContent: 'space-between', '& p': { color: 'var(--text-muted)', margin: '5px 0 0' } })
 const issueStyle = css({ borderColor: 'var(--warning-border)', color: 'var(--warning-text)' })
-const validStyle = css({ background: 'var(--success-surface)', border: '1px solid var(--success-border)', borderRadius: '12px', color: 'var(--success-text)', fontWeight: 700, margin: 0, padding: '14px 18px' })
 const comparisonStyle = css({ display: 'grid', gap: '16px' })
 const comparisonGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 380px), 1fr))' })
 const emptyStyle = css({ color: 'var(--text-muted)' })
 const codeStyle = css({ fontSize: '11px', lineHeight: 1.5, margin: 0, maxHeight: '480px', overflow: 'auto', whiteSpace: 'pre-wrap' })
 const tableStyle = css({ borderCollapse: 'collapse', fontSize: '13px', width: '100%', '& th': { color: 'var(--text-muted)', textAlign: 'left' }, '& td, & th': { borderBottom: '1px solid var(--border)', padding: '10px 8px' } })
-const publishedStyle = css({ background: 'var(--success-surface)', borderRadius: '999px', color: 'var(--success-text)', display: 'inline-block', fontSize: '11px', fontWeight: 800, padding: '5px 9px', textTransform: 'uppercase' })
-const draftStyle = css({ background: 'var(--warning-surface)', borderRadius: '999px', color: 'var(--warning-text)', display: 'inline-block', fontSize: '11px', fontWeight: 800, padding: '5px 9px', textTransform: 'uppercase' })
+const sectionTitleStyle = css({ alignItems: 'baseline', display: 'flex', justifyContent: 'space-between', '& span': { color: 'var(--text-muted)' } })
+const characterGridStyle = css({ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' })
+const characterLinkStyle = css({ alignItems: 'center', color: 'var(--text-primary) !important', display: 'grid', gap: '12px', gridTemplateColumns: '54px minmax(0, 1fr)', padding: '10px 14px', textDecoration: 'none', '& img': { height: '54px', objectFit: 'contain', width: '54px' }, '& span': { display: 'grid', gap: '3px', minWidth: 0 }, '& strong': { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }, '& small': { color: 'var(--text-muted)', fontSize: '13px' }, '&:hover': { borderColor: 'var(--border-strong)', transform: 'translateY(-1px)' } })
+const summaryStyle = css({ display: 'grid', gap: '16px' })
+const summaryGridStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 140px), 1fr))', margin: 0, '& dt': { color: 'var(--text-muted)', fontSize: '13px' }, '& dd': { fontFamily: 'var(--font-display)', fontSize: '24px', margin: '4px 0 0' } })

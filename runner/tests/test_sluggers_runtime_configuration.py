@@ -12,6 +12,12 @@ from starworks_runner.games.sluggers.bridge.configuration import (
     RuntimeConfigurationBlock,
 )
 from starworks_runner.games.sluggers.bridge.layout import BridgeProtocolError
+from starworks_runner.games.sluggers.session import (
+    FINAL_FORMATION_POINTER_ADDRESS,
+    FORMATION_SLOT_SIZE,
+    FORMATION_TEAM_SIZE,
+    LiveSluggersSession,
+)
 from starworks_runner.match_configuration import compile_match_configuration
 
 
@@ -128,3 +134,63 @@ def test_stadium_ids_match_the_reviewed_rmbe01_runtime_order() -> None:
         "daisy-cruiser": 7,
         "bowser-jr-playroom": 8,
     }
+
+
+class SparseMemoryTransport:
+    def __init__(self) -> None:
+        self.memory: dict[int, int] = {}
+
+    def read(self, address: int, size: int) -> bytes:
+        return bytes(self.memory.get(address + offset, 0) for offset in range(size))
+
+    def write(self, address: int, value: bytes) -> None:
+        self.memory.update(
+            {address + offset: byte for offset, byte in enumerate(value)}
+        )
+
+
+def test_final_formation_rewrites_only_character_and_position_bytes(
+    tmp_path: Path,
+) -> None:
+    _, compiled = compiled_configuration()
+    configuration = RuntimeConfigurationBlock.from_operation_bundles(
+        compiled.home,
+        compiled.away,
+    )
+    transport = SparseMemoryTransport()
+    home_address = 0x90001090
+    transport.write(
+        FINAL_FORMATION_POINTER_ADDRESS, home_address.to_bytes(4, "big")
+    )
+    for team, address, untouched in (
+        (configuration.away, home_address - FORMATION_TEAM_SIZE, 0xA5),
+        (configuration.home, home_address, 0x5A),
+    ):
+        initial = bytearray([untouched]) * FORMATION_TEAM_SIZE
+        for game_id, batting_slot, fielding_position in reversed(team.entries):
+            random_slot = 8 - batting_slot
+            offset = random_slot * FORMATION_SLOT_SIZE
+            initial[offset + 1] = game_id
+            initial[offset + 12] = fielding_position
+        transport.write(address, bytes(initial))
+    session = LiveSluggersSession(
+        build_directory=tmp_path,
+        dolphin_executable=tmp_path / "Dolphin",
+        profile_directory=tmp_path / "profile",
+        adapter_build_sha256="a" * 64,
+        game_build_sha256="b" * 64,
+    )
+    session.transport = transport  # type: ignore[assignment]
+
+    session.apply_final_formation(configuration)
+
+    for team, address, untouched in (
+        (configuration.away, home_address - FORMATION_TEAM_SIZE, 0xA5),
+        (configuration.home, home_address, 0x5A),
+    ):
+        observed = transport.read(address, FORMATION_TEAM_SIZE)
+        for game_id, batting_slot, fielding_position in team.entries:
+            offset = batting_slot * FORMATION_SLOT_SIZE
+            assert observed[offset + 1] == game_id
+            assert observed[offset + 12] == fielding_position
+            assert observed[offset] == untouched

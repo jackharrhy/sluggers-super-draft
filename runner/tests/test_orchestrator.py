@@ -26,6 +26,7 @@ class FakeControlClient:
         self.updates: list[str] = []
         self.heartbeats: list[str] = []
         self.telemetry_sequences: list[int] = []
+        self.renew_error: RunnerApiError | None = None
 
     def register(
         self, station_name: str, capabilities: dict[str, Any]
@@ -53,6 +54,8 @@ class FakeControlClient:
     def update_lease(self, message: dict[str, Any]) -> dict[str, Any]:
         action = message["action"]
         self.updates.append(action)
+        if action == "renew" and self.renew_error is not None:
+            raise self.renew_error
         if action == "complete" and self.fail_complete_once:
             self.fail_complete_once = False
             raise RunnerApiError("temporary outage")
@@ -216,6 +219,28 @@ def test_incremental_executor_keeps_the_attempt_running_until_game_end(
         assert state.load_active_run() is None
         assert executor.executions == [False, True]
         assert client.updates == ["started", "renew", "complete"]
+
+
+def test_runner_releases_local_journal_after_server_rejects_expired_lease(
+    tmp_path: Path,
+) -> None:
+    envelope, configuration = execution_fixtures()
+    client = FakeControlClient(envelope, configuration)
+    client.fail_complete_once = False
+    executor = IncrementalExecutor()
+    with RunnerStateStore(tmp_path / "runner.sqlite3") as state:
+        state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
+        station = create_station(client, state)
+        assert station.run_once(executor).status == "running"
+
+        client.renew_error = RunnerApiError("Runner lease has expired", status=409)
+        result = station.run_once(executor)
+
+        assert result.status == "failed"
+        assert result.detail == "Runner lease has expired"
+        assert state.load_active_run() is None
+        assert state.list_pending_telemetry(envelope["attemptId"]) == []
+        assert executor.executions == [False]
 
 
 def test_runner_persists_and_restores_live_runtime_identity(tmp_path: Path) -> None:
