@@ -331,7 +331,12 @@ class ContentCompilationPlan:
     writes: tuple[PlannedWrite, ...]
     guards: tuple[PatternRegionGuard, ...] = ()
 
-    def apply(self, game_root: Path) -> list[dict[str, str]]:
+    def apply(
+        self,
+        game_root: Path,
+        *,
+        verified_base_sha256_by_path: dict[PurePosixPath, str] | None = None,
+    ) -> list[dict[str, str]]:
         by_path: dict[PurePosixPath, list[PlannedWrite]] = {}
         for write in self.writes:
             by_path.setdefault(write.target_path, []).append(write)
@@ -358,10 +363,14 @@ class ContentCompilationPlan:
                 )
             original = target_path.read_bytes()
             input_sha256 = hashlib.sha256(original).hexdigest()
+            verified_input_sha256 = (
+                verified_base_sha256_by_path or {}
+            ).get(relative_path, input_sha256)
             for guard in guards_by_path.get(relative_path, []):
-                if input_sha256 not in guard.supported_input_sha256:
+                if verified_input_sha256 not in guard.supported_input_sha256:
                     raise BuildIntegrityError(
-                        f"Profile guard {guard.guard_id} does not support input {input_sha256}"
+                        f"Profile guard {guard.guard_id} does not support input "
+                        f"{verified_input_sha256} (verified base)"
                     )
                 if guard.end_offset > len(original):
                     raise BuildIntegrityError(
@@ -382,9 +391,10 @@ class ContentCompilationPlan:
                         f"Profile guard {guard.guard_id} region hash failed"
                     )
             for write in writes:
-                if input_sha256 not in write.supported_input_sha256:
+                if verified_input_sha256 not in write.supported_input_sha256:
                     raise BuildIntegrityError(
-                        f"Static target {write.target_id} does not support input {input_sha256}"
+                        f"Static target {write.target_id} does not support input "
+                        f"{verified_input_sha256} (verified base)"
                     )
             ordered = sorted(
                 writes, key=lambda item: (item.target_offset, item.target_id)

@@ -7,7 +7,7 @@ import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from starworks_runner.contracts import validate_contract
@@ -184,7 +184,20 @@ class GameBuildService:
                 else []
             )
             if content_plan:
-                patch_receipts.extend(content_plan.apply(game_directory))
+                patch_receipts.extend(
+                    content_plan.apply(
+                        game_directory,
+                        verified_base_sha256_by_path={
+                            PurePosixPath("sys/main.dol"): (
+                                base_fingerprint.main_dol_sha256
+                            ),
+                            PurePosixPath("files/dt_na.dat"): (
+                                base_fingerprint.data_archive_sha256
+                            ),
+                            PurePosixPath("sys/fst.bin"): base_fingerprint.fst_sha256,
+                        },
+                    )
+                )
 
             outputs = tuple(
                 fingerprint_file(game_directory, path) for path in OUTPUT_PATHS

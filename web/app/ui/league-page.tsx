@@ -2,101 +2,64 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
-import { administrativeRoles } from '../platform/repository.ts'
 import { routes } from '../routes.ts'
-import { AppShell, buttonStyle, cardStyle } from './app-shell.tsx'
+import type { LeagueOverviewSeason } from '../telemetry/statistics.ts'
+import { AppShell, cardStyle } from './app-shell.tsx'
+import { PlayerLeaderList, StandingsTable } from './league-summary.tsx'
 
-export function LeaguePage(
-  handle: Handle<{ identity: SessionIdentity | null; league: LeagueDetail }>,
-) {
+export function LeaguePage(handle: Handle<{
+  identity: SessionIdentity | null
+  league: LeagueDetail
+  seasons: LeagueOverviewSeason[]
+}>) {
   return () => {
-    let { identity, league } = handle.props
-    let mayAdminister = identity?.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))
+    let { identity, league, seasons } = handle.props
+    let current = seasons[0]
+    let resultsHref = identity
+      ? routes.leagues.operations.results.index.href({ leagueSlug: league.slug })
+      : null
+    let hasStandings = Boolean(current?.standings?.length)
+    let hasPlayers = Boolean(current?.playerTotals && Object.keys(current.playerTotals).length)
     return (
       <AppShell identity={identity} league={league} title={`${league.name} · Starworks`}>
-        <section>
-          <p mix={eyebrowStyle}>{league.publication.leagueVisible ? 'Public league' : 'Private league'}</p>
-          <h1 mix={headingStyle}>{league.name}</h1>
-          <p mix={ledeStyle}>
-            Drafts, teams, stat profiles, rulesets, match operations, and broadcasts will live under
-            this league boundary.
-          </p>
-        </section>
-        {mayAdminister ? (
-          <>
-          <section mix={[cardStyle, settingsStyle]} aria-labelledby="configuration-heading">
-            <div>
-              <h2 id="configuration-heading" mix={subheadingStyle}>League configuration</h2>
-              <p mix={mutedStyle}>Build versioned stat profiles, rulesets, rosters, and game-ready lineups.</p>
+        <header mix={heroStyle}>
+          <h1>{league.name}</h1>
+          <p>{current?.name ?? 'League home'}</p>
+        </header>
+
+        {current && current.standings !== null ? (
+          <section mix={sectionStyle} aria-labelledby="top-teams-heading">
+            <h2 id="top-teams-heading">Top teams</h2>
+            <div mix={cardStyle}>
+              {hasStandings
+                ? <StandingsTable standings={current.standings} limit={5} />
+                : <p mix={emptyStyle}>No official results yet.</p>}
             </div>
-            <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>Open configuration workspace</a>
+            {resultsHref ? <a href={resultsHref} mix={moreLinkStyle}>See all standings</a> : null}
           </section>
-          <section mix={[cardStyle, settingsStyle]} aria-labelledby="operations-heading">
-            <div>
-              <h2 id="operations-heading" mix={subheadingStyle}>Match operations</h2>
-              <p mix={mutedStyle}>Schedule games, queue immutable attempts, and manage native runner stations.</p>
-            </div>
-            <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Open operations workspace</a>
-          </section>
-          <section mix={[cardStyle, settingsStyle]} aria-labelledby="content-heading">
-            <div>
-              <h2 id="content-heading" mix={subheadingStyle}>Content packs</h2>
-              <p mix={mutedStyle}>Publish versioned local-build manifests and allowed user-created source art.</p>
-            </div>
-            <a href={routes.leagues.content.dashboard.href({ leagueSlug: league.slug })}>Open content workspace</a>
-          </section>
-          <section mix={[cardStyle, settingsStyle]} aria-labelledby="publication-heading">
-            <div>
-              <h2 id="publication-heading" mix={subheadingStyle}>Publication policy</h2>
-              <p mix={mutedStyle}>Nothing becomes public simply because the league exists.</p>
-            </div>
-            <form action={routes.leagues.updatePublication.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
-              <Checkbox name="leagueVisible" checked={league.publication.leagueVisible} label="League page" />
-              <Checkbox name="standingsVisible" checked={league.publication.standingsVisible} label="Standings" />
-              <Checkbox name="statsVisible" checked={league.publication.statsVisible} label="Statistics" />
-              <Checkbox name="draftVisible" checked={league.publication.draftVisible} label="Draft" />
-              <button type="submit" mix={buttonStyle}>Save publication policy</button>
-            </form>
-          </section>
-          </>
         ) : null}
-        {identity ? (
-          <>
-          <section mix={[cardStyle, settingsStyle]} aria-labelledby="draft-heading">
-            <div>
-              <h2 id="draft-heading" mix={subheadingStyle}>Draft room</h2>
-              <p mix={mutedStyle}>Follow the live order, manage a private queue, and make server-authoritative picks.</p>
+
+        {current && current.playerTotals !== null ? (
+          <section mix={sectionStyle} aria-labelledby="top-players-heading">
+            <h2 id="top-players-heading">Top players</h2>
+            <div mix={cardStyle}>
+              {hasPlayers
+                ? <PlayerLeaderList playerTotals={current.playerTotals} limit={10} />
+                : <p mix={emptyStyle}>Player leaders will appear after the first official result.</p>}
             </div>
-            <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Open draft workspace</a>
+            {resultsHref ? <a href={resultsHref} mix={moreLinkStyle}>See full leaderboard</a> : null}
           </section>
-          {!mayAdminister ? <section mix={[cardStyle, settingsStyle]} aria-labelledby="team-operations-heading">
-            <div>
-              <h2 id="team-operations-heading" mix={subheadingStyle}>Team operations</h2>
-              <p mix={mutedStyle}>Review published rosters, propose trades, and respond to approval requests.</p>
-            </div>
-            <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Open team operations</a>
-          </section> : null}
-          </>
+        ) : null}
+
+        {!current || (current.standings === null && current.playerTotals === null) ? (
+          <p mix={[cardStyle, emptyStyle]}>No league results have been published yet.</p>
         ) : null}
       </AppShell>
     )
   }
 }
 
-function Checkbox(handle: Handle<{ checked: boolean; label: string; name: string }>) {
-  return () => (
-    <label mix={checkboxStyle}>
-      <input type="checkbox" name={handle.props.name} defaultChecked={handle.props.checked} />
-      <span>{handle.props.label}</span>
-    </label>
-  )
-}
-
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
-const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
-const subheadingStyle = css({ fontFamily: 'var(--font-display)', fontSize: '28px', margin: '0 0 6px' })
-const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.65, maxWidth: '700px' })
-const mutedStyle = css({ color: 'var(--text-muted)', margin: 0 })
-const settingsStyle = css({ display: 'grid', gap: '28px', marginTop: '56px', maxWidth: '760px' })
-const formStyle = css({ display: 'grid', gap: '14px', justifyItems: 'start' })
-const checkboxStyle = css({ alignItems: 'center', display: 'flex', gap: '10px' })
+const heroStyle = css({ textAlign: 'center', '& h1': { fontFamily: 'var(--font-happiness)', fontSize: 'clamp(40px, 8vw, 64px)', lineHeight: 1, margin: '20px 0 8px' }, '& p': { color: 'var(--text-soft)', fontSize: '16px', margin: 0 } })
+const sectionStyle = css({ marginTop: '42px', '& h2': { fontSize: '21px', margin: '0 0 14px' } })
+const emptyStyle = css({ color: 'var(--text-muted)', margin: 0 })
+const moreLinkStyle = css({ border: '1px solid var(--border-strong)', borderRadius: '6px', display: 'inline-block', fontSize: '13px', marginTop: '12px', padding: '8px 14px', textDecoration: 'none' })

@@ -113,8 +113,12 @@ export interface RunnerOperationsDashboard {
   }>
 }
 
+export type RunnerMatchDashboard = Omit<RunnerOperationsDashboard, 'audit' | 'stations'>
+export type RunnerStationDashboard = Pick<RunnerOperationsDashboard, 'audit' | 'stations'>
+
 export interface RunnerAdminApplication {
-  dashboard(identity: SessionIdentity | null, leagueId: string): Promise<RunnerOperationsDashboard>
+  matchDashboard(identity: SessionIdentity | null, leagueId: string): Promise<RunnerMatchDashboard>
+  stationDashboard(identity: SessionIdentity | null, leagueId: string): Promise<RunnerStationDashboard>
   scheduleMatch: RunnerAdminService['scheduleMatch']
   queueAttempt: RunnerAdminService['queueAttempt']
   revokeStation: RunnerAdminService['revokeStation']
@@ -136,12 +140,12 @@ export class RunnerAdminService {
     this.#createNonce = options.createNonce ?? createOpaqueToken
   }
 
-  async dashboard(
+  async matchDashboard(
     identity: SessionIdentity | null,
     leagueId: string,
-  ): Promise<RunnerOperationsDashboard> {
+  ): Promise<RunnerMatchDashboard> {
     this.#requireAdmin(identity, leagueId)
-    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, contentPackRows, venueRows, matchRows, attemptRows, stationRows, auditRows] = await Promise.all([
+    let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, contentPackRows, venueRows, matchRows, attemptRows] = await Promise.all([
       this.database.select({ id: seasons.id, name: seasons.name }).from(seasons).where(eq(seasons.leagueId, leagueId)),
       this.database.select({ id: leagueTeams.id, name: leagueTeams.name, seasonId: leagueTeams.seasonId }).from(leagueTeams).where(eq(leagueTeams.leagueId, leagueId)),
       this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))),
@@ -149,7 +153,7 @@ export class RunnerAdminService {
       this.database.select({ id: rulesetRevisions.id, name: rulesetRevisions.name, revisionNumber: rulesetRevisions.revisionNumber }).from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.status, 'published'))),
       this.database.select({ id: contentPackRevisions.id, name: contentPacks.name, revisionNumber: contentPackRevisions.revisionNumber, rulesetRevisionId: contentPackRevisions.rulesetRevisionId, statProfileRevisionId: contentPackRevisions.statProfileRevisionId }).from(contentPackRevisions).innerJoin(contentPacks, and(eq(contentPacks.leagueId, contentPackRevisions.leagueId), eq(contentPacks.id, contentPackRevisions.contentPackId))).where(and(eq(contentPackRevisions.leagueId, leagueId), eq(contentPackRevisions.status, 'published'))),
       this.database.select({ gameVenueId: venues.gameVenueId, id: venues.id, name: venues.name }).from(venues).where(eq(venues.leagueId, leagueId)),
-      this.database.select().from(matches).where(eq(matches.leagueId, leagueId)),
+      this.database.select().from(matches).where(eq(matches.leagueId, leagueId)).orderBy(desc(matches.createdAt), desc(matches.id)),
       this.database.select({
         attemptNumber: matchAttempts.attemptNumber,
         failureKind: matchAttempts.failureKind,
@@ -157,26 +161,10 @@ export class RunnerAdminService {
         matchId: matchAttempts.matchId,
         requiredGameBuildSha256: matchAttempts.requiredGameBuildSha256,
         status: matchAttempts.status,
-      }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)),
-      this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
-      this.database
-        .select({
-          action: auditRecords.action,
-          actorDisplayName: people.displayName,
-          metadata: auditRecords.metadata,
-          occurredAt: auditRecords.occurredAt,
-          targetId: auditRecords.targetId,
-          targetType: auditRecords.targetType,
-        })
-        .from(auditRecords)
-        .leftJoin(people, eq(people.id, auditRecords.actorPersonId))
-        .where(eq(auditRecords.leagueId, leagueId))
-        .orderBy(desc(auditRecords.occurredAt), desc(auditRecords.id))
-        .limit(100),
+      }).from(matchAttempts).where(eq(matchAttempts.leagueId, leagueId)).orderBy(desc(matchAttempts.attemptNumber)),
     ])
     let teamNames = new Map(teamRows.map((team) => [team.id, team.name]))
     return {
-      audit: auditRows,
       contentPacks: contentPackRows,
       seasons: seasonRows.map((season) => ({
         ...season,
@@ -199,6 +187,33 @@ export class RunnerAdminService {
         scheduledAt: match.scheduledAt,
         status: match.status,
       })),
+    }
+  }
+
+  async stationDashboard(
+    identity: SessionIdentity | null,
+    leagueId: string,
+  ): Promise<RunnerStationDashboard> {
+    this.#requireAdmin(identity, leagueId)
+    let [stationRows, auditRows] = await Promise.all([
+      this.database.select().from(runnerStations).where(eq(runnerStations.leagueId, leagueId)),
+      this.database
+        .select({
+          action: auditRecords.action,
+          actorDisplayName: people.displayName,
+          metadata: auditRecords.metadata,
+          occurredAt: auditRecords.occurredAt,
+          targetId: auditRecords.targetId,
+          targetType: auditRecords.targetType,
+        })
+        .from(auditRecords)
+        .leftJoin(people, eq(people.id, auditRecords.actorPersonId))
+        .where(eq(auditRecords.leagueId, leagueId))
+        .orderBy(desc(auditRecords.occurredAt), desc(auditRecords.id))
+        .limit(20),
+    ])
+    return {
+      audit: auditRows,
       stations: stationRows.map((station) => ({
         capabilities: station.capabilities,
         componentHealth: station.componentHealth,

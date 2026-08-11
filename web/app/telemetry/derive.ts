@@ -228,6 +228,10 @@ function structuralIssues(events: TelemetryEnvelope[]): string[] {
     && (event.payload.code === 'overflow' || event.payload.code === 'sequence-gap'))) {
     issues.push('bridge reported missing or overflowing telemetry')
   }
+  if (events.some((event) => event.eventType === 'bridge-warning'
+    && (event.payload.code === 'provisional-observation' || event.payload.code === 'incompatibility'))) {
+    issues.push('bridge reported provisional or incompatible telemetry')
+  }
   return issues
 }
 

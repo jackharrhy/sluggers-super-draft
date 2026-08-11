@@ -54,7 +54,7 @@
   "staticTargetCatalog": {
     "path": "static_targets.v1.json",
     "sha256": "a9eba85e93cc78978eac7c9444b97bf89cbdc116a2bd69637f34157b2c260c46",
-    "status": "exact-dol-verified-live-mutation-pending"
+    "status": "exact-dol-and-live-memory-verified"
   },
   "releaseEvidence": [
     {
@@ -92,12 +92,21 @@
       "guardCount": 16,
       "patternCount": 24,
       "scalarCellsVerified": 16406,
-      "researchLead": "The Mario Sluggers Resource Folder address workbook and legacy Stat Editor handicap-code output",
-      "independentCheck": "Every virtual address, DOL file offset, region hash, codec, and byte round-trip was checked against the maintainer-owned exact base DOL; handicap values are guarded u8 instruction immediates."
+      "researchLead": "The maintainer-authorized Sluggers Stat Editor v4.1 implementation and Mario Sluggers Resource Folder address workbook",
+      "independentCheck": "Every virtual address, DOL file offset, region hash, codec, byte round-trip, and all 16,406 trusted editor default cells were checked against the maintainer-owned exact base DOL; handicap values are guarded u8 instruction immediates."
+    },
+    {
+      "kind": "stat-editor-v4-live-memory",
+      "dolphinVersion": "2606",
+      "gameBuildSha256": "8ed08246ccba97b1f36f9df8eccf530c0d6ffc5051b0b3a4fe6f325ca6f0c525",
+      "mainDolSha256": "95fa2cfa474f8c5492c928c320ac877f80f9bce0d2f09ab3b278c7c837762740",
+      "patternsVerified": 24,
+      "transport": "Dolphin Memory Engine 1.3.1",
+      "result": "Every representative compiled mutation matched live emulated memory, including all six handicap instruction immediates."
     }
   ],
   "releaseGates": [
     "Live Dolphin 2606 acceptance is required for runtime rules, team selection, and adapter-owned CPU control.",
-    "Profile table and handicap instruction mappings require representative live mutation acceptance before product-complete status."
+    "A server-published stat profile must pass through the unattended scheduled-match path before product-complete status."
   ]
 }

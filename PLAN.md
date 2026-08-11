@@ -18,13 +18,14 @@ playable alpha. Status claims use three separate meanings:
 
 | Area | Status | Next gate |
 | --- | --- | --- |
-| Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, and schedules | Application/data layer implemented; the former operations super-page is split into focused Matches, Teams, and Admin routes | Extract the remaining shared page implementation, add the Results view, and accept the end-to-end alpha workflow |
+| Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
 | Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
 | Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat to completion with the now-proven scheduled formation path |
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through game start | Exact server-backed teams and active defense passed game-owned read-back; complete a full accepted run |
-| Full Stat Editor v4 profile | Lossless 507-line import/export and typed per-character web editing implemented; relational/global web editing and live proof remain | Chemistry, trajectory, curve, star-event, boost, and handicap editors; then representative live-mutation acceptance |
-| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, and game-end detection exist; resolved plate appearances remain open |
+| Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; all 16,406 guarded cells match the exact stock DOL and trusted v4.1 editor defaults; representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | Carry a server-published profile through an unattended scheduled match |
+| Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
+| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace and a tested conservative appearance reducer | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, game end, ordinary outs/singles, correct half-inning ordering, and fail-closed scoring warnings are live proven; accept remaining result classes, then add scorer/RBI attribution without guessing |
 | Health-gated automatic result confirmation and one-retry recovery | Implemented | Full live server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
 | RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
@@ -50,18 +51,52 @@ appear as unavailable rather than zero.
 
 1. Repeat the already-proven adapter-owned full-game path to completion using
    the now-proven server-backed formation and game-owned read-back gate.
-2. Finish the DME snapshot reducer for resolved plate appearances and capture a
-   complete healthy event stream. Add a game hook only where a measured field
-   cannot be observed reliably; keep unavailable metrics explicit in the parity
-   ledger.
+2. Continue live acceptance of the implemented DME snapshot reducer beyond the
+   now-proven ordinary out and single. Prove walks, strikeouts, hit-by-pitch,
+   extra-base hits, and the warning path for scoring plays; then add scorer/RBI
+   and remaining outcome attribution only where measured evidence supports it.
+   Capture a complete healthy event stream and keep unavailable metrics explicit
+   in the parity ledger.
 3. Pass the clean-station happy path, network outage, reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
-4. Complete the focused Stat Editor screens for every v4 section, extract the
-   remaining shared implementation behind the now-separated Matches, Teams,
-   and Admin routes, and add the Results view. Continue following the legacy
-   application's navigation and player-first visual language.
+4. Carry a server-published Stat Editor profile through the unattended match
+   path. Continue focused user acceptance of the now-separated Matches, Teams,
+   Results, and Admin workspaces, following the legacy application's navigation
+   and player-first visual language rather than adding dashboard-style
+   super-pages.
 
 ### Latest acceptance evidence
+
+On 2026-08-11, the complete Stat Editor v4 catalogue was rechecked against a
+fresh extraction of the user-owned exact `RMBE01` Rev 0 ISO. The clean
+`main.dol` matched SHA-256
+`3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151`.
+All 16 region hashes, 24 virtual/file mappings, and 16,406 scalar cells passed.
+The verifier then parsed the trusted Sluggers Stat Editor v4.1 source without
+executing it; all ten stock matrices and all 16,406 encoded cells matched the
+game byte-for-byte. Finally, one representative value in every pattern was
+compiled and all 16,406 guarded writes were applied to a temporary DOL copy,
+producing 30 changed bytes and output SHA-256
+`37d57a5665660de3b4acfca689b8eb3bf6abec5f99e13e7d68918396cfcaf7dd`
+without altering the clean source. This completes exact-DOL and compiler
+acceptance. The exercise also exposed and fixed a real composition defect:
+content guards previously compared the bridge-mutated DOL with the clean
+whole-file hash even though every guarded stat region remained exact. The
+builder now carries the already-verified base fingerprints through sequential,
+non-overlapping bridge and content application while preserving region hashes,
+virtual/file mapping checks, and expected-byte guards.
+
+The resulting bridge-plus-profile managed build had build SHA-256
+`8ed08246ccba97b1f36f9df8eccf530c0d6ffc5051b0b3a4fe6f325ca6f0c525`
+and `main.dol` SHA-256
+`95fa2cfa474f8c5492c928c320ac877f80f9bce0d2f09ab3b278c7c837762740`.
+It launched in the runner-managed Dolphin 2606, DME attached, and one changed
+cell from each of all 24 patterns read back exactly from live emulated memory.
+That includes the complete character/chemistry families, trajectories, speed,
+pitching, size/catch/hitbox tables, team stars, star handicaps, all three star
+boost codecs, and all six handicap instruction immediates. The remaining
+product gate is carrying a profile published by the web application through a
+normal scheduled runner attempt, not further address discovery.
 
 On 2026-08-11, the local-only Mushroom League fixture exercised the real Remix,
 PostgreSQL, and Python runner path. The checkpoint package integrity mismatch
@@ -78,18 +113,48 @@ completed healthy result or automatic confirmation.
 The local demo now also includes a full 101-character, 49-field Stat Editor v4
 profile: an immutable published revision supplies the seeded two-team draft
 room while an editable next revision remains the Stat Editor sandbox. The
-Remix application accepts real v4 file uploads, edits one character through
-typed controls, preserves every global and relational section, and exports the
-original 507-line representation losslessly. Stat Editor and AutoTeam numeric
-roster slots now resolve through one readable character catalogue, with legacy
-player portraits used in the new roster, trade, and draft UI. The remaining v4
-sections are represented and round-tripped but do not yet have focused web
-editors. The local seed is idempotent and prints a direct draft-room URL.
+Remix application accepts real v4 file uploads and provides focused, typed
+screens for characters, chemistry, trajectory names/activation/tables, global
+speed curves, team star gains, star boosts, and handicap parameters. Cloned
+revisions show prior values inline only where a field changed. Every section
+preserves the complete profile and exports the original 507-line representation
+losslessly. The profile page is a short section directory rather than a 101-row
+super-page; the dedicated character directory keeps the legacy portrait-first
+language. Stat Editor and AutoTeam numeric roster slots resolve through the
+same readable character catalogue. The local seed is idempotent and prints a
+direct draft-room URL.
 
-The league workspace now exposes separate Matches, Teams, and Admin routes.
+The league workspace now exposes separate Matches, Teams, Results, and Admin
+routes with separate controllers and purpose-sized service read models.
 The Teams route uses readable character names and the legacy portrait assets
 for rosters and trade selection; raw game IDs are no longer the manager-facing
-interaction. On 2026-08-11 a normal-speed live smoke test also forced a seed
+interaction. Ruleset and lineup revisions no longer expose JSON or monospace
+comparison panels. A ruleset starts from the five controls Starworks supports
+today, while unsupported imported settings remain visible and unchanged. The
+lineup editor keeps the draft/trade-authored roster fixed and provides portrait
+rows for captain, batting slot, and fielding position; the player at P becomes
+the pitcher. Published lineups render as compact roster summaries instead of
+disabled forms. The local seed creates immutable published parents plus
+deterministic editable rules and lineup drafts without rewriting history.
+Match-attempt creation now selects an immutable ruleset instead of exposing a
+raw JSON override field. Results now presents standings, recent scorecards, and
+portrait-first player leaders from accepted derivations. Scorer review is
+separate from scheduling and uses team/player names plus supported baseball
+stats instead of entity IDs, JSON paths, or caller-supplied current values. The
+idempotent demo seed includes one historical accepted result for visual testing
+without making it runner-claimable, and prints direct draft, match, and Results
+URLs. The adapter compile preview also summarizes player tuning, rules, captain,
+batting order, and fielding without leaking the operation bundle as raw JSON.
+The advertorial league workspace home has been replaced by the legacy site's
+data-first shape: league and season identity, top-five standings, and
+portrait-first player leaders. Publication policy now belongs to Admin rather
+than sharing the home page. The overview read model redacts standings and
+player totals independently for anonymous visitors, and its season rebuild uses
+one joined derivation query instead of querying once per confirmed attempt.
+The completed verification pass includes 35 contract tests, 79 Remix tests,
+148 runner tests, and all 16 PostgreSQL integration tests.
+
+On 2026-08-11 a normal-speed live smoke test also forced a seed
 profile that had disabled throttling back to `EmulationSpeed = 1.0`, restored
 the managed checkpoint, passed scheduled formation read-back, entered inning
 one, and advanced DME telemetry. That is live synchronization evidence, not a

@@ -571,6 +571,87 @@ def test_trusted_static_hook_is_preflighted_and_recorded_in_the_build(
     assert result.manifest["warnings"] == []
 
 
+def test_content_composes_with_a_reviewed_non_overlapping_bridge_patch(
+    tmp_path: Path,
+) -> None:
+    image = tmp_path / "user-owned.rvz"
+    image.write_bytes(b"synthetic image")
+    dtk = tmp_path / "dtk"
+    dtk_hash = create_fake_dtk(dtk)
+    clean = tmp_path / "clean"
+    create_extraction(clean)
+    source = (clean / "sys/main.dol").read_bytes()
+
+    bridge_bytes = b"STAR"
+    bridge_output = bridge_bytes + source[len(bridge_bytes) :]
+    artifacts = tmp_path / "artifacts"
+    artifacts.mkdir()
+    (artifacts / "bridge.bin").write_bytes(bridge_bytes)
+    bridge_plan = PrecompiledPatchPlan(
+        patch_id="synthetic-static-hook",
+        target_path=PurePosixPath("sys/main.dol"),
+        expected_input_sha256=hashlib.sha256(source).hexdigest(),
+        expected_output_sha256=hashlib.sha256(bridge_output).hexdigest(),
+        artifact_path=PurePosixPath("bridge.bin"),
+        artifact_sha256=hashlib.sha256(bridge_bytes).hexdigest(),
+        artifact_size_bytes=len(bridge_bytes),
+        writes=(
+            GuardedWrite(
+                target_offset=0,
+                artifact_offset=0,
+                size_bytes=len(bridge_bytes),
+                expected_bytes=source[: len(bridge_bytes)],
+            ),
+        ),
+    )
+    manifest, operations = content_documents(clean)
+    operations["operations"][0]["resource"] = "main-dol"
+    content_offset = 10
+    target = StaticValueTarget(
+        target_id="synthetic-mario-slap-power",
+        operation="set-character-stat",
+        character_id="mario",
+        rule_key=None,
+        gameplay_target="character.batting.slapPower",
+        resource="main-dol",
+        codec="u16-be",
+        target_path=PurePosixPath("sys/main.dol"),
+        target_offset=content_offset,
+        expected_bytes=source[content_offset : content_offset + 2],
+        supported_input_sha256=(hashlib.sha256(source).hexdigest(),),
+        enum_values={},
+    )
+    content = ContentPackInput(
+        manifest=manifest,
+        operation_bundle=operations,
+        target_catalog=StaticTargetCatalog("0.1.0", (target,), ()).validated(),
+    )
+    service = GameBuildService(
+        DtkDiscTool(
+            dtk,
+            release=fake_release(),
+            expected_sha256=dtk_hash,
+            timeout_seconds=10,
+        ),
+        registry_for(clean),
+        trusted_patch_set=PrecompiledPatchSetApplier(artifacts, (bridge_plan,)),
+    )
+
+    result = service.build(
+        build_request(image, tmp_path / "cache", content_pack=content)
+    )
+
+    expected = bytearray(bridge_output)
+    expected[content_offset : content_offset + 2] = b"\x00`"
+    assert (result.game_directory / "sys/main.dol").read_bytes() == bytes(expected)
+    assert [
+        receipt["patchId"] for receipt in result.manifest["patchReceipts"]
+    ] == [
+        bridge_plan.patch_id,
+        f"content-pack-{result.manifest['contentPackSha256'][:16]}-main.dol",
+    ]
+
+
 def content_documents(clean: Path) -> tuple[dict[str, object], dict[str, object]]:
     fixtures = Path(__file__).resolve().parents[2] / "contracts/fixtures/valid"
     manifest = json.loads((fixtures / "content-pack-manifest.json").read_text())

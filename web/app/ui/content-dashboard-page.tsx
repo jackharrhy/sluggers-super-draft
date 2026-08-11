@@ -24,7 +24,7 @@ export function ContentDashboardPage(
         <nav mix={navStyle} aria-label="League workspaces">
           <a href={routes.leagues.show.href({ leagueSlug: league.slug })}>League home</a>
           <a href={routes.leagues.configuration.dashboard.href({ leagueSlug: league.slug })}>Configuration</a>
-          <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Operations</a>
+          <a href={routes.leagues.operations.matches.index.href({ leagueSlug: league.slug })}>Matches</a>
         </nav>
       </header>
 

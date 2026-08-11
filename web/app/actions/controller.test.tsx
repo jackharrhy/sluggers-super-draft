@@ -16,6 +16,7 @@ import type { AppRuntime } from '../platform/runtime.ts'
 import { PlatformService } from '../platform/service.ts'
 import { createAppRouter } from '../router.ts'
 import { routes } from '../routes.ts'
+import type { TelemetryApplication } from '../telemetry/service.ts'
 
 const CORRELATION_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -50,6 +51,42 @@ describe('root controller', () => {
     assert.equal(record.method, 'GET')
     assert.equal(record.path, '/')
     assert.equal(record.status, 200)
+  })
+
+  it('renders a public league as real standings instead of an advertorial workspace', async () => {
+    let publicLeague: LeagueDetail = {
+      id: '22222222-2222-4222-8222-222222222222',
+      name: 'Shell League',
+      publication: { draftVisible: false, leagueVisible: true, standingsVisible: true, statsVisible: false },
+      roles: [],
+      slug: 'shell-league',
+      status: 'active',
+    }
+    let telemetry = {
+      async leagueOverview() {
+        return [{
+          name: 'Summer 2026',
+          playerTotals: null,
+          seasonId: '33333333-3333-4333-8333-333333333333',
+          standings: [{ losses: 0, runsAgainst: 2, runsFor: 5, teamId: '44444444-4444-4444-8444-444444444444', teamName: 'Mario Fireballs', wins: 1 }],
+        }]
+      },
+    } as unknown as TelemetryApplication
+    let runtime = createTestRuntime({
+      repository: { async findAccessibleLeague() { return publicLeague } },
+      telemetry,
+    })
+    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+      new Request('http://localhost' + routes.leagues.show.href({ leagueSlug: publicLeague.slug })),
+    )
+
+    assert.equal(response.status, 200)
+    let html = await response.text()
+    assert.match(html, /Top teams/)
+    assert.match(html, /Mario Fireballs/)
+    assert.match(html, /Summer 2026/)
+    assert.doesNotMatch(html, /will live|Open configuration workspace|Publication policy|>Admin</)
+    assert.doesNotMatch(html, /Top players/)
   })
 
   it('replaces an invalid inbound correlation ID', async () => {
@@ -214,7 +251,7 @@ describe('root controller', () => {
     assert.equal(response.status, 302)
     assert.equal(
       response.headers.get('location'),
-      routes.leagues.operations.dashboard.href({ leagueSlug: 'mushroom-league' }),
+      routes.leagues.operations.matches.index.href({ leagueSlug: 'mushroom-league' }),
     )
     let localCookie = response.headers.get('set-cookie') ?? ''
     assert.match(localCookie, /test_session=/)
@@ -233,6 +270,7 @@ function createTestRuntime(
     identity?: SessionIdentity | null
     operations?: OperationsApplication
     repository?: Partial<PlatformRepository>
+    telemetry?: TelemetryApplication
     token?: string
   } = {},
 ): AppRuntime {
@@ -299,7 +337,7 @@ function createTestRuntime(
     runnerControl: {} as AppRuntime['runnerControl'],
     runnerAdmin: {} as AppRuntime['runnerAdmin'],
     sessionCookie: createCookie('test_session', cookieOptions),
-    telemetry: {} as AppRuntime['telemetry'],
+    telemetry: options.telemetry ?? ({} as AppRuntime['telemetry']),
   }
 }
 

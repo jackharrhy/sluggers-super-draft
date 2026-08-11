@@ -109,6 +109,11 @@ Unlimited-speed research profiles are normalized when an attempt profile is
 prepared because menu timing, bridge polling, and telemetry deadlines require
 real-time emulation.
 
+The headless station does not record by default. Pass `--recordings DIR` when a
+local match artifact is wanted; this keeps repeated development/demo runs from
+silently filling the runner data directory. The Qt station currently enables
+its visible local-recording feature in the application data directory.
+
 `probe-bridge` remains an explicit reverse-engineering diagnostic for Dolphin
 2606's GDB remote stub:
 

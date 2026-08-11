@@ -206,7 +206,7 @@ def create_parser() -> argparse.ArgumentParser:
     station_parser.add_argument(
         "--recordings",
         type=Path,
-        help="local match artifact directory (defaults beside the runner state)",
+        help="enable local match recording in this artifact directory",
     )
     station_parser.add_argument("--ffmpeg", default="ffmpeg")
     station_parser.add_argument(
@@ -519,7 +519,7 @@ def run(arguments: argparse.Namespace) -> int:
         recordings = (
             arguments.recordings.expanduser().resolve()
             if arguments.recordings
-            else arguments.state.expanduser().resolve().parent / "artifacts"
+            else None
         )
         service = create_sluggers_station_service(
             SluggersStationConfig(

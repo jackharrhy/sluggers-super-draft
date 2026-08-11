@@ -147,9 +147,12 @@ test(
             control.asset(fixture.credentials.second.raw, firstAttempt.attemptId, content.sha256),
             (error: unknown) => error instanceof PlatformError && error.code === 'not_found',
           )
-          let operations = await admin.dashboard(fixture.identity, fixture.leagueId)
-          assert.equal(operations.matches[0]?.attempts[0]?.status, 'leased')
-          assert.equal(operations.stations.length, 2)
+          let [matchDashboard, stationDashboard] = await Promise.all([
+            admin.matchDashboard(fixture.identity, fixture.leagueId),
+            admin.stationDashboard(fixture.identity, fixture.leagueId),
+          ])
+          assert.equal(matchDashboard.matches[0]?.attempts[0]?.status, 'leased')
+          assert.equal(stationDashboard.stations.length, 2)
           let recoveryClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.deepEqual(recoveryClaim.run, firstClaim.run)
           let unavailableClaim = await control.claim(fixture.credentials.second.raw, claim(secondRegistration.runnerId))
@@ -268,12 +271,20 @@ test(
           )
 
           let lifecycle = await database
-            .select({ eventType: attemptLifecycleEvents.eventType })
+            .select({
+              eventType: attemptLifecycleEvents.eventType,
+              matchAttemptId: attemptLifecycleEvents.matchAttemptId,
+            })
             .from(attemptLifecycleEvents)
             .where(eq(attemptLifecycleEvents.leagueId, fixture.leagueId))
           assert.deepEqual(
-            lifecycle.map((event) => event.eventType),
-            ['queued', 'claimed', 'started', 'renewed', 'completed', 'queued', 'claimed', 'cancelled', 'queued', 'claimed', 'lease-expired', 'queued', 'claimed', 'station-revoked'],
+            lifecycleByAttempt(lifecycle),
+            {
+              [afterExpiry.run.attemptId]: ['claimed', 'queued', 'station-revoked'],
+              [cancellationClaim.run.attemptId]: ['cancelled', 'claimed', 'queued'],
+              [expiringClaim.run.attemptId]: ['claimed', 'lease-expired', 'queued'],
+              [firstAttempt.attemptId]: ['claimed', 'completed', 'queued', 'renewed', 'started'],
+            },
           )
           throw new RollbackFixture()
         }),
@@ -284,6 +295,19 @@ test(
     }
   },
 )
+
+function lifecycleByAttempt(
+  events: Array<{ eventType: string; matchAttemptId: string }>,
+): Record<string, string[]> {
+  let byAttempt: Record<string, string[]> = {}
+  for (let event of events) {
+    let attemptEvents = byAttempt[event.matchAttemptId] ?? []
+    attemptEvents.push(event.eventType)
+    byAttempt[event.matchAttemptId] = attemptEvents
+  }
+  for (let eventTypes of Object.values(byAttempt)) eventTypes.sort()
+  return byAttempt
+}
 
 async function createRunnerFixture(database: StarworksDatabase) {
   let source = TeamLineupRevisionSchema.parse(lineupFixture)

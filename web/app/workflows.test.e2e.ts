@@ -120,7 +120,7 @@ describe('critical Starworks browser workflows', () => {
     assert.deepEqual(picked, { characterId: 'mario', expectedVersion: 1, reason: undefined })
     await page.getByLabel('Pick history').getByText('Mario Fireballs').waitFor()
 
-    await page.goto(routes.leagues.configuration.showLineup.href({
+    await page.goto(routes.leagues.configuration.teams.lineup.show.href({
       leagueSlug: league.slug,
       revisionId: lineup.lineupRevisionId,
       teamId: lineup.teamId,
@@ -161,10 +161,11 @@ describe('critical Starworks browser workflows', () => {
     let page = await t.serve(server)
     await authenticate(page, server.baseUrl, runtime)
 
-    await page.goto(routes.leagues.operations.dashboard.href({ leagueSlug: league.slug }))
-    await page.getByLabel('Required game-build SHA-256').fill('a'.repeat(64))
-    await page.getByRole('button', { name: 'Queue immutable attempt' }).click()
-    await page.getByText('#1 · queued').waitFor()
+    await page.goto(routes.leagues.operations.matches.index.href({ leagueSlug: league.slug }))
+    await page.getByText('Queue runner attempt').click()
+    await page.getByLabel('Game build SHA-256').fill('a'.repeat(64))
+    await page.getByRole('button', { name: 'Queue attempt' }).click()
+    await page.getByText('Attempt 1').waitFor()
     assert.deepEqual(queued, {
       awayLineupRevisionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
       contentPackRevisionId: null,
@@ -177,14 +178,12 @@ describe('critical Starworks browser workflows', () => {
       statProfileRevisionId: PROFILE_ID,
     })
 
-    await page.getByText('Add an audited scorer correction').click()
-    await page.getByLabel('Team or character ID').fill(HOME_TEAM_ID)
-    await page.getByLabel('Stat path').fill('hits')
-    await page.getByLabel('Current value').fill('4')
+    await page.goto(routes.leagues.operations.results.index.href({ leagueSlug: league.slug }))
+    await page.getByText('Record a scorer correction').click()
+    await page.getByLabel('Statistic').selectOption({ label: 'Mario Fireballs · Hits (currently 4)' })
     await page.getByLabel('Corrected value').fill('5')
     await page.getByLabel('Reason').fill('Official scorer ruling')
-    await page.getByRole('button', { name: 'Record correction and rebuild' }).click()
-    await page.getByText('1 correction receipt').click()
+    await page.getByRole('button', { name: 'Save correction' }).click()
     await page.getByText(/Official scorer ruling/).waitFor()
     assert.deepEqual(corrected, {
       afterValue: 5,
@@ -347,7 +346,14 @@ function configurationApplication(
     createRulesetDraft: unexpected,
     createStatProfileDraft: unexpected,
     createTeamLineupDraft: unexpected,
-    async dashboard() { return { profiles: [], rulesets: [], teams: [] } },
+    async dashboard() {
+      let revision = current()
+      return {
+        profiles: [],
+        rulesets: [],
+        teams: [{ id: revision.teamId, lineups: [], name: 'Mario Fireballs' }],
+      }
+    },
     getRulesetRevision: unexpected,
     getStatProfileRevision: unexpected,
     async getTeamLineupRevision(): Promise<TeamLineupRevisionDetail> {
@@ -363,6 +369,7 @@ function configurationApplication(
         }],
         issues: [],
         revision,
+        teamName: 'Mario Fireballs',
       }
     },
     publishRuleset: unexpected,
@@ -425,13 +432,19 @@ function runnerAdminApplication(
   onQueue: (input: unknown) => void,
 ): RunnerAdminApplication {
   return {
-    async dashboard() { return dashboard },
+    async matchDashboard() {
+      let { audit: _, stations: __, ...matches } = dashboard
+      return matches
+    },
     async queueAttempt(_identity, _leagueId, _matchId, input) {
       onQueue(input)
       return { attemptId: ATTEMPT_ID, attemptNumber: 1 }
     },
     async revokeStation() {},
     async scheduleMatch() { return {} as never },
+    async stationDashboard() {
+      return { audit: dashboard.audit, stations: dashboard.stations }
+    },
   }
 }
 
@@ -520,6 +533,8 @@ function telemetryApplication(
     async derive() { return {} as never },
     async finalizeHealthyAttempt() { throw new Error('Unexpected automatic finalization') },
     async ingest() { return {} as never },
+    async leagueOverview() { return [] },
+    async leagueStatistics() { return [{ name: 'Season One', seasonId: SEASON_ID, statistics: { playerTotals: {}, standings: [] } }] },
     async rebuildSeason() { return { playerTotals: {}, standings: [] } },
   }
 }

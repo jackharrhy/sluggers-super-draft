@@ -24,9 +24,9 @@ export function ConfigurationHomePage(handle: Handle<ConfigurationPageProps>) {
     return (
       <ConfigurationShell identity={identity} league={league} heading="Admin">
         <nav mix={workspaceGridStyle} aria-label="League administration">
-          <WorkspaceLink href={routes.leagues.configuration.statProfiles.href({ leagueSlug: league.slug })} heading="Stats" detail={`${dashboard.profiles.length} profiles`} />
-          <WorkspaceLink href={routes.leagues.configuration.rulesets.href({ leagueSlug: league.slug })} heading="Rules" detail={`${dashboard.rulesets.length} rulesets`} />
-          <WorkspaceLink href={routes.leagues.configuration.teams.href({ leagueSlug: league.slug })} heading="Teams" detail={`${dashboard.teams.length} teams`} />
+          <WorkspaceLink href={routes.leagues.configuration.statProfiles.index.href({ leagueSlug: league.slug })} heading="Stats" detail={`${dashboard.profiles.length} profiles`} />
+          <WorkspaceLink href={routes.leagues.configuration.rulesets.index.href({ leagueSlug: league.slug })} heading="Rules" detail={`${dashboard.rulesets.length} rulesets`} />
+          <WorkspaceLink href={routes.leagues.configuration.teams.index.href({ leagueSlug: league.slug })} heading="Teams" detail={`${dashboard.teams.length} teams`} />
           <WorkspaceLink href={routes.leagues.content.dashboard.href({ leagueSlug: league.slug })} heading="Content" detail="Build inputs and assets" />
         </nav>
         <section mix={[cardStyle, compileStyle]} aria-labelledby="compile-heading">
@@ -60,14 +60,14 @@ export function StatProfilesPage(handle: Handle<ConfigurationPageProps>) {
             <div mix={listStyle}>
               {dashboard.profiles.map((profile) => (
                 <RevisionCard name={profile.name} revisions={profile.revisions} revisionHref={(revisionId) =>
-                  routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId })} />
+                  routes.leagues.configuration.statProfiles.revision.show.href({ leagueSlug: league.slug, revisionId })} />
               ))}
               {!dashboard.profiles.length ? <p mix={mutedStyle}>No stat profiles yet.</p> : null}
             </div>
           </section>
           <section mix={[cardStyle, importStyle]} aria-labelledby="import-heading">
             <h2 id="import-heading">Import Stat Editor v4</h2>
-            <form action={routes.leagues.configuration.importStatEditor.href({ leagueSlug: league.slug })} method="post" encType="multipart/form-data" mix={formStyle}>
+            <form action={routes.leagues.configuration.statProfiles.importStatEditor.href({ leagueSlug: league.slug })} method="post" encType="multipart/form-data" mix={formStyle}>
               <Field label="Profile name" name="name" value="Imported stats" />
               <Field label="Slug" name="slug" value="imported-stats" />
               <label mix={fieldStyle}>
@@ -88,13 +88,26 @@ export function RulesetsPage(handle: Handle<ConfigurationPageProps>) {
     let { dashboard, identity, league } = handle.props
     return (
       <ConfigurationShell identity={identity} league={league} heading="Rules">
-        <SectionHeading id="rulesets-heading" heading="Rulesets" count={dashboard.rulesets.length} />
-        <div mix={cardGridStyle}>
-          {dashboard.rulesets.map((ruleset) => (
-            <RevisionCard name={ruleset.name} revisions={ruleset.revisions} revisionHref={(revisionId) =>
-              routes.leagues.configuration.showRuleset.href({ leagueSlug: league.slug, revisionId })} />
-          ))}
-          {!dashboard.rulesets.length ? <p mix={mutedStyle}>No rulesets yet.</p> : null}
+        <div mix={contentColumnsStyle}>
+          <section aria-labelledby="rulesets-heading">
+            <SectionHeading id="rulesets-heading" heading="Rulesets" count={dashboard.rulesets.length} />
+            <div mix={[cardGridStyle, listStyle]}>
+              {dashboard.rulesets.map((ruleset) => (
+                <RevisionCard name={ruleset.name} revisions={ruleset.revisions} revisionHref={(revisionId) =>
+                  routes.leagues.configuration.rulesets.revision.show.href({ leagueSlug: league.slug, revisionId })} />
+              ))}
+              {!dashboard.rulesets.length ? <p mix={mutedStyle}>No rulesets yet.</p> : null}
+            </div>
+          </section>
+          <section mix={[cardStyle, importStyle]} aria-labelledby="create-ruleset-heading">
+            <h2 id="create-ruleset-heading">New ruleset</h2>
+            <p mix={mutedStyle}>Starts with every rule supported by the current Sluggers runner.</p>
+            <form action={routes.leagues.configuration.rulesets.create.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
+              <Field label="Name" name="name" value="League rules" />
+              <Field label="Slug" name="slug" value="league-rules" />
+              <button type="submit" mix={buttonStyle}>Create ruleset</button>
+            </form>
+          </section>
         </div>
       </ConfigurationShell>
     )
@@ -111,14 +124,14 @@ export function TeamsConfigurationPage(handle: Handle<ConfigurationPageProps>) {
           {dashboard.teams.map((team) => (
             <article mix={[cardStyle, formStyle]}>
               <h2 mix={cardHeadingStyle}>{team.name}</h2>
-              <RevisionList revisions={team.lineups} revisionHref={(revisionId) => routes.leagues.configuration.showLineup.href({
+              <RevisionList revisions={team.lineups} revisionHref={(revisionId) => routes.leagues.configuration.teams.lineup.show.href({
                 leagueSlug: league.slug,
                 revisionId,
                 teamId: team.id,
               })} />
               <details>
                 <summary>Import AutoTeam lineup</summary>
-                <form action={routes.leagues.configuration.importAutoTeam.href({ leagueSlug: league.slug, teamId: team.id })} method="post" mix={formStyle}>
+                <form action={routes.leagues.configuration.teams.importAutoTeam.href({ leagueSlug: league.slug, teamId: team.id })} method="post" mix={formStyle}>
                   <input type="hidden" name="teamName" value={team.name} />
                   <label mix={fieldStyle}>
                     <span>teams.json entry</span>

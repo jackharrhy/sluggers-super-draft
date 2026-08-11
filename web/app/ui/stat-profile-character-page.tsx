@@ -13,12 +13,13 @@ export function StatProfileCharacterPage(handle: Handle<{
   definitions: StatDefinition[]
   identity: SessionIdentity
   league: LeagueDetail
+  previousValues: StatProfileRevision['characterValues'][number]['values'] | null
   profileName: string
   revisionId: string
   status: 'draft' | 'published'
 }>) {
   return () => {
-    let { character, definitions, identity, league, profileName, revisionId, status } = handle.props
+    let { character, definitions, identity, league, previousValues, profileName, revisionId, status } = handle.props
     let groups = groupDefinitions(definitions)
     let routeParams = { characterId: character.characterId, leagueSlug: league.slug, revisionId }
     return (
@@ -29,16 +30,16 @@ export function StatProfileCharacterPage(handle: Handle<{
             <p mix={eyebrowStyle}>{profileName}</p>
             <h1>{displayCharacterName(character.characterId)}</h1>
           </div>
-          <a href={routes.leagues.configuration.showStatProfile.href({ leagueSlug: league.slug, revisionId })}>Back to profile</a>
+          <a href={routes.leagues.configuration.statProfiles.revision.characters.href({ leagueSlug: league.slug, revisionId })}>Back to characters</a>
         </header>
         {status === 'draft' ? (
-          <form action={routes.leagues.configuration.updateStatProfileCharacter.href(routeParams)} method="post" mix={formStyle}>
+          <form action={routes.leagues.configuration.statProfiles.revision.character.update.href(routeParams)} method="post" mix={formStyle}>
             {groups.map(([group, groupDefinitions]) => (
               <fieldset mix={[cardStyle, fieldsetStyle]}>
                 <legend>{group}</legend>
                 <div mix={fieldGridStyle}>
                   {groupDefinitions.map((definition) => (
-                    <StatField definition={definition} value={character.values[definition.key]} />
+                    <StatField definition={definition} previousValue={previousValues?.[definition.key]} value={character.values[definition.key]} />
                   ))}
                 </div>
               </fieldset>
@@ -53,7 +54,7 @@ export function StatProfileCharacterPage(handle: Handle<{
               <section mix={[cardStyle, fieldsetStyle]}>
                 <h2>{group}</h2>
                 <dl mix={valueGridStyle}>
-                  {groupDefinitions.map((definition) => <div><dt>{definition.display.label}</dt><dd>{String(character.values[definition.key] ?? '—')}</dd></div>)}
+                  {groupDefinitions.map((definition) => <div><dt>{definition.display.label}</dt><dd>{String(character.values[definition.key] ?? '—')}</dd>{changedValue(character.values[definition.key], previousValues?.[definition.key])}</div>)}
                 </dl>
               </section>
             ))}
@@ -64,15 +65,15 @@ export function StatProfileCharacterPage(handle: Handle<{
   }
 }
 
-function StatField(handle: Handle<{ definition: StatDefinition; value: unknown }>) {
+function StatField(handle: Handle<{ definition: StatDefinition; previousValue: unknown; value: unknown }>) {
   return () => {
-    let { definition, value } = handle.props
+    let { definition, previousValue, value } = handle.props
     let name = `stat.${definition.key}`
     if (definition.dataType === 'boolean') {
-      return <label mix={checkboxStyle}><input type="checkbox" name={name} defaultChecked={value === true} /><span>{definition.display.label}</span></label>
+      return <label mix={checkboxStyle}><input type="checkbox" name={name} defaultChecked={value === true} /><span>{definition.display.label}</span>{changedValue(value, previousValue)}</label>
     }
     if (definition.dataType === 'enum') {
-      return <label mix={fieldStyle}><span>{definition.display.label}</span><select name={name} defaultValue={typeof value === 'string' ? value : ''} required={definition.required} mix={inputStyle}>{!definition.required ? <option value="">Not set</option> : null}{definition.choices.map((choice) => <option value={choice.value}>{choice.label}</option>)}</select></label>
+      return <label mix={fieldStyle}><span>{definition.display.label}</span><select name={name} required={definition.required} mix={inputStyle}>{!definition.required ? <option value="" selected={typeof value !== 'string'}>Not set</option> : null}{definition.choices.map((choice) => <option value={choice.value} selected={choice.value === value}>{choice.label}</option>)}</select>{changedValue(value, previousValue)}</label>
     }
     return (
       <label mix={fieldStyle}>
@@ -88,9 +89,16 @@ function StatField(handle: Handle<{ definition: StatDefinition; value: unknown }
           mix={inputStyle}
         />
         {definition.display.unit ? <small>{definition.display.unit}</small> : null}
+        {changedValue(value, previousValue)}
       </label>
     )
   }
+}
+
+function changedValue(value: unknown, previousValue: unknown) {
+  return previousValue !== undefined && value !== previousValue
+    ? <small mix={previousValueStyle}>was {String(previousValue ?? 'not set')}</small>
+    : null
 }
 
 function groupDefinitions(definitions: StatDefinition[]) {
@@ -112,3 +120,4 @@ const fieldStyle = css({ display: 'grid', fontSize: '14px', fontWeight: 700, gap
 const checkboxStyle = css({ alignItems: 'center', display: 'flex', gap: '9px', minHeight: '48px' })
 const saveBarStyle = css({ display: 'flex', justifyContent: 'flex-end' })
 const valueGridStyle = css({ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', margin: 0, '& div': { borderBottom: '1px solid var(--border)', paddingBottom: '8px' }, '& dt': { color: 'var(--text-muted)', fontSize: '13px' }, '& dd': { margin: '3px 0 0' } })
+const previousValueStyle = css({ color: 'var(--warning-text)', fontSize: '11px', fontWeight: 700 })

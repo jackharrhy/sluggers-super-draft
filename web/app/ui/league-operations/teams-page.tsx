@@ -6,8 +6,9 @@ import type { LeagueDetail, SessionIdentity } from '../../platform/model.ts'
 import { routes } from '../../routes.ts'
 import { buttonStyle, cardStyle, inputStyle } from '../app-shell.tsx'
 import { CharacterBadge } from './character-badge.tsx'
+import { OperationsShell } from './workspace-page.tsx'
 
-export function TeamsOperationsPage(handle: Handle<{
+export function LeagueTeamsPage(handle: Handle<{
   identity: SessionIdentity
   league: LeagueDetail
   mayAdminister: boolean
@@ -17,7 +18,7 @@ export function TeamsOperationsPage(handle: Handle<{
     let { identity, league, mayAdminister, operations } = handle.props
     let teams = operations.seasons.flatMap((season) => season.teams)
     let managedTeamIds = new Set(teams.filter((team) => team.managerPersonId === identity.personId).map((team) => team.id))
-    return <>
+    return <OperationsShell heading="Teams" identity={identity} league={league}>
       <section mix={sectionStyle} aria-labelledby="rosters-heading">
         <div mix={sectionHeadingStyle}>
           <h2 id="rosters-heading">Current rosters</h2>
@@ -35,10 +36,10 @@ export function TeamsOperationsPage(handle: Handle<{
       <div mix={twoColumnStyle}>
         <section mix={cardStyle} aria-labelledby="trade-offer-heading">
           <h2 id="trade-offer-heading">Offer a trade</h2>
-          <form action={routes.leagues.operations.proposeTrade.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
+          <form action={routes.leagues.operations.teams.proposeTrade.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
             <label>Season<select name="seasonId" required mix={inputStyle}>{operations.seasons.map((season) => <option value={season.id}>{season.name}</option>)}</select></label>
             <label>Your team<select name="proposerTeamId" required mix={inputStyle}>{teams.map((team) => <option value={team.id}>{team.name}</option>)}</select></label>
-            <label>Other team<select name="counterpartyTeamId" required defaultValue={teams[1]?.id ?? teams[0]?.id} mix={inputStyle}>{teams.map((team) => <option value={team.id}>{team.name}</option>)}</select></label>
+            <label>Other team<select name="counterpartyTeamId" required mix={inputStyle}>{teams.map((team, index) => <option value={team.id} selected={index === (teams.length > 1 ? 1 : 0)}>{team.name}</option>)}</select></label>
             <CharacterChoices legend="Players you send" name="proposerCharacterIds" teams={teams} />
             <CharacterChoices legend="Players you receive" name="counterpartyCharacterIds" teams={teams} />
             <label>Message<textarea name="message" rows={2} mix={inputStyle} /></label>
@@ -49,9 +50,9 @@ export function TeamsOperationsPage(handle: Handle<{
         <section mix={cardStyle} aria-labelledby="deadlines-heading">
           <h2 id="deadlines-heading">League deadlines</h2>
           {operations.deadlines.length ? <ul mix={deadlineListStyle}>{operations.deadlines.map((deadline) => <li><strong>{deadline.seasonName} · {deadline.kind}</strong><span>{deadline.closesAt.toLocaleString()}</span>{deadline.note ? <small>{deadline.note}</small> : null}</li>)}</ul> : <p mix={mutedStyle}>No transaction deadlines are configured.</p>}
-          {mayAdminister ? <form action={routes.leagues.operations.setDeadline.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
+          {mayAdminister ? <form action={routes.leagues.operations.teams.setDeadline.href({ leagueSlug: league.slug })} method="post" mix={formStyle}>
             <label>Season<select name="seasonId" required mix={inputStyle}>{operations.seasons.map((season) => <option value={season.id}>{season.name}</option>)}</select></label>
-            <label>Deadline type<select name="kind" defaultValue="trade" mix={inputStyle}><option value="trade">Trades</option><option value="roster">Roster changes</option><option value="lineup">Lineups</option></select></label>
+            <label>Deadline type<select name="kind" mix={inputStyle}><option value="trade" selected>Trades</option><option value="roster">Roster changes</option><option value="lineup">Lineups</option></select></label>
             <label>Closes at<input type="datetime-local" name="closesAt" required mix={inputStyle} /></label>
             <label>Note<input name="note" placeholder="Postseason lock" mix={inputStyle} /></label>
             <button type="submit" mix={buttonStyle}>Set deadline</button>
@@ -79,19 +80,19 @@ export function TeamsOperationsPage(handle: Handle<{
               {trade.message ? <p>{trade.message}</p> : null}
               <p mix={mutedStyle}>{trade.approvals.length} of 2 team decisions recorded</p>
               {trade.status === 'pending' ? <div mix={tradeActionsStyle}>
-                {mayReview ? <form action={routes.leagues.operations.reviewTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post" mix={reviewFormStyle}>
+                {mayReview ? <form action={routes.leagues.operations.teams.reviewTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post" mix={reviewFormStyle}>
                   <input name="reason" placeholder="Optional decision note" mix={inputStyle} />
                   <button name="decision" value="approved" mix={buttonStyle}>Approve and apply</button>
                   <button name="decision" value="rejected" mix={dangerStyle}>Reject</button>
                 </form> : null}
-                {mayCancel ? <form action={routes.leagues.operations.cancelTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post"><button mix={secondaryButtonStyle}>Cancel offer</button></form> : null}
+                {mayCancel ? <form action={routes.leagues.operations.teams.cancelTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post"><button mix={secondaryButtonStyle}>Cancel offer</button></form> : null}
               </div> : null}
             </article>
           })}
           {!operations.trades.length ? <p mix={emptyStyle}>No trade proposals have been recorded.</p> : null}
         </div>
       </section>
-    </>
+    </OperationsShell>
   }
 }
 

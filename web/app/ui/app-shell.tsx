@@ -1,7 +1,8 @@
 import type { Handle, RemixNode } from 'remix/ui'
 import { css } from 'remix/ui'
 
-import type { SessionIdentity } from '../platform/model.ts'
+import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
+import { administrativeRoles } from '../platform/repository.ts'
 import { routes } from '../routes.ts'
 import { Document } from './document.tsx'
 
@@ -9,12 +10,15 @@ export function AppShell(
   handle: Handle<{
     children?: RemixNode
     identity?: SessionIdentity | null
-    league?: { name: string; slug: string }
+    league?: LeagueDetail
     title?: string
   }>,
 ) {
   return () => {
     let { children, identity = null, league, title } = handle.props
+    let isMember = Boolean(identity && (identity.isSiteAdmin || league?.roles.length))
+    let mayAdminister = Boolean(identity && league
+      && (identity.isSiteAdmin || league.roles.some((role) => administrativeRoles.has(role))))
     return (
       <Document title={title}>
         <div mix={pageStyle}>
@@ -23,18 +27,22 @@ export function AppShell(
             {league ? (
               <nav mix={leagueNavStyle} aria-label={`${league.name} navigation`}>
                 <a href={routes.leagues.show.href({ leagueSlug: league.slug })}>Home</a>
-                <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Drafts</a>
-                <a href={routes.leagues.operations.teams.href({ leagueSlug: league.slug })}>Teams</a>
-                <a href={routes.leagues.configuration.statProfiles.href({ leagueSlug: league.slug })}>Stats</a>
-                <a href={routes.leagues.configuration.rulesets.href({ leagueSlug: league.slug })}>Rules</a>
-                <a href={routes.leagues.operations.dashboard.href({ leagueSlug: league.slug })}>Matches</a>
-                <a href={routes.leagues.operations.admin.href({ leagueSlug: league.slug })}>Admin</a>
+                {isMember ? <>
+                  <a href={routes.leagues.drafts.dashboard.href({ leagueSlug: league.slug })}>Drafts</a>
+                  <a href={routes.leagues.operations.teams.index.href({ leagueSlug: league.slug })}>Teams</a>
+                  <a href={routes.leagues.operations.matches.index.href({ leagueSlug: league.slug })}>Matches</a>
+                  <a href={routes.leagues.operations.results.index.href({ leagueSlug: league.slug })}>Results</a>
+                </> : null}
+                {mayAdminister ? <>
+                  <a href={routes.leagues.configuration.statProfiles.index.href({ leagueSlug: league.slug })}>Stats</a>
+                  <a href={routes.leagues.configuration.rulesets.index.href({ leagueSlug: league.slug })}>Rules</a>
+                  <a href={routes.leagues.operations.admin.index.href({ leagueSlug: league.slug })}>Admin</a>
+                </> : null}
               </nav>
             ) : null}
             <nav mix={navStyle} aria-label="Account">
               {identity ? (
                 <>
-                  <span>{identity.displayName}</span>
                   {identity.isSiteAdmin ? <a href={routes.admin.newLeague.href()}>Create league</a> : null}
                   <form action={routes.auth.logout.href()} method="post">
                     <button type="submit" mix={linkButtonStyle}>Sign out</button>
@@ -103,7 +111,7 @@ const headerStyle = css({
   maxWidth: '1280px',
   padding: '16px 24px',
   width: '100%',
-  '@media (max-width: 1050px)': {
+  '@media (max-width: 820px)': {
     gridTemplateColumns: 'auto minmax(0, 1fr)',
     '& nav[aria-label="Account"]': { gridColumn: '2' },
   },

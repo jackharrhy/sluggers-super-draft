@@ -4,9 +4,11 @@ import pytest
 from starworks_runner.games.sluggers.tracker import (
     BATTER_BLOCK_ADDRESS,
     BATTER_BLOCK_END,
+    BASES_ADVANCED_ADDRESS,
     GAME_TIMER_ADDRESS,
     GAMEPLAY_BLOCK_ADDRESS,
     GAMEPLAY_BLOCK_END,
+    HOME_RUN_ADDRESS,
     PITCHER_BLOCK_ADDRESS,
     PITCHER_BLOCK_END,
     GameSnapshot,
@@ -46,6 +48,10 @@ def snapshot(**overrides: int) -> GameSnapshot:
         "pitcher_game_id": 1,
         "runs_this_play": 0,
         "outs_this_play": 0,
+        "bases_advanced": 0,
+        "ball_was_hit": 0,
+        "bean_ball": 0,
+        "home_run": 0,
     }
     values.update(overrides)
     return GameSnapshot(**values)
@@ -59,7 +65,7 @@ def tracker() -> SluggersGameTracker:
     )
 
 
-def test_memory_reader_uses_four_contiguous_read_only_blocks() -> None:
+def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     memory = FakeMemory()
     gameplay = bytearray(GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS)
     batter = bytearray(BATTER_BLOCK_END - BATTER_BLOCK_ADDRESS)
@@ -78,11 +84,15 @@ def test_memory_reader_uses_four_contiguous_read_only_blocks() -> None:
     gameplay[0x38A] = 1
     batter[0] = 6
     batter[0xC3] = 2
+    batter[0x168] = 1
+    batter[0x169] = 1
     pitcher[2] = 1
     memory.values[(GAMEPLAY_BLOCK_ADDRESS, len(gameplay))] = bytes(gameplay)
     memory.values[(BATTER_BLOCK_ADDRESS, len(batter))] = bytes(batter)
     memory.values[(PITCHER_BLOCK_ADDRESS, len(pitcher))] = bytes(pitcher)
     memory.values[(GAME_TIMER_ADDRESS, 4)] = (12345).to_bytes(4, "big")
+    memory.values[(BASES_ADVANCED_ADDRESS, 1)] = (2).to_bytes(1, "big", signed=True)
+    memory.values[(HOME_RUN_ADDRESS, 1)] = b"\x01"
 
     value = SluggersMemoryReader(memory).read()
 
@@ -102,12 +112,18 @@ def test_memory_reader_uses_four_contiguous_read_only_blocks() -> None:
         pitcher_game_id=1,
         runs_this_play=2,
         outs_this_play=1,
+        bases_advanced=2,
+        ball_was_hit=1,
+        bean_ball=1,
+        home_run=1,
     )
     assert memory.reads == [
         (GAMEPLAY_BLOCK_ADDRESS, GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS),
         (BATTER_BLOCK_ADDRESS, BATTER_BLOCK_END - BATTER_BLOCK_ADDRESS),
         (PITCHER_BLOCK_ADDRESS, PITCHER_BLOCK_END - PITCHER_BLOCK_ADDRESS),
         (GAME_TIMER_ADDRESS, 4),
+        (BASES_ADVANCED_ADDRESS, 1),
+        (HOME_RUN_ADDRESS, 1),
     ]
 
 
@@ -219,6 +235,200 @@ def test_tracker_emits_one_final_score_and_can_restore_state() -> None:
         "reason": "completed",
     }
     assert restored.observe(snapshot(frame=901, state=0x0E)) == []
+
+
+@pytest.mark.parametrize(
+    ("during", "result"),
+    [
+        ({"balls": 4, "pitches": 4}, "walk"),
+        ({"strikes": 3, "pitches": 3}, "strikeout"),
+        ({"bean_ball": 1, "pitches": 1}, "hit-by-pitch"),
+        (
+            {
+                "away_hits": 1,
+                "ball_was_hit": 1,
+                "bases_advanced": 2,
+                "pitches": 1,
+            },
+            "double",
+        ),
+        ({"ball_was_hit": 1, "outs_this_play": 1, "pitches": 1}, "out"),
+    ],
+)
+def test_tracker_resolves_supported_scoreless_appearances(
+    during: dict[str, int], result: str
+) -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(snapshot(frame=101, **during))
+
+    events = game.observe(snapshot(frame=102, batter_game_id=2, away_hits=during.get("away_hits", 0)))
+
+    assert events[0].event_type == "plate-appearance-ended"
+    assert events[0].payload == {
+        "batterCharacterId": "mario",
+        "battingSide": "away",
+        "errorByCharacterId": None,
+        "outsRecorded": during.get("outs_this_play", 0),
+        "pitcherCharacterId": "luigi",
+        "result": result,
+        "rbi": 0,
+        "scorerCharacterIds": [],
+    }
+    assert events[1].event_type == "batter-changed"
+
+
+def test_new_batter_waits_for_previous_play_fields_to_clear() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=150,
+            ball_was_hit=1,
+            outs=1,
+            outs_this_play=1,
+            pitches=1,
+        )
+    )
+
+    first_boundary = game.observe(
+        snapshot(
+            frame=200,
+            batter_game_id=1,
+            ball_was_hit=1,
+            outs=1,
+            outs_this_play=1,
+        )
+    )
+    assert first_boundary[0].event_type == "plate-appearance-ended"
+    assert first_boundary[0].payload["outsRecorded"] == 1
+
+    game.observe(snapshot(frame=210, batter_game_id=1, outs=1))
+    game.observe(
+        snapshot(
+            frame=250,
+            batter_game_id=1,
+            away_hits=1,
+            ball_was_hit=1,
+            bases_advanced=1,
+            outs=1,
+            pitches=1,
+        )
+    )
+    second_boundary = game.observe(
+        snapshot(
+            frame=300,
+            batter_game_id=2,
+            away_hits=1,
+            ball_was_hit=1,
+            bases_advanced=1,
+            outs=1,
+            outs_this_play=1,
+        )
+    )
+
+    assert second_boundary[0].event_type == "plate-appearance-ended"
+    assert second_boundary[0].payload["result"] == "single"
+    assert second_boundary[0].payload["outsRecorded"] == 0
+    assert game.pending_appearance is not None
+    assert game.pending_appearance.awaiting_play_reset is True
+    assert second_boundary[1].event_type == "batter-changed"
+
+
+def test_final_appearance_precedes_the_next_half_inning() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=150,
+            ball_was_hit=1,
+            outs_this_play=1,
+            outs=3,
+            pitches=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(
+            frame=200,
+            half=1,
+            batter_game_id=2,
+            pitcher_game_id=0,
+        )
+    )
+
+    assert [event.event_type for event in events] == [
+        "plate-appearance-ended",
+        "inning-started",
+        "batter-changed",
+        "pitcher-changed",
+    ]
+    assert events[0].payload["battingSide"] == "away"
+    assert events[1].payload == {"inning": 1, "half": "bottom"}
+
+
+def test_tracker_withholds_ambiguous_scoring_appearance_and_warns() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=101,
+            away_score=2,
+            away_hits=1,
+            ball_was_hit=1,
+            bases_advanced=2,
+            runs_this_play=2,
+            pitches=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_score=2, away_hits=1)
+    )
+
+    assert events[0].event_type == "bridge-warning"
+    assert events[0].payload["code"] == "provisional-observation"
+    assert "scorer and RBI attribution" in events[0].payload["message"]
+    assert all(event.event_type != "plate-appearance-ended" for event in events)
+
+
+def test_tracker_withholds_a_run_before_the_scoreboard_catches_up() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=101,
+            away_hits=1,
+            ball_was_hit=1,
+            bases_advanced=1,
+            runs_this_play=1,
+            pitches=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_hits=1)
+    )
+
+    assert events[0].event_type == "bridge-warning"
+    assert "scorer and RBI attribution" in events[0].payload["message"]
+    assert all(event.event_type != "plate-appearance-ended" for event in events)
+
+
+def test_tracker_restores_pending_appearance_without_duplicate_resolution() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(snapshot(frame=101, strikes=3, pitches=3))
+    restored = tracker()
+    restored.restore(game.state())
+
+    events = restored.observe(snapshot(frame=102, batter_game_id=2))
+
+    assert [event.event_type for event in events[:2]] == [
+        "plate-appearance-ended",
+        "batter-changed",
+    ]
+    assert restored.observe(snapshot(frame=103, batter_game_id=2)) == []
 
 
 def test_tracker_rejects_malformed_saved_state() -> None:

@@ -74,7 +74,7 @@ export default createController(routes.auth, {
       }
       let sessionCookie = context.get(SessionCookie)
       return redirect(
-        routes.leagues.operations.dashboard.href({
+        routes.leagues.operations.matches.index.href({
           leagueSlug: configuration.leagueSlug,
         }),
         {

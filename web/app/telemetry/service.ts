@@ -18,9 +18,11 @@ import {
   leagueTeams,
   matches,
   matchAttempts,
+  publicationSettings,
   rosterRevisions,
   runnerCredentials,
   runnerLeases,
+  seasons,
   telemetryCorrections,
   telemetryDerivations,
   telemetryEvents,
@@ -37,6 +39,11 @@ import type {
   TelemetryDerivationResult,
   TelemetryHealth,
 } from './model.ts'
+import {
+  rebuildSeasonStatistics,
+  type LeagueOverviewSeason,
+  type SeasonStatistics,
+} from './statistics.ts'
 
 const RUNNER_CREDENTIAL_PATTERN = /^starworks_runner_([0-9a-f-]{36})\.([A-Za-z0-9_-]{32,128})$/i
 const CorrectionSchema = z.strictObject({
@@ -78,18 +85,6 @@ export interface TelemetryAttemptSummary {
   corrections: TelemetryCorrectionRecord[]
 }
 
-export interface SeasonStatistics {
-  standings: Array<{
-    teamId: string
-    teamName: string
-    wins: number
-    losses: number
-    runsFor: number
-    runsAgainst: number
-  }>
-  playerTotals: Record<string, MatchBoxScore['characters'][string]>
-}
-
 export interface TelemetryApplication {
   ingest(bearerCredential: string, input: unknown): Promise<TelemetryUploadResponse>
   dashboard(identity: SessionIdentity | null, leagueId: string): Promise<TelemetryAttemptSummary[]>
@@ -101,6 +96,12 @@ export interface TelemetryApplication {
     matchId: string
     status: 'confirmed' | 'review'
   }>
+  leagueStatistics(identity: SessionIdentity | null, leagueId: string): Promise<Array<{
+    name: string
+    seasonId: string
+    statistics: SeasonStatistics
+  }>>
+  leagueOverview(identity: SessionIdentity | null, leagueId: string): Promise<LeagueOverviewSeason[]>
   rebuildSeason(identity: SessionIdentity | null, leagueId: string, seasonId: string): Promise<SeasonStatistics>
 }
 
@@ -553,46 +554,67 @@ export class TelemetryService implements TelemetryApplication {
     seasonId: string,
   ): Promise<SeasonStatistics> {
     this.#requireMember(identity, leagueId)
-    let [teamRows, attempts] = await Promise.all([
-      this.database.select({ id: leagueTeams.id, name: leagueTeams.name }).from(leagueTeams).where(and(
-        eq(leagueTeams.leagueId, leagueId), eq(leagueTeams.seasonId, seasonId),
-      )),
-      this.database
-        .select({ attemptId: matchAttempts.id })
-        .from(matchAttempts)
-        .innerJoin(matches, and(eq(matches.leagueId, matchAttempts.leagueId), eq(matches.id, matchAttempts.matchId)))
-        .where(and(
-          eq(matchAttempts.leagueId, leagueId),
-          eq(matchAttempts.status, 'confirmed'),
-          eq(matches.seasonId, seasonId),
-        )),
-    ])
-    let standings = new Map(teamRows.map((team) => [team.id, {
-      losses: 0, runsAgainst: 0, runsFor: 0, teamId: team.id, teamName: team.name, wins: 0,
-    }]))
-    let playerTotals: SeasonStatistics['playerTotals'] = {}
-    for (let { attemptId } of attempts) {
-      let latest = await this.#latestDerivation(leagueId, attemptId)
-      if (!latest || latest.status !== 'ready') continue
-      let box = latest.boxScore as unknown as MatchBoxScore
-      let home = standings.get(box.teams.home.teamId)
-      let away = standings.get(box.teams.away.teamId)
-      if (!home || !away) continue
-      home.runsFor += box.teams.home.runs
-      home.runsAgainst += box.teams.away.runs
-      away.runsFor += box.teams.away.runs
-      away.runsAgainst += box.teams.home.runs
-      if (box.teams.home.runs > box.teams.away.runs) { home.wins += 1; away.losses += 1 }
-      if (box.teams.away.runs > box.teams.home.runs) { away.wins += 1; home.losses += 1 }
-      for (let [characterId, stats] of Object.entries(box.characters)) {
-        playerTotals[characterId] = addCharacterTotals(playerTotals[characterId], stats)
+    return rebuildSeasonStatistics(this.database, leagueId, seasonId)
+  }
+
+  async leagueStatistics(
+    identity: SessionIdentity | null,
+    leagueId: string,
+  ): Promise<Array<{ name: string; seasonId: string; statistics: SeasonStatistics }>> {
+    this.#requireMember(identity, leagueId)
+    let seasonRows = await this.database
+      .select({ id: seasons.id, name: seasons.name })
+      .from(seasons)
+      .where(eq(seasons.leagueId, leagueId))
+      .orderBy(desc(seasons.createdAt))
+    return Promise.all(seasonRows.map(async (season) => ({
+      name: season.name,
+      seasonId: season.id,
+      statistics: await rebuildSeasonStatistics(this.database, leagueId, season.id),
+    })))
+  }
+
+  async leagueOverview(
+    identity: SessionIdentity | null,
+    leagueId: string,
+  ): Promise<LeagueOverviewSeason[]> {
+    let member = this.#isMember(identity, leagueId)
+    let [publication] = await this.database
+      .select({
+        leagueVisible: publicationSettings.leagueVisible,
+        standingsVisible: publicationSettings.standingsVisible,
+        statsVisible: publicationSettings.statsVisible,
+      })
+      .from(publicationSettings)
+      .where(eq(publicationSettings.leagueId, leagueId))
+      .limit(1)
+    if (!member && !publication?.leagueVisible) {
+      throw new PlatformError('League membership is required', 'forbidden')
+    }
+    let showStandings = member || publication?.standingsVisible === true
+    let showStats = member || publication?.statsVisible === true
+    let seasonRows = await this.database
+      .select({ id: seasons.id, name: seasons.name })
+      .from(seasons)
+      .where(eq(seasons.leagueId, leagueId))
+      .orderBy(desc(seasons.createdAt))
+    if (!showStandings && !showStats) {
+      return seasonRows.map((season) => ({
+        name: season.name,
+        playerTotals: null,
+        seasonId: season.id,
+        standings: null,
+      }))
+    }
+    return Promise.all(seasonRows.map(async (season) => {
+      let statistics = await rebuildSeasonStatistics(this.database, leagueId, season.id)
+      return {
+        name: season.name,
+        playerTotals: showStats ? statistics.playerTotals : null,
+        seasonId: season.id,
+        standings: showStandings ? statistics.standings : null,
       }
-    }
-    return {
-      playerTotals,
-      standings: [...standings.values()].sort((left, right) =>
-        right.wins - left.wins || left.losses - right.losses || left.teamName.localeCompare(right.teamName)),
-    }
+    }))
   }
 
   async #deriveAndStore(leagueId: string, attemptId: string): Promise<TelemetryDerivationResult> {
@@ -698,9 +720,14 @@ export class TelemetryService implements TelemetryApplication {
 
   #requireMember(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {
     if (!identity) throw new PlatformError('Sign in is required', 'unauthorized')
-    if (!identity.isSiteAdmin && !identity.memberships.some((membership) => membership.leagueId === leagueId)) {
+    if (!this.#isMember(identity, leagueId)) {
       throw new PlatformError('League membership is required', 'forbidden')
     }
+  }
+
+  #isMember(identity: SessionIdentity | null, leagueId: string): identity is SessionIdentity {
+    return Boolean(identity && (identity.isSiteAdmin
+      || identity.memberships.some((membership) => membership.leagueId === leagueId)))
   }
 
   #requireAdmin(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {
@@ -754,6 +781,10 @@ function basicHealth(events: TelemetryEnvelope[]): TelemetryHealth {
     && (event.payload.code === 'overflow' || event.payload.code === 'sequence-gap'))) {
     issues.push('bridge reported missing or overflowing telemetry')
   }
+  if (events.some((event) => event.eventType === 'bridge-warning'
+    && (event.payload.code === 'provisional-observation' || event.payload.code === 'incompatibility'))) {
+    issues.push('bridge reported provisional or incompatible telemetry')
+  }
   return {
     eventCount: events.length,
     firstSequence: events[0]?.sequence ?? 0,
@@ -789,19 +820,4 @@ function stableJson(value: unknown): string {
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([key, item]) => `${JSON.stringify(key)}:${stableJson(item)}`).join(',')}}`
   return JSON.stringify(value)
-}
-
-function addCharacterTotals(
-  current: MatchBoxScore['characters'][string] | undefined,
-  incoming: MatchBoxScore['characters'][string],
-): MatchBoxScore['characters'][string] {
-  if (!current) return structuredClone(incoming)
-  for (let category of ['batting', 'running', 'pitching', 'fielding'] as const) {
-    for (let [stat, value] of Object.entries(incoming[category])) {
-      ;(current[category] as unknown as Record<string, number>)[stat] =
-        ((current[category] as unknown as Record<string, number>)[stat] ?? 0) + value
-    }
-  }
-  current.positions = [...new Set([...current.positions, ...incoming.positions])]
-  return current
 }

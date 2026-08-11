@@ -69,6 +69,7 @@ export interface TeamLineupRevisionDetail {
   history: RevisionSummary[]
   issues: ReturnType<typeof validateTeamLineupRevision>
   revision: TeamLineupRevision
+  teamName: string
 }
 
 export type ConfigurationApplication = Pick<
@@ -459,13 +460,18 @@ export class ConfigurationService {
 
   async getTeamLineupRevision(identity: SessionIdentity | null, leagueId: string, teamId: string, revisionId: string): Promise<TeamLineupRevisionDetail> {
     await this.#requireTeamAdmin(identity, leagueId, teamId)
-    let revision = await this.#loadLineupRevision(leagueId, teamId, revisionId)
-    if (!revision) throw new PlatformError('Lineup revision was not found', 'not_found')
-    let history = await this.database.select().from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.teamId, teamId))).orderBy(desc(lineupRevisions.revisionNumber))
-    let basedOnRevision = revision.basedOnLineupRevisionId
-      ? await this.#loadLineupRevision(leagueId, teamId, revision.basedOnLineupRevisionId)
-      : null
-    return { basedOnRevision, revision, history: history.map(summary), issues: validateTeamLineupRevision(revision) }
+    let [revision, [team]] = await Promise.all([
+      this.#loadLineupRevision(leagueId, teamId, revisionId),
+      this.database.select({ name: leagueTeams.name }).from(leagueTeams).where(and(eq(leagueTeams.leagueId, leagueId), eq(leagueTeams.id, teamId))).limit(1),
+    ])
+    if (!revision || !team) throw new PlatformError('Lineup revision was not found', 'not_found')
+    let [history, basedOnRevision] = await Promise.all([
+      this.database.select().from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.teamId, teamId))).orderBy(desc(lineupRevisions.revisionNumber)),
+      revision.basedOnLineupRevisionId
+        ? this.#loadLineupRevision(leagueId, teamId, revision.basedOnLineupRevisionId)
+        : Promise.resolve(null),
+    ])
+    return { basedOnRevision, revision, history: history.map(summary), issues: validateTeamLineupRevision(revision), teamName: team.name }
   }
 
   async updateTeamLineupDraft(
