@@ -11,7 +11,7 @@ from starworks_runner.capture import (
     CapturingAttemptExecutor,
     FfmpegCaptureController,
 )
-from starworks_runner.control import RunnerControlClient
+from starworks_runner.control import RunnerApiError, RunnerControlClient
 from starworks_runner.games.sluggers.live_executor import LiveSluggersExecutor
 from starworks_runner.orchestrator import AttemptExecutor, RunnerStation, RunOnceResult
 from starworks_runner.state import RunnerStateStore, StationRegistration
@@ -107,7 +107,17 @@ class StationService:
     def tick(self) -> RunOnceResult:
         with self._lock:
             self._require_open()
-            self._last_result = self.station.run_once(self.executor)
+            try:
+                self._last_result = self.station.run_once(self.executor)
+            except RunnerApiError as error:
+                if not error.retryable:
+                    raise
+                active = self.state.load_active_run()
+                self._last_result = RunOnceResult(
+                    status="offline",
+                    attempt_id=active.envelope["attemptId"] if active else None,
+                    detail=str(error),
+                )
             return self._last_result
 
     def snapshot(self) -> StationSnapshot:

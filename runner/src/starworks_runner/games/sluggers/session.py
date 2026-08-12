@@ -686,21 +686,11 @@ class LiveSluggersSession:
                     process.kill()
                     process.wait(timeout=timeout_seconds)
         elif process_id is not None and process_identity is not None:
-            try:
-                if process_identity_sha256(process_id) == process_identity:
-                    os.kill(process_id, signal.SIGTERM)
-                    deadline = time.monotonic() + timeout_seconds
-                    while time.monotonic() < deadline:
-                        try:
-                            process_identity_sha256(process_id)
-                        except BridgeProtocolError:
-                            break
-                        time.sleep(0.05)
-                    else:
-                        if process_identity_sha256(process_id) == process_identity:
-                            os.kill(process_id, signal.SIGKILL)
-            except (BridgeProtocolError, ProcessLookupError, PermissionError):
-                pass
+            terminate_matching_process(
+                process_id,
+                process_identity,
+                timeout_seconds=timeout_seconds,
+            )
         self.launch = None
         self.attached_pid = None
         self.process_identity_sha256 = None
@@ -752,3 +742,46 @@ def process_identity_sha256(process_id: int) -> str:
     if completed.returncode != 0 or not identity:
         raise BridgeProtocolError("The recorded Dolphin process is no longer running")
     return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+def terminate_matching_process(
+    process_id: int,
+    expected_identity_sha256: str,
+    *,
+    timeout_seconds: float = 5.0,
+) -> None:
+    """Terminate only the exact persisted process owned by a lost attempt."""
+
+    try:
+        os.kill(process_id, 0)
+    except ProcessLookupError:
+        return
+    except PermissionError as error:
+        raise BridgeProtocolError(
+            "The recorded Dolphin process cannot be inspected"
+        ) from error
+    try:
+        actual_identity = process_identity_sha256(process_id)
+    except BridgeProtocolError:
+        try:
+            os.kill(process_id, 0)
+        except ProcessLookupError:
+            return
+        raise
+    try:
+        if actual_identity != expected_identity_sha256:
+            raise BridgeProtocolError(
+                "Running Dolphin process identity changed before teardown"
+            )
+        os.kill(process_id, signal.SIGTERM)
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            try:
+                process_identity_sha256(process_id)
+            except BridgeProtocolError:
+                return
+            time.sleep(0.05)
+        if process_identity_sha256(process_id) == expected_identity_sha256:
+            os.kill(process_id, signal.SIGKILL)
+    except ProcessLookupError:
+        return

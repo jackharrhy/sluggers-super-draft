@@ -478,6 +478,15 @@ class CapturingAttemptExecutor:
         if callable(restore):
             restore(metadata)
 
+    def abandon_runtime(self, metadata: dict[str, Any]) -> None:
+        abandon = getattr(self.executor, "abandon_runtime", None)
+        try:
+            if callable(abandon):
+                abandon(metadata)
+        finally:
+            self.last_health = self.capture.stop()
+            self.active_attempt_id = None
+
     def runtime_metadata(self) -> dict[str, Any] | None:
         metadata = getattr(self.executor, "runtime_metadata", None)
         return metadata() if callable(metadata) else None

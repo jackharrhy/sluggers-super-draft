@@ -41,7 +41,9 @@ class AttemptExecutor(Protocol):
 
 @dataclass(frozen=True)
 class RunOnceResult:
-    status: Literal["no-work", "running", "completed", "cancelled", "failed"]
+    status: Literal[
+        "no-work", "running", "offline", "completed", "cancelled", "failed"
+    ]
     attempt_id: str | None
     detail: str | None = None
 
@@ -102,7 +104,12 @@ class RunnerStation:
 
     def run_once(self, executor: AttemptExecutor) -> RunOnceResult:
         registration = self._registration()
-        self.flush_pending_updates()
+        active = self.state.load_active_run()
+        sync_error = self._retryable_sync(self.flush_pending_updates)
+        if sync_error is not None and (
+            active is None or active.stage != "running"
+        ):
+            raise sync_error
         active = self.state.load_active_run()
         if active is None:
             response = self.client.claim(registration.runner_id)
@@ -111,20 +118,25 @@ class RunnerStation:
                 self.heartbeat("idle")
                 return RunOnceResult(status="no-work", attempt_id=None)
             active = self.state.accept_run(envelope)
-        else:
+        elif sync_error is None:
             try:
                 self.client.update_lease(
                     self._lease_message(active, registration.runner_id, "renew")
                 )
             except RunnerApiError as error:
-                if error.status != 409:
+                if error.status == 409:
+                    abandon = getattr(executor, "abandon_runtime", None)
+                    if active.runtime_metadata is not None and callable(abandon):
+                        abandon(active.runtime_metadata)
+                    self.state.archive_lost_lease(active.envelope["attemptId"])
+                    return RunOnceResult(
+                        status="failed",
+                        attempt_id=active.envelope["attemptId"],
+                        detail=str(error),
+                    )
+                if not error.retryable:
                     raise
-                self.state.archive_lost_lease(active.envelope["attemptId"])
-                return RunOnceResult(
-                    status="failed",
-                    attempt_id=active.envelope["attemptId"],
-                    detail=str(error),
-                )
+                sync_error = error
 
         if active.configuration is None:
             configuration = self.client.configuration(
@@ -144,12 +156,19 @@ class RunnerStation:
         if callable(supply_content):
             supply_content(resolved_content.source if resolved_content else None)
 
-        self.flush_pending_telemetry(active, registration.runner_id)
-
         attempt_id = active.envelope["attemptId"]
         if active.pending_outcome:
+            if sync_error is not None:
+                return self._offline(attempt_id, sync_error)
+            sync_error = self._retryable_sync(
+                lambda: self.flush_pending_telemetry(active, registration.runner_id)
+            )
+            if sync_error is not None:
+                return self._offline(attempt_id, sync_error)
             self._queue_update(active, registration.runner_id, active.pending_outcome)
-            self.flush_pending_updates()
+            sync_error = self._retryable_sync(self.flush_pending_updates)
+            if sync_error is not None:
+                return self._offline(attempt_id, sync_error)
             return RunOnceResult(
                 status=(
                     "completed" if active.pending_outcome == "complete" else "cancelled"
@@ -157,7 +176,16 @@ class RunnerStation:
                 attempt_id=attempt_id,
             )
         recovering = active.stage == "running"
-        self.heartbeat("recovering" if active.stage == "running" else "preparing")
+        if recovering:
+            if sync_error is None:
+                sync_error = self._sync_running(
+                    active, registration.runner_id, "recovering"
+                )
+        else:
+            if sync_error is not None:
+                raise sync_error
+            self.flush_pending_telemetry(active, registration.runner_id)
+            self.heartbeat("preparing")
         if active.stage != "running":
             try:
                 self.state.update_stage(attempt_id, "preparing")
@@ -204,19 +232,60 @@ class RunnerStation:
         if active is None:
             raise RuntimeError("Active attempt disappeared during execution")
         if outcome.action == "continue":
-            self.flush_pending_telemetry(active, registration.runner_id)
-            self.heartbeat("running")
+            if sync_error is None:
+                sync_error = self._sync_running(
+                    active, registration.runner_id, "running"
+                )
+            if sync_error is not None:
+                return self._offline(attempt_id, sync_error)
             return RunOnceResult(status="running", attempt_id=attempt_id)
         self.state.mark_execution_outcome(attempt_id, outcome.action)
         active = self.state.load_active_run()
         if active is None:
             raise RuntimeError("Active attempt disappeared after its outcome")
-        self.flush_pending_telemetry(active, registration.runner_id)
+        if sync_error is not None:
+            return self._offline(attempt_id, sync_error)
+        sync_error = self._retryable_sync(
+            lambda: self.flush_pending_telemetry(active, registration.runner_id)
+        )
+        if sync_error is not None:
+            return self._offline(attempt_id, sync_error)
         self._queue_update(active, registration.runner_id, outcome.action)
-        self.flush_pending_updates()
+        sync_error = self._retryable_sync(self.flush_pending_updates)
+        if sync_error is not None:
+            return self._offline(attempt_id, sync_error)
         return RunOnceResult(
             status="completed" if outcome.action == "complete" else "cancelled",
             attempt_id=attempt_id,
+        )
+
+    def _sync_running(
+        self,
+        active: ActiveRun,
+        runner_id: str,
+        runtime_state: str,
+    ) -> RunnerApiError | None:
+        error = self._retryable_sync(
+            lambda: self.flush_pending_telemetry(active, runner_id)
+        )
+        if error is not None:
+            return error
+        return self._retryable_sync(lambda: self.heartbeat(runtime_state))
+
+    @staticmethod
+    def _retryable_sync(operation: Callable[[], object]) -> RunnerApiError | None:
+        try:
+            operation()
+        except RunnerApiError as error:
+            if not error.retryable:
+                raise
+            return error
+        return None
+
+    @staticmethod
+    def _offline(attempt_id: str, error: RunnerApiError) -> RunOnceResult:
+        return RunOnceResult(
+            status="offline", attempt_id=attempt_id, detail=str(error)
         )
 
     def flush_pending_telemetry(self, active: ActiveRun, runner_id: str) -> None:

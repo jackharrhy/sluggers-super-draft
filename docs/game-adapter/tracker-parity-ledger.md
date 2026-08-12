@@ -1,6 +1,6 @@
 # Sluggers Stat Tracker parity ledger
 
-Last verified: 2026-08-11
+Last verified: 2026-08-12
 
 This ledger inventories the fields in the local legacy Stat Tracker without
 adopting its workbook or Python model as a Starworks contract. `Implemented`
@@ -15,15 +15,16 @@ current server box-score shape is an implemented derivation target, but only
 the narrow lifecycle/team rows below have live DME evidence. Plate-appearance
 and player-stat rows remain acceptance-blocked until a complete RMBE01 trace
 proves the new reducer inputs. The reducer emits only outcomes it can classify
-exactly: scoreless supported appearances, home runs with exact occupied-base
-identity, and bases-loaded walks or hit-by-pitches. Other scoring plays produce
-a review warning rather than guessed attribution.
+exactly. In addition to scoreless appearances, home runs, and bases-loaded
+force plays, it now retains the trusted tracker's per-runner destination values
+and accepts an ordinary scoring hit only when the players reaching home exactly
+equal the scoreboard delta. Other scoring plays produce a review warning.
 
 ## Workstreams
 
 - <a id="sw-telem-core"></a>`SW-TELEM-CORE`: prove lifecycle, inning,
   batter/pitcher, resolved plate appearance, score, substitution, and game-end
-  hooks on the exact supported DOL.
+  observations on the exact supported DOL; use hooks only for a measured gap.
 - <a id="sw-telem-pitch"></a>`SW-TELEM-PITCH`: add pitch/count and star-pitch
   events after the core stream is stable.
 - <a id="sw-telem-running"></a>`SW-TELEM-RUNNING`: add runner movement, steals,
@@ -52,8 +53,8 @@ a review warning rather than guessed attribution.
 | --- | --- | --- | --- |
 | plate appearances, at bats, hits, singles, doubles, triples, home runs, walks, strikeouts, hit by pitch, total bases | Reducer implemented; partial live evidence | The v0 DME reducer accumulates the trusted count, hit, bases-advanced, score/hit delta, outs, bean-ball, home-run, and initial base-occupant fields until a real batter/side change. Normal-speed attempts live-proved ordinary outs, singles, the prior-play reset gate, final-PA-before-next-inning ordering, and batting-order indices moving through the base slots across consecutive singles. The remaining result classes still need live examples. | [core](#sw-telem-core) |
 | sacrifice flies, sacrifice bunts | Deferred | These subtypes are not yet unambiguous and remain unavailable rather than zero-filled. | [core](#sw-telem-core) |
-| RBI | Partial; live acceptance pending | Exact RBI is emitted for a home run when every occupied runner slot is valid, and for a bases-loaded walk/HBP. Every other scoring play remains provisional. | [core](#sw-telem-core) |
-| runs | Partial; runner identity live proven | Base slots at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` were live-observed as signed batting-order indices across consecutive singles. The reducer uses them only for exact home-run and bases-loaded force scoring; other cases remain unavailable. | [core](#sw-telem-core) |
+| RBI | Partial; ordinary scoring hits live proven | Home runs and bases-loaded force plays remain exact. The destination-aware path live-attributed Boo, Bowser Jr., Luigi, and Peach on ordinary RBI singles. A later Toad scoring shape remained unavailable, and a complete score-consistent game and non-hit scoring cases remain pending. | [core](#sw-telem-core) |
+| runs | Partial; ordinary scorer identity live proven | Base slots hold signed batting-order indices and their paired destination fields identify a runner reaching home at destination 4. The reducer retains those destinations across the play and fails closed unless observed scorer count equals the score delta. | [core](#sw-telem-core) |
 | batting average, on-base percentage, slugging percentage, OPS | Deferred | Pure derivations of the accepted batting totals above. They must remain unavailable while the inputs are unavailable. | [core](#sw-telem-core) |
 | one-run, two-run, three-run home runs; grand slams; inside-the-park home runs | Deferred | The core result distinguishes a home run but not these subtypes. | [Sluggers](#sw-telem-sluggers) |
 | star singles, star doubles, star triples, star home runs, star hits, star swings, raw stars used, stars used, total star bases, star slugging percentage | Deferred | No accepted star-action event exists. | [Sluggers](#sw-telem-sluggers) |
@@ -77,7 +78,7 @@ a review warning rather than guessed attribution.
 
 | Legacy fields | Status | Starworks source or reason | Workstream |
 | --- | --- | --- | --- |
-| runs | Partial; runner identity live proven | Exact home-run and bases-loaded force cases resolve through the live-proven batting-order indices in the three base slots. Other runner-scoring paths remain deferred. | [core](#sw-telem-core) |
+| runs | Partial; ordinary scorer identity live proven | Home-run and bases-loaded force cases resolve through batting-order indices; destination-aware tracking also live-proved one runner scoring from second on a single. Remaining play shapes require equivalent evidence. | [core](#sw-telem-core) |
 | stolen bases, caught stealing, steal attempts, caught-stealing percentage | Deferred | No runner-action event exists. | [running](#sw-telem-running) |
 | close plays won, close plays lost | Deferred | The legacy model declares these fields but explicitly does not track them. A game-side resolution hook must be discovered. | [running](#sw-telem-running) |
 
@@ -106,6 +107,9 @@ verified function boundaries. The current v0 reader also consumes pitches at
 `0x900D6A94`/`0x900D6A95`, and the home-run flag at `0x900D953C`. These new
 reads and their reducer still require exact-build live acceptance. The runner
 slots at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` were additionally proven
-live to hold signed immutable batting-order indices. Polling still cannot
-produce automatically confirmed Starworks results until the complete reducer
-and fault matrix pass acceptance.
+live to hold signed immutable batting-order indices. Their destination fields
+at `0x900DB921`, `0x900DBAF5`, and `0x900DBCC9`, plus the batter fields at
+`0x900DB5F9` and `0x900DB74D`, now have ordinary scoring-hit evidence. DME
+telemetry still cannot auto-confirm until a complete score-consistent run and
+fault matrix justify replacing the blanket provenance gate with exact
+reader/reducer health checks.

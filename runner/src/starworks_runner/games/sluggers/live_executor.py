@@ -24,6 +24,7 @@ from starworks_runner.games.sluggers.session import (
     RuntimeGameObservation,
     RuntimeLineupObservation,
     load_game_build_manifest,
+    terminate_matching_process,
 )
 from starworks_runner.games.sluggers.tools import DtkDiscTool
 from starworks_runner.games.sluggers.tracker import (
@@ -163,6 +164,25 @@ class LiveSluggersExecutor:
                 "Saved Dolphin recovery stage is invalid", "runner-crash"
             )
         self.live_stage = live_stage
+
+    def abandon_runtime(self, metadata: dict[str, Any]) -> None:
+        """Stop the exact Dolphin process retained for an expired lease."""
+
+        process_id = metadata.get("processId")
+        identity = metadata.get("processIdentitySha256")
+        if (
+            metadata.get("kind") != "sluggers-live-session"
+            or not isinstance(process_id, int)
+            or process_id <= 0
+            or not isinstance(identity, str)
+            or len(identity) != 64
+        ):
+            raise AttemptExecutionError(
+                "Saved Dolphin process identity is invalid", "runner-crash"
+            )
+        terminate_matching_process(process_id, identity)
+        self.recovery_state = None
+        self.session = None
 
     def runtime_metadata(self) -> dict[str, Any] | None:
         if self.session is None or self.session.process_id is None:

@@ -32,7 +32,12 @@ export default createController(routes.leagues.configuration.statProfiles.revisi
       let league = context.get(ConfigurationLeague)
       try {
         let detail = await context.get(Configuration).getStatProfileRevision(identity, league.id, context.params.revisionId)
-        return context.render(<StatProfileCharactersPage identity={identity} league={league} revision={detail.revision} />)
+        return context.render(<StatProfileCharactersPage
+          identity={identity}
+          league={league}
+          revision={detail.revision}
+          selectedKind={characterKind(context.url.searchParams.get('kind'))}
+        />)
       } catch (error) {
         return renderConfigurationError(context, error)
       }
@@ -83,4 +88,8 @@ export default createController(routes.leagues.configuration.statProfiles.revisi
 
 function profileHref(leagueSlug: string, revisionId: string): string {
   return routes.leagues.configuration.statProfiles.revision.show.href({ leagueSlug, revisionId })
+}
+
+function characterKind(value: string | null): 'playable' | 'mii' | 'unused' {
+  return value === 'mii' || value === 'unused' ? value : 'playable'
 }

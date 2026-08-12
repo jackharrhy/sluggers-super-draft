@@ -16,6 +16,14 @@ class RunnerApiError(RuntimeError):
         super().__init__(message)
         self.status = status
 
+    @property
+    def retryable(self) -> bool:
+        return (
+            self.status is None
+            or self.status in {408, 425, 429}
+            or self.status >= 500
+        )
+
 
 @dataclass(frozen=True)
 class HttpResponse:

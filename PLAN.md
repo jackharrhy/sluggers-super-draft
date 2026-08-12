@@ -20,14 +20,14 @@ playable alpha. Status claims use three separate meanings:
 | --- | --- | --- |
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
 | Web/runner contracts | One strict, evolving pre-release contract set; dummy `schemaVersion` fields, `.v1.schema.json` artifacts, and `/api/v1` routing have been removed | Add compatibility versions only when the first real external-consumer boundary exists |
-| Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
+| Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven; retryable API outages now keep a running executor alive in automated coverage | Live-accept outage spooling, reattach, and exact orphan teardown |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
-| Complete CPU-vs-CPU game | Live proven in normal-speed, server-scheduled one- and seven-inning games with adapter-owned CPU control | Produce a healthy hook-sourced result from the same path |
+| Complete CPU-vs-CPU game | Live proven in normal-speed, server-scheduled one- and seven-inning games with adapter-owned CPU control | Produce a healthy score-consistent result from the same path |
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through a complete scheduled game | Repeat on clean-station acceptance runs while telemetry work continues |
 | Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; the local demo imports the trusted v4.1 stock profile instead of synthetic values; known encoded character fields use domain-aware controls; all 16,406 guarded cells match the exact stock DOL and representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | User-accept the editor, then repeat the scheduled path with a visibly changed published value |
 | Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
-| Semantic game telemetry and box-score derivation | Partial; a complete scheduled run uploaded 36 contiguous events, but three scoring plays lacked attribution and the derived 0–2 score disagreed with the game-ended 3–2 score | Move the alpha semantic slice from provisional memory observations to exact bridge hooks and close scorer/RBI attribution |
-| Health-gated automatic result confirmation and one-retry recovery | Implemented; live review routing correctly rejected the inconsistent 3–2 run | Prove healthy auto-confirmation, live reattach, and the full server/runner fault matrix |
+| Semantic game telemetry and box-score derivation | Partial; complete scheduled runs are contiguous, and the trusted Stat Tracker's runner-destination fields now resolve ordinary scorer/RBI identity with live evidence; a complete score-consistent run is still pending | Finish the conservative DME slice and use a game hook only for a specific semantic value that cannot be observed reliably |
+| Health-gated automatic result confirmation and one-retry recovery | Partial; review routing and one fresh retry are live proven, while a web restart exposed and drove fixes for runner exit and orphan-Dolphin teardown | Prove healthy auto-confirmation, live reattach, and the full server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
 | RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
 
@@ -50,16 +50,16 @@ appear as unavailable rather than zero.
 
 ### Current critical path
 
-1. Instrument exact game-side hooks for the alpha semantic slice: lifecycle,
-   inning transitions, batter/pitcher changes, completed plate appearances,
-   scorer/RBI attribution, substitutions, errors, and game end. Keep DME
-   snapshots as diagnostics and hook-discovery evidence, not auto-confirmable
-   product telemetry.
-2. Replace the provisional memory-observation stream with exact hooks, then
-   repeat the normal-speed scheduled path until it derives the same final score
-   as the game and auto-confirms. Continue
-   result-class acceptance without guessing, and keep unavailable metrics
-   explicit in the parity ledger.
+1. Finish the alpha semantic slice through the smallest reliable boundary. Use
+   the trusted Stat Tracker's exact-build DME fields for lifecycle, inning,
+   batter/pitcher, plate appearances, runner destinations, and game end. Add a
+   reviewed game hook only when a named value cannot preserve causality or
+   attribution through DME; do not require hooks by policy.
+2. Repeat the normal-speed scheduled path until the conservative event stream
+   derives the same final score as the game without a provisional warning.
+   Then replace the blanket `memory-observation` rejection with health checks
+   tied to exact build, reader, reducer, sequence, and terminal-score evidence.
+   Keep unavailable metrics explicit in the parity ledger.
 3. Pass the clean-station happy path, network outage, live reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
 4. Repeat the unattended match with a visibly changed server-published Stat
@@ -89,6 +89,49 @@ build remained byte-for-byte identical to the pinned artifact at SHA-256
 All 35 contract tests, 84 Remix tests, and 154 runner tests passed after the
 change.
 
+On 2026-08-12, Starworks adopted the trusted Stat Tracker's per-runner
+destination fields rather than presuming that PowerPC semantic hooks were the
+only valid route. The reader now observes the batter and three base-runner
+destinations at `0x900DB74D`, `0x900DB921`, `0x900DBAF5`, and `0x900DBCC9`,
+and the reducer retains the maximum destination by immutable batting-order
+index across a play. It emits a scoring appearance only when the exact runners
+reaching destination 4 equal the scoreboard delta. Scheduled attempt
+`78cc0b45-aca9-492d-877b-57c0a57f4cc2` live-proved the new path repeatedly:
+ordinary RBI singles attributed Boo, Bowser Jr., Luigi, and Peach from their
+observed destinations, while home runs retained exact scorer order. The run
+reached the fifth inning and uploaded 133 contiguous events. It also found one
+remaining scoring shape for Toad that the conservative reducer correctly
+withheld, plus a pitcher-publication transition that was mistaken for a
+mid-appearance change. The transition is fixed by binding the pitcher only
+after prior-play bytes clear; a true later change still fails closed.
+Complete-game score consistency and auto-confirmation remain open.
+
+The same attempt provided the first real temporary-network-outage exercise. A
+Compose web rebuild interrupted the API for about five seconds and exposed that
+the station process exited before its next DME sample instead of remaining
+offline and spooling. Retryable transport/server failures now produce an
+`offline` station tick, allow an already-running executor to keep sampling, and
+preserve telemetry-before-completion ordering. Because implementation work
+outlasted the 60-second lease, the resumed station correctly received a lease
+conflict and the server queued exactly one fresh attempt. That replacement then
+failed safely because the old Dolphin process was still alive. Expired-lease
+handling now terminates only the PID whose persisted process identity matches
+before releasing the journal, preventing a replacement from colliding with an
+orphan. These recovery changes have automated coverage but still require a
+fresh live outage/restart acceptance run.
+
+The complete repository verification for this pass is green: 35 contract
+tests, 85 Remix tests (including the three Chromium workflows), 161 runner
+tests, both TypeScript typechecks, generated-contract checks, and all 16
+PostgreSQL integration tests.
+
+The same research pass added tested GDB write-watchpoint support for future
+hook discovery and fixed a real parser bug: a valid PowerPC register value
+beginning with hexadecimal `E` was previously mistaken for Dolphin's three-byte
+`Ehh` error packet. The local `dolphin-emu-nogui` research target did not
+reproduce the managed Qt checkpoint lifecycle, and no hook address was claimed
+from that divergent path.
+
 On 2026-08-12, scheduled attempt
 `d65b7083-cb1f-4174-b981-177d0c3f5baf` ran from the web queue through the
 native station and stock Dolphin 2606 at enforced `EmulationSpeed = 1.0`. The
@@ -107,9 +150,10 @@ emitted explicit provisional warnings. The server derived 0–2 while the
 terminal event reported 3–2 and correctly routed the attempt to commissioner
 review. It did not auto-confirm or update standings from inconsistent data.
 Because every current live event is still marked `memory-observation`, even a
-score-consistent stream remains ineligible for automatic confirmation. The
-next adapter work is therefore exact semantic game hooks, not faster Dolphin,
-more menu automation, or optimistic derivation.
+score-consistent stream remains ineligible for automatic confirmation. That
+blanket gate stays until a complete destination-aware run is score-consistent;
+after that it should become an exact-build/reducer health gate rather than a
+preference for one instrumentation mechanism.
 
 The run also exposed two station lifecycle boundaries now covered by tests.
 An OS file lock prevents two runner processes from sharing one SQLite journal.
@@ -129,8 +173,10 @@ and station lifetime remain synchronized across a regulation-length game.
 The longer run also remained deliberately non-confirmable: 20 scoring plays
 could not be attributed from snapshots, leaving the derived score at 9–10
 versus the terminal 17–18. The server routed it to review and did not update
-standings. Repeating more snapshot-based games is therefore no longer on the
-critical path; exact game-side semantic hooks are.
+standings. Repeating the old snapshot shape is therefore no longer useful. The
+next acceptance run must include the newly observed runner destinations;
+game-side hooks remain a fallback for semantics the expanded DME model still
+cannot resolve.
 
 On 2026-08-11, the complete Stat Editor v4 catalogue was rechecked against a
 fresh extraction of the user-owned exact `RMBE01` Rev 0 ISO. The clean
@@ -196,6 +242,12 @@ redundant created/published columns, and fresh fixture revisions preserve valid
 creation-before-publication ordering. Stat Editor and AutoTeam numeric roster
 slots resolve through the same readable character catalogue. The local seed is
 idempotent and prints a direct draft-room URL.
+
+The 101-slot character directory is now three focused server-rendered views for
+playable characters, Mii slots, and retained unused slots instead of one long
+super-page. The real local Remix page was browser-verified in both playable and
+Mii views: the selected group alone is rendered, portrait links remain intact,
+and the URL is directly shareable without client-side state.
 
 The league workspace now exposes separate Matches, Teams, Results, and Admin
 routes with separate controllers and purpose-sized service read models.
@@ -481,10 +533,11 @@ that semantic game hooks are installed today.
 
 The current game-side adapter compiles maintainable C and small reviewed
 PowerPC trampolines. Dolphin Memory Engine remains the host-side transport.
-Exact semantic hooks are required for the alpha event stream wherever polled
-snapshots cannot preserve causality or attribution; DME snapshots remain useful
-for diagnostics and hook discovery. Extending game code does not imply
-replacing DME or forking Dolphin.
+Exact semantic hooks are reserved for values whose causality or attribution
+cannot be preserved through the exact-build DME reader. DME is a product
+telemetry boundary, not merely diagnostics: the trusted community tools and
+Starworks' complete scheduled runs already prove it can observe stable game
+state. Extending game code does not imply replacing DME or forking Dolphin.
 
 ### Targeted decompilation
 
