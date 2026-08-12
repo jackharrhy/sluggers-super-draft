@@ -25,7 +25,7 @@ playable alpha. Status claims use three separate meanings:
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through game start | Exact server-backed teams and active defense passed game-owned read-back; complete a full accepted run |
 | Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; all 16,406 guarded cells match the exact stock DOL and trusted v4.1 editor defaults; representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | Carry a server-published profile through an unattended scheduled match |
 | Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
-| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace and a tested conservative appearance reducer | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, game end, ordinary outs/singles, correct half-inning ordering, and fail-closed scoring warnings are live proven; accept remaining result classes, then add scorer/RBI attribution without guessing |
+| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace and a tested conservative appearance reducer | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, game end, ordinary outs/singles, correct half-inning ordering, fail-closed scoring warnings, and runner-slot identity are live proven; live-accept the implemented exact home-run and bases-loaded force attribution, then continue remaining result classes without guessing |
 | Health-gated automatic result confirmation and one-retry recovery | Implemented | Full live server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
 | RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
@@ -53,8 +53,9 @@ appear as unavailable rather than zero.
    the now-proven server-backed formation and game-owned read-back gate.
 2. Continue live acceptance of the implemented DME snapshot reducer beyond the
    now-proven ordinary out and single. Prove walks, strikeouts, hit-by-pitch,
-   extra-base hits, and the warning path for scoring plays; then add scorer/RBI
-   and remaining outcome attribution only where measured evidence supports it.
+   extra-base hits, exact home-run and bases-loaded force attribution, and the
+   warning path for every other scoring play. Add remaining outcome attribution
+   only where measured evidence supports it.
    Capture a complete healthy event stream and keep unavailable metrics explicit
    in the parity ledger.
 3. Pass the clean-station happy path, network outage, reattach, one-retry, and
@@ -152,12 +153,22 @@ than sharing the home page. The overview read model redacts standings and
 player totals independently for anonymous visitors, and its season rebuild uses
 one joined derivation query instead of querying once per confirmed attempt.
 The completed verification pass includes 35 contract tests, 79 Remix tests,
-148 runner tests, and all 16 PostgreSQL integration tests.
+152 runner tests, and all 16 PostgreSQL integration tests.
 
 On 2026-08-11 a normal-speed live smoke test also forced a seed
 profile that had disabled throttling back to `EmulationSpeed = 1.0`, restored
 the managed checkpoint, passed scheduled formation read-back, entered inning
 one, and advanced DME telemetry. That is live synchronization evidence, not a
+completed-game acceptance result.
+
+A subsequent focused normal-speed DME trace reconciled Starworks with trusted
+Sluggers Stat Tracker `origin/main` at
+`72547b8909086b1bd2b4ba287afee4f61a1e963b`. It proved that the three live base
+slots carry signed batting-order indices: Wario moved from first to second as
+Waluigi occupied first across consecutive singles. The reducer now persists
+those indices and emits scorer/RBI data only for exact home runs and a
+bases-loaded walk or hit-by-pitch. All other scoring plays remain provisional.
+The traced runner attempt was interrupted during instrumentation and is not a
 completed-game acceptance result.
 
 ## Product principles

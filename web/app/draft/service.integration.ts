@@ -126,8 +126,11 @@ test(
         (error: unknown) => error instanceof PlatformError && error.code === 'conflict',
       )
     } finally {
-      await cleanupFixture(connection, fixture.leagueId)
-      await connection.close()
+      try {
+        await cleanupFixture(connection, fixture.leagueId, fixture.personIds)
+      } finally {
+        await connection.close()
+      }
     }
   },
 )
@@ -211,6 +214,7 @@ async function createFixture(database: ReturnType<typeof createDatabase>['databa
     marioTeamId,
     peachManager: identity(peachPersonId, 'Peach Manager'),
     peachTeamId,
+    personIds: [adminPersonId, marioPersonId, peachPersonId] as const,
     seasonId,
     statProfileRevisionId,
   }
@@ -219,6 +223,7 @@ async function createFixture(database: ReturnType<typeof createDatabase>['databa
 async function cleanupFixture(
   connection: ReturnType<typeof createDatabase>,
   leagueId: string,
+  personIds: readonly [string, string, string],
 ): Promise<void> {
   await connection.client.begin(async (transaction) => {
     await transaction`alter table stat_profile_revisions disable trigger user`
@@ -230,8 +235,6 @@ async function cleanupFixture(
     await transaction`delete from game_characters where game_id = 'RMBE01' and character_id in ('character-00', 'character-01', 'character-02')`
     await transaction`alter table roster_revisions enable trigger user`
     await transaction`alter table stat_profile_revisions enable trigger user`
-    await transaction`delete from people where display_name in ('Draft Admin', 'Mario Manager', 'Peach Manager') and not exists (
-      select 1 from league_memberships where person_id = people.id
-    )`
+    await transaction`delete from people where id in (${personIds[0]}, ${personIds[1]}, ${personIds[2]})`
   })
 }

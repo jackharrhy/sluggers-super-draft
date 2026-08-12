@@ -24,7 +24,7 @@ from starworks_runner.games.sluggers.session import (
     RuntimeGameObservation,
     RuntimeLineupObservation,
 )
-from starworks_runner.games.sluggers.tracker import GameSnapshot
+from starworks_runner.games.sluggers.game_observation import GameSnapshot
 from starworks_runner.orchestrator import AttemptExecutionError
 
 

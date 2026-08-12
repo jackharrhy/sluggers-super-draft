@@ -93,7 +93,8 @@ The workstreams meet at explicit integration milestones. Reverse engineering can
 
 - A clean checkout can start the web dependencies with root `compose.yml`.
 - One command validates representative contract fixtures in both TypeScript and Python.
-- No Starworks package contains code copied from an unlicensed or incompatible source.
+- No Starworks package contains community code reused without authorization,
+  provenance, and attribution under the policy in `PRIOR_ART.md`.
 - Product terminology and architectural boundaries are documented once and linked from the README.
 
 ## Milestone 1 — Prove the game boundary early
@@ -134,7 +135,8 @@ This milestone deliberately precedes a large web rewrite. It retires the highest
 
 ### 1C. Patch-toolchain spike
 
-- Reproduce one existing guarded Sluggers hook without copying unlicensed code.
+- Reproduce one existing guarded Sluggers hook using the trusted Stat
+  Editor/Tracker/AutoTeam sources where useful and record exact provenance.
 - Compare two approaches:
   - Python applying a precompiled patch artifact.
   - Kamek compiling/linking a small C/C++ bridge during trusted development/CI.

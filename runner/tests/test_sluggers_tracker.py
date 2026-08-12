@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
+
 import pytest
-from starworks_runner.games.sluggers.tracker import (
+from starworks_runner.games.sluggers.game_observation import (
     BATTER_BLOCK_ADDRESS,
     BATTER_BLOCK_END,
     BASES_ADVANCED_ADDRESS,
@@ -11,10 +13,12 @@ from starworks_runner.games.sluggers.tracker import (
     HOME_RUN_ADDRESS,
     PITCHER_BLOCK_ADDRESS,
     PITCHER_BLOCK_END,
+    RUNNER_INDEX_BLOCK_ADDRESS,
+    RUNNER_INDEX_BLOCK_END,
     GameSnapshot,
-    SluggersGameTracker,
     SluggersMemoryReader,
 )
+from starworks_runner.games.sluggers.tracker import SluggersGameTracker
 
 
 class FakeMemory:
@@ -30,7 +34,7 @@ class FakeMemory:
         raise AssertionError("The game tracker must be read-only")
 
 
-def snapshot(**overrides: int) -> GameSnapshot:
+def snapshot(**overrides: int | tuple[int, int, int]) -> GameSnapshot:
     values = {
         "frame": 100,
         "state": 0x01,
@@ -52,6 +56,7 @@ def snapshot(**overrides: int) -> GameSnapshot:
         "ball_was_hit": 0,
         "bean_ball": 0,
         "home_run": 0,
+        "base_runner_indices": (-1, -1, -1),
     }
     values.update(overrides)
     return GameSnapshot(**values)
@@ -62,6 +67,18 @@ def tracker() -> SluggersGameTracker:
         away_team_id="away-team",
         home_team_id="home-team",
         character_ids={0: "mario", 1: "luigi", 2: "donkey-kong"},
+        away_batting_order=(
+            "mario",
+            "luigi",
+            "donkey-kong",
+            "away-4",
+            "away-5",
+            "away-6",
+            "away-7",
+            "away-8",
+            "away-9",
+        ),
+        home_batting_order=tuple(f"home-{index}" for index in range(1, 10)),
     )
 
 
@@ -70,6 +87,9 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     gameplay = bytearray(GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS)
     batter = bytearray(BATTER_BLOCK_END - BATTER_BLOCK_ADDRESS)
     pitcher = bytearray(PITCHER_BLOCK_END - PITCHER_BLOCK_ADDRESS)
+    runner_indices = bytearray(
+        RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS
+    )
     gameplay[0] = 2
     gameplay[1] = 3
     gameplay[2] = 1
@@ -87,12 +107,18 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     batter[0x168] = 1
     batter[0x169] = 1
     pitcher[2] = 1
+    runner_indices[0] = 4
+    runner_indices[0x1D4] = 0xFF
+    runner_indices[0x3A8] = 7
     memory.values[(GAMEPLAY_BLOCK_ADDRESS, len(gameplay))] = bytes(gameplay)
     memory.values[(BATTER_BLOCK_ADDRESS, len(batter))] = bytes(batter)
     memory.values[(PITCHER_BLOCK_ADDRESS, len(pitcher))] = bytes(pitcher)
     memory.values[(GAME_TIMER_ADDRESS, 4)] = (12345).to_bytes(4, "big")
     memory.values[(BASES_ADVANCED_ADDRESS, 1)] = (2).to_bytes(1, "big", signed=True)
     memory.values[(HOME_RUN_ADDRESS, 1)] = b"\x01"
+    memory.values[(RUNNER_INDEX_BLOCK_ADDRESS, len(runner_indices))] = bytes(
+        runner_indices
+    )
 
     value = SluggersMemoryReader(memory).read()
 
@@ -116,6 +142,7 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
         ball_was_hit=1,
         bean_ball=1,
         home_run=1,
+        base_runner_indices=(4, -1, 7),
     )
     assert memory.reads == [
         (GAMEPLAY_BLOCK_ADDRESS, GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS),
@@ -124,6 +151,10 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
         (GAME_TIMER_ADDRESS, 4),
         (BASES_ADVANCED_ADDRESS, 1),
         (HOME_RUN_ADDRESS, 1),
+        (
+            RUNNER_INDEX_BLOCK_ADDRESS,
+            RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS,
+        ),
     ]
 
 
@@ -219,7 +250,7 @@ def test_tracker_ignores_load_boundaries_and_scoreboard_replay_regressions() -> 
 def test_tracker_emits_one_final_score_and_can_restore_state() -> None:
     game = tracker()
     game.observe(snapshot())
-    saved = game.state()
+    saved = json.loads(json.dumps(game.state()))
     restored = tracker()
     restored.restore(saved)
 
@@ -415,12 +446,88 @@ def test_tracker_withholds_a_run_before_the_scoreboard_catches_up() -> None:
     assert all(event.event_type != "plate-appearance-ended" for event in events)
 
 
+def test_tracker_attributes_a_bases_loaded_home_run_exactly() -> None:
+    game = tracker()
+    game.observe(snapshot(base_runner_indices=(1, 2, 3)))
+    game.observe(
+        snapshot(
+            frame=101,
+            away_score=4,
+            away_hits=1,
+            ball_was_hit=1,
+            home_run=1,
+            runs_this_play=4,
+            pitches=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_score=4, away_hits=1)
+    )
+
+    assert events[0].event_type == "plate-appearance-ended"
+    assert events[0].payload["result"] == "home-run"
+    assert events[0].payload["rbi"] == 4
+    assert events[0].payload["scorerCharacterIds"] == [
+        "away-4",
+        "donkey-kong",
+        "luigi",
+        "mario",
+    ]
+
+
+@pytest.mark.parametrize("result_fields", [{"balls": 4}, {"bean_ball": 1}])
+def test_tracker_attributes_a_bases_loaded_force_run_exactly(
+    result_fields: dict[str, int],
+) -> None:
+    game = tracker()
+    game.observe(snapshot(base_runner_indices=(1, 2, 3)))
+    game.observe(
+        snapshot(
+            frame=101,
+            away_score=1,
+            runs_this_play=1,
+            pitches=1,
+            **result_fields,
+        )
+    )
+
+    events = game.observe(snapshot(frame=102, batter_game_id=2, away_score=1))
+
+    assert events[0].event_type == "plate-appearance-ended"
+    assert events[0].payload["rbi"] == 1
+    assert events[0].payload["scorerCharacterIds"] == ["away-4"]
+
+
+def test_tracker_withholds_scoring_when_a_runner_index_is_invalid() -> None:
+    game = tracker()
+    game.observe(snapshot(base_runner_indices=(1, 2, 12)))
+    game.observe(
+        snapshot(
+            frame=101,
+            away_score=4,
+            away_hits=1,
+            ball_was_hit=1,
+            home_run=1,
+            runs_this_play=4,
+            pitches=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_score=4, away_hits=1)
+    )
+
+    assert events[0].event_type == "bridge-warning"
+    assert all(event.event_type != "plate-appearance-ended" for event in events)
+
+
 def test_tracker_restores_pending_appearance_without_duplicate_resolution() -> None:
     game = tracker()
     game.observe(snapshot())
     game.observe(snapshot(frame=101, strikes=3, pitches=3))
     restored = tracker()
-    restored.restore(game.state())
+    restored.restore(json.loads(json.dumps(game.state())))
 
     events = restored.observe(snapshot(frame=102, batter_game_id=2))
 
@@ -434,3 +541,10 @@ def test_tracker_restores_pending_appearance_without_duplicate_resolution() -> N
 def test_tracker_rejects_malformed_saved_state() -> None:
     with pytest.raises(Exception, match="unknown fields"):
         tracker().restore({"sequence": 1})
+
+    game = tracker()
+    game.observe(snapshot())
+    saved = json.loads(json.dumps(game.state()))
+    saved["last"]["base_runner_indices"] = [1, 2]
+    with pytest.raises(Exception, match="snapshot is invalid"):
+        tracker().restore(saved)

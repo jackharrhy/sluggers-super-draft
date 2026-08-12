@@ -14,8 +14,10 @@ No metric in this ledger is represented as zero when it is unavailable. The
 current server box-score shape is an implemented derivation target, but only
 the narrow lifecycle/team rows below have live DME evidence. Plate-appearance
 and player-stat rows remain acceptance-blocked until a complete RMBE01 trace
-proves the new reducer inputs. The reducer now emits only scoreless outcomes it
-can classify exactly and emits a review warning for everything else.
+proves the new reducer inputs. The reducer emits only outcomes it can classify
+exactly: scoreless supported appearances, home runs with exact occupied-base
+identity, and bases-loaded walks or hit-by-pitches. Other scoring plays produce
+a review warning rather than guessed attribution.
 
 ## Workstreams
 
@@ -35,10 +37,10 @@ can classify exactly and emits a review warning for everything else.
 
 | Legacy field | Status | Starworks source or reason | Workstream |
 | --- | --- | --- | --- |
-| away/home team identity and roster membership | Implemented; acceptance blocked | The runner reads both initialized game-owned rosters and batting/fielding flags. Live evidence found both configured roster sets, but also showed that the current adapter lets the game swap/reorder the scheduled formation; the run now fails closed. | [core](#sw-telem-core) |
-| batting order and starting positions | Deferred | A game-owned read-back gate is implemented and live evidence currently fails it. Final formation application must be fixed before these values are accepted. | [core](#sw-telem-core) |
+| away/home team identity and roster membership | Implemented and live proven through game start | The runner applies both scheduled formations at the final game-owned boundary and reads both initialized rosters back before Begin. A server-backed attempt passed the gate and entered CPU-vs-CPU gameplay; completion in the same run remains pending. | [core](#sw-telem-core) |
+| batting order and starting positions | Implemented and live proven through game start | The same fail-closed read-back verifies all nine batting-order slots and active defensive positions against the immutable attempt. Full-match acceptance remains pending. | [core](#sw-telem-core) |
 | stadium, regulation innings, mercy, stars, items, CPU control | Implemented | Runtime values are read back on the exact build; adapter-owned CPU activation is receipt- and gameplay-observed. Time of day remains deliberately fixed to day for the current runner. | [core](#sw-telem-core) |
-| final away/home score, end reason | Implemented; acceptance blocked | Replay-safe cumulative score observation and exact end states produced one `game-ended` event for a complete 4–11 adapter-owned CPU game. The trace is execution evidence, not a healthy result, because lineup read-back fails. | [core](#sw-telem-core) |
+| final away/home score, end reason | Implemented; combined acceptance pending | Replay-safe cumulative score observation and exact end states produced one `game-ended` event for a complete 4–11 adapter-owned CPU game. A separate later run proved scheduled formation through gameplay. One unattended run has not yet proven both together. | [core](#sw-telem-core) |
 | score by inning, innings played | Partial | Live inning transitions and cumulative scores are observed. A stable scoring-event reducer is still required before per-inning lines are accepted. | [core](#sw-telem-core) |
 | team hits | Implemented | Exact-build cumulative hit fields are live observed and clamped across replay memory regressions. | [core](#sw-telem-core) |
 | team errors | Deferred | Requires resolved appearance and attributed fielding evidence. | [core](#sw-telem-core), [fielding](#sw-telem-fielding) |
@@ -48,9 +50,10 @@ can classify exactly and emits a review warning for everything else.
 
 | Legacy fields | Status | Starworks source or reason | Workstream |
 | --- | --- | --- | --- |
-| plate appearances, at bats, hits, singles, doubles, triples, home runs, walks, strikeouts, hit by pitch, total bases | Reducer implemented; partial live evidence | The v0 DME reducer accumulates the trusted count, hit, bases-advanced, score/hit delta, outs, bean-ball, and home-run fields until a real batter/side change. Normal-speed attempts live-proved ordinary outs, singles, the prior-play reset gate, and final-PA-before-next-inning ordering. A one-run play emitted only a review warning, without fabricated RBI or scorer data. The remaining result classes still need live examples. | [core](#sw-telem-core) |
-| sacrifice flies, sacrifice bunts, RBI | Deferred | Sacrifice subtypes, scorer identities, and RBI attribution are not yet unambiguous. Scoring appearances are withheld rather than zero-filled. | [core](#sw-telem-core) |
-| runs | Deferred; unavailable path live proven | Derivable from scorer identities on accepted appearances; live scorer attribution is not hooked. A real scoring play emitted a provisional warning and no zero-filled scorer list. | [core](#sw-telem-core) |
+| plate appearances, at bats, hits, singles, doubles, triples, home runs, walks, strikeouts, hit by pitch, total bases | Reducer implemented; partial live evidence | The v0 DME reducer accumulates the trusted count, hit, bases-advanced, score/hit delta, outs, bean-ball, home-run, and initial base-occupant fields until a real batter/side change. Normal-speed attempts live-proved ordinary outs, singles, the prior-play reset gate, final-PA-before-next-inning ordering, and batting-order indices moving through the base slots across consecutive singles. The remaining result classes still need live examples. | [core](#sw-telem-core) |
+| sacrifice flies, sacrifice bunts | Deferred | These subtypes are not yet unambiguous and remain unavailable rather than zero-filled. | [core](#sw-telem-core) |
+| RBI | Partial; live acceptance pending | Exact RBI is emitted for a home run when every occupied runner slot is valid, and for a bases-loaded walk/HBP. Every other scoring play remains provisional. | [core](#sw-telem-core) |
+| runs | Partial; runner identity live proven | Base slots at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` were live-observed as signed batting-order indices across consecutive singles. The reducer uses them only for exact home-run and bases-loaded force scoring; other cases remain unavailable. | [core](#sw-telem-core) |
 | batting average, on-base percentage, slugging percentage, OPS | Deferred | Pure derivations of the accepted batting totals above. They must remain unavailable while the inputs are unavailable. | [core](#sw-telem-core) |
 | one-run, two-run, three-run home runs; grand slams; inside-the-park home runs | Deferred | The core result distinguishes a home run but not these subtypes. | [Sluggers](#sw-telem-sluggers) |
 | star singles, star doubles, star triples, star home runs, star hits, star swings, raw stars used, stars used, total star bases, star slugging percentage | Deferred | No accepted star-action event exists. | [Sluggers](#sw-telem-sluggers) |
@@ -61,7 +64,8 @@ can classify exactly and emits a review warning for everything else.
 | Legacy fields | Status | Starworks source or reason | Workstream |
 | --- | --- | --- | --- |
 | batters faced, outs pitched, hits allowed, singles/doubles/triples/home runs allowed, walks, strikeouts, bean balls, at bats against | Reducer implemented; partial live evidence | The server derives these from the same conservative scoreless appearance slice. Ordinary out and single inputs are now exact-build live proven; the remaining classes still require examples. | [core](#sw-telem-core) |
-| runs allowed, sacrifice flies/bunts allowed | Deferred | Scoring and sacrifice attribution are deliberately withheld until the required runner and out evidence is proven. | [core](#sw-telem-core) |
+| runs allowed | Partial; live acceptance pending | Accepted exact scorer/RBI events can attribute these; ambiguous scoring events remain withheld. | [core](#sw-telem-core) |
+| sacrifice flies/bunts allowed | Deferred | Sacrifice attribution is deliberately withheld until the required runner and out evidence is proven. | [core](#sw-telem-core) |
 | innings pitched, total bases allowed, batting average against, on-base percentage against, slugging against, OPS against | Deferred | Pure derivations of unavailable accepted pitching totals. | [core](#sw-telem-core) |
 | earned runs, ERA-7, ERA-9 | Deferred | Requires error and inherited-run attribution; the legacy tracker itself currently assumes runs are earned. Starworks will not preserve that assumption. | [fielding](#sw-telem-fielding), [running](#sw-telem-running) |
 | pitches, balls, strikes | Deferred | No pitch/count event exists yet. | [pitch](#sw-telem-pitch) |
@@ -73,7 +77,7 @@ can classify exactly and emits a review warning for everything else.
 
 | Legacy fields | Status | Starworks source or reason | Workstream |
 | --- | --- | --- | --- |
-| runs | Deferred | Derivable from scorer identities once live resolved-appearance hooks exist. | [core](#sw-telem-core) |
+| runs | Partial; runner identity live proven | Exact home-run and bases-loaded force cases resolve through the live-proven batting-order indices in the three base slots. Other runner-scoring paths remain deferred. | [core](#sw-telem-core) |
 | stolen bases, caught stealing, steal attempts, caught-stealing percentage | Deferred | No runner-action event exists. | [running](#sw-telem-running) |
 | close plays won, close plays lost | Deferred | The legacy model declares these fields but explicitly does not track them. A game-side resolution hook must be discovered. | [running](#sw-telem-running) |
 
@@ -91,7 +95,7 @@ can classify exactly and emits a review warning for everything else.
 ## Research provenance
 
 The trusted tracker `origin/main` at
-`6791f8ee10a92fc1825e369cd70e3616e0e6c1b9` identifies useful dynamic-memory
+`72547b8909086b1bd2b4ba287afee4f61a1e963b` identifies useful dynamic-memory
 leads for RMBE01, including
 game state near `0x900D5C28`, inning/half near `0x900D5D97` and `0x900D5E25`,
 scores near `0x900D5D98` and `0x900D5DB2`, batter/pitcher identity near
@@ -100,5 +104,8 @@ scores near `0x900D5D98` and `0x900D5DB2`, batter/pitcher identity near
 verified function boundaries. The current v0 reader also consumes pitches at
 `0x900D692C`, bases advanced at `0x900D66D2`, ball-hit/bean-ball flags at
 `0x900D6A94`/`0x900D6A95`, and the home-run flag at `0x900D953C`. These new
-reads and their reducer still require exact-build live acceptance, and polling
-them cannot yet produce automatically confirmed Starworks results.
+reads and their reducer still require exact-build live acceptance. The runner
+slots at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` were additionally proven
+live to hold signed immutable batting-order indices. Polling still cannot
+produce automatically confirmed Starworks results until the complete reducer
+and fault matrix pass acceptance.

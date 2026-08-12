@@ -106,7 +106,7 @@
     }
   ],
   "releaseGates": [
-    "Live Dolphin 2606 acceptance is required for runtime rules, team selection, and adapter-owned CPU control.",
+    "One unattended Dolphin 2606 match must prove runtime rules, scheduled formation, adapter-owned CPU control, and a healthy terminal event together.",
     "A server-published stat profile must pass through the unattended scheduled-match path before product-complete status."
   ]
 }
