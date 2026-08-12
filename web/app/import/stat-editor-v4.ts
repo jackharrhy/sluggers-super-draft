@@ -8,6 +8,7 @@ import {
 } from '@starworks/contracts'
 import { z } from 'zod'
 
+import { STAT_EDITOR_V4_CORE_STAT_BOUNDS } from '../configuration/stat-editor-character-fields.ts'
 import { PlatformError } from '../platform/errors.ts'
 import { SLUGGERS_CHARACTER_IDS } from '../sluggers/characters.ts'
 
@@ -144,7 +145,7 @@ export function importStatEditorV4(input: unknown): StatEditorImportDraft {
 
   let stats = parsed.get('character stats')!
   let definitions = [
-    ...buildDefinitions('stat', coreStatLabels, stats, 0),
+    ...buildDefinitions('stat', coreStatLabels, stats, 0, STAT_EDITOR_V4_CORE_STAT_BOUNDS),
     ...buildDefinitions('size', sizeLabels, sizes, coreStatLabels.length),
     ...buildDefinitions('pitching', pitchingLabels, pitching, coreStatLabels.length + sizeLabels.length),
   ]
@@ -181,10 +182,15 @@ function buildDefinitions(
   labels: readonly string[],
   rows: number[][],
   orderOffset: number,
+  bounds?: ReadonlyArray<readonly [number, number]>,
 ): StatDefinition[] {
   return labels.map((label, column) => {
     let values = rows.map((row) => row[column]!)
     let integer = values.every(Number.isSafeInteger)
+    let observedMinimum = Math.min(...values)
+    let observedMaximum = Math.max(...values)
+    let minimum = Math.min(bounds?.[column]?.[0] ?? observedMinimum, observedMinimum)
+    let maximum = Math.max(bounds?.[column]?.[1] ?? observedMaximum, observedMaximum)
     let key = `legacy.stat-editor.${group}-${String(column).padStart(2, '0')}`
     let base = {
       definitionId: deterministicUuid(key),
@@ -205,16 +211,16 @@ function buildDefinitions(
       return {
         ...base,
         dataType: 'integer' as const,
-        maximum: Math.max(...values),
-        minimum: Math.min(...values),
+        maximum,
+        minimum,
         step: 1,
       }
     }
     return {
       ...base,
       dataType: 'number' as const,
-      maximum: Math.max(...values),
-      minimum: Math.min(...values),
+      maximum,
+      minimum,
       step: 0.0001,
     }
   })

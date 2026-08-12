@@ -3,12 +3,16 @@ import { css } from 'remix/ui'
 
 import type { StatDefinition, StatProfileRevision } from '@starworks/contracts'
 
+import {
+  displayStatEditorCharacterValue,
+  statEditorCharacterChoices,
+} from '../configuration/stat-editor-character-fields.ts'
 import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { routes } from '../routes.ts'
 import { characterHeadshotPath, displayCharacterName } from '../sluggers/characters.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
 
-export function StatProfileCharacterPage(handle: Handle<{
+interface StatProfileCharacterPageProps {
   character: StatProfileRevision['characterValues'][number]
   definitions: StatDefinition[]
   identity: SessionIdentity
@@ -17,9 +21,32 @@ export function StatProfileCharacterPage(handle: Handle<{
   profileName: string
   revisionId: string
   status: 'draft' | 'published'
-}>) {
+  trajectoryActivation: number[]
+  trajectoryNames: string[]
+}
+
+interface StatFieldProps {
+  definition: StatDefinition
+  previousValue: unknown
+  trajectoryActivation: number[]
+  trajectoryNames: string[]
+  value: unknown
+}
+
+export function StatProfileCharacterPage(handle: Handle<StatProfileCharacterPageProps>) {
   return () => {
-    let { character, definitions, identity, league, previousValues, profileName, revisionId, status } = handle.props
+    let {
+      character,
+      definitions,
+      identity,
+      league,
+      previousValues,
+      profileName,
+      revisionId,
+      status,
+      trajectoryActivation,
+      trajectoryNames,
+    } = handle.props
     let groups = groupDefinitions(definitions)
     let routeParams = { characterId: character.characterId, leagueSlug: league.slug, revisionId }
     return (
@@ -39,7 +66,13 @@ export function StatProfileCharacterPage(handle: Handle<{
                 <legend>{group}</legend>
                 <div mix={fieldGridStyle}>
                   {groupDefinitions.map((definition) => (
-                    <StatField definition={definition} previousValue={previousValues?.[definition.key]} value={character.values[definition.key]} />
+                    <StatField
+                      definition={definition}
+                      previousValue={previousValues?.[definition.key]}
+                      trajectoryActivation={trajectoryActivation}
+                      trajectoryNames={trajectoryNames}
+                      value={character.values[definition.key]}
+                    />
                   ))}
                 </div>
               </fieldset>
@@ -54,7 +87,7 @@ export function StatProfileCharacterPage(handle: Handle<{
               <section mix={[cardStyle, fieldsetStyle]}>
                 <h2>{group}</h2>
                 <dl mix={valueGridStyle}>
-                  {groupDefinitions.map((definition) => <div><dt>{definition.display.label}</dt><dd>{String(character.values[definition.key] ?? '—')}</dd>{changedValue(character.values[definition.key], previousValues?.[definition.key])}</div>)}
+                  {groupDefinitions.map((definition) => <div><dt>{definition.display.label}</dt><dd>{displayStatEditorCharacterValue(definition.key, character.values[definition.key], trajectoryNames)}</dd>{changedValue(character.values[definition.key], previousValues?.[definition.key])}</div>)}
                 </dl>
               </section>
             ))}
@@ -65,15 +98,34 @@ export function StatProfileCharacterPage(handle: Handle<{
   }
 }
 
-function StatField(handle: Handle<{ definition: StatDefinition; previousValue: unknown; value: unknown }>) {
+function StatField(handle: Handle<StatFieldProps>) {
   return () => {
-    let { definition, previousValue, value } = handle.props
+    let { definition, previousValue, trajectoryActivation, trajectoryNames, value } = handle.props
     let name = `stat.${definition.key}`
     if (definition.dataType === 'boolean') {
       return <label mix={checkboxStyle}><input type="checkbox" name={name} defaultChecked={value === true} /><span>{definition.display.label}</span>{changedValue(value, previousValue)}</label>
     }
     if (definition.dataType === 'enum') {
       return <label mix={fieldStyle}><span>{definition.display.label}</span><select name={name} required={definition.required} mix={inputStyle}>{!definition.required ? <option value="" selected={typeof value !== 'string'}>Not set</option> : null}{definition.choices.map((choice) => <option value={choice.value} selected={choice.value === value}>{choice.label}</option>)}</select>{changedValue(value, previousValue)}</label>
+    }
+    let encodedChoices = statEditorCharacterChoices(definition.key, trajectoryNames, trajectoryActivation)
+    if (encodedChoices) {
+      let includesCurrentValue = typeof value === 'number'
+        && encodedChoices.some((choice) => choice.value === value)
+      return (
+        <label mix={fieldStyle}>
+          <span>{definition.display.label}</span>
+          <select name={name} required={definition.required} mix={inputStyle}>
+            {!includesCurrentValue && typeof value === 'number'
+              ? <option value={String(value)} selected>Unknown value ({value})</option>
+              : null}
+            {encodedChoices.map((choice) => (
+              <option value={String(choice.value)} selected={choice.value === value}>{choice.label}</option>
+            ))}
+          </select>
+          {changedValue(value, previousValue)}
+        </label>
+      )
     }
     return (
       <label mix={fieldStyle}>

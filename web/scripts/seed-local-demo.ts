@@ -13,7 +13,6 @@ import statProfileFixture from '../../contracts/fixtures/valid/stat-profile-revi
 import demoMatchFixture from '../../demo/sluggers-match.json' with { type: 'json' }
 import { DraftService } from '../app/draft/service.ts'
 import { createStarterRulesetSettings } from '../app/configuration/sluggers-rules.ts'
-import { buildStatEditorV4Fixture } from '../app/import/stat-editor-v4.fixture.ts'
 import { importStatEditorV4 } from '../app/import/stat-editor-v4.ts'
 import { demoTeamLineup, parseLocalDemoMatch } from '../app/import/local-demo-match.ts'
 import { RunnerAdminService } from '../app/runner/admin-service.ts'
@@ -65,6 +64,7 @@ const ids = {
   statEditorProfile: '10000000-0000-4000-8000-000000000303',
   statEditorRevision: '10000000-0000-4000-8000-000000000304',
   statEditorPublishedRevision: '10000000-0000-4000-8000-000000000305',
+  statEditorStockPublishedRevision: '10000000-0000-4000-8000-000000000306',
   ruleset: '10000000-0000-4000-8000-000000000401',
   rulesetDraftRevision: '10000000-0000-4000-8000-000000000403',
   rulesetRevision: '10000000-0000-4000-8000-000000000402',
@@ -79,6 +79,8 @@ if (demoMatch.league !== DEMO_SLUG || demoMatch.home.team !== 'mario-fireballs' 
 }
 
 let repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+let stockStatEditorV4 = await readFile(path.join(repositoryRoot, 'demo/stat-editor-v4-stock.txt'), 'utf8')
+let seededStatEditorRevisionId: string = ids.statEditorPublishedRevision
 let environmentPath = path.join(repositoryRoot, '.starworks/demo.env')
 let existingEnvironment = await readEnvironment(environmentPath)
 let sessionToken = existingEnvironment.STARWORKS_DEMO_SESSION_TOKEN ?? createOpaqueToken()
@@ -194,7 +196,7 @@ try {
 
     let statEditorDraft = importStatEditorV4({
       profileName: 'Stat Editor Sandbox',
-      rawText: buildStatEditorV4Fixture(),
+      rawText: stockStatEditorV4,
       sourceVersion: 'v4',
     })
     await database.insert(statProfiles).values({
@@ -203,25 +205,41 @@ try {
       name: statEditorDraft.name,
       slug: 'stat-editor-sandbox',
     }).onConflictDoNothing()
-    await database.update(statProfileRevisions).set({
-      revisionNumber: 2,
-    }).where(eq(statProfileRevisions.id, ids.statEditorRevision))
+    let [existingStatEditorPublishedRevision] = await database
+      .select({ sluggersTuning: statProfileRevisions.sluggersTuning })
+      .from(statProfileRevisions)
+      .where(eq(statProfileRevisions.id, ids.statEditorPublishedRevision))
+      .limit(1)
+    let draftRevisionNumber = 2
+    // Published demo revisions obey the same immutability trigger as product
+    // data. Preserve an older synthetic revision and add stock data as r2.
+    if (
+      existingStatEditorPublishedRevision
+      && existingStatEditorPublishedRevision.sluggersTuning?.importSource.sha256
+        !== statEditorDraft.sluggersTuning.importSource.sha256
+    ) {
+      seededStatEditorRevisionId = ids.statEditorStockPublishedRevision
+      draftRevisionNumber = 3
+      await database.update(statProfileRevisions).set({
+        revisionNumber: draftRevisionNumber,
+      }).where(eq(statProfileRevisions.id, ids.statEditorRevision))
+    }
     await database.insert(statProfileRevisions).values({
       basedOnRevisionId: null,
       characterValues: statEditorDraft.characterValues,
       createdByPersonId: admin.personId,
       definitions: statEditorDraft.definitions,
-      id: ids.statEditorPublishedRevision,
+      id: seededStatEditorRevisionId,
       leagueId: league.id,
       name: 'Summer 2026 Draft Pool',
       profileId: ids.statEditorProfile,
       publishedAt,
-      revisionNumber: 1,
+      revisionNumber: draftRevisionNumber - 1,
       sluggersTuning: statEditorDraft.sluggersTuning,
       status: 'published',
     }).onConflictDoNothing()
     await database.insert(statProfileRevisions).values({
-      basedOnRevisionId: ids.statEditorPublishedRevision,
+      basedOnRevisionId: seededStatEditorRevisionId,
       characterValues: statEditorDraft.characterValues,
       createdByPersonId: admin.personId,
       definitions: statEditorDraft.definitions,
@@ -230,16 +248,16 @@ try {
       name: statEditorDraft.name,
       profileId: ids.statEditorProfile,
       publishedAt: null,
-      revisionNumber: 2,
+      revisionNumber: draftRevisionNumber,
       sluggersTuning: statEditorDraft.sluggersTuning,
       status: 'draft',
     }).onConflictDoUpdate({
       set: {
-        basedOnRevisionId: ids.statEditorPublishedRevision,
+        basedOnRevisionId: seededStatEditorRevisionId,
         characterValues: statEditorDraft.characterValues,
         definitions: statEditorDraft.definitions,
         name: statEditorDraft.name,
-        revisionNumber: 2,
+        revisionNumber: draftRevisionNumber,
         sluggersTuning: statEditorDraft.sluggersTuning,
       },
       target: statProfileRevisions.id,
@@ -408,7 +426,7 @@ try {
       rounds: 9,
       seasonId: ids.season,
       slotTeamIds: [ids.homeTeam, ids.awayTeam],
-      statProfileRevisionId: ids.statEditorPublishedRevision,
+      statProfileRevisionId: seededStatEditorRevisionId,
     })).id
   }
   if (!match) {

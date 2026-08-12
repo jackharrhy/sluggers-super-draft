@@ -107,6 +107,8 @@ export const SLUGGERS_CHARACTER_IDS = [
 
 let characterIndexById = new Map<string, number>(SLUGGERS_CHARACTER_IDS.map((id, index) => [id, index]))
 
+export type SluggersCharacterKind = 'playable' | 'mii' | 'unused'
+
 export function sluggersCharacterIdAt(index: number): string {
   let characterId = SLUGGERS_CHARACTER_IDS[index]
   if (!characterId) throw new RangeError(`Unknown Sluggers character index ${index}`)
@@ -123,8 +125,7 @@ export function sluggersCharacterIndex(characterId: string): number | null {
 }
 
 export function displayCharacterName(characterId: string): string {
-  let index = sluggersCharacterIndex(characterId)
-  let canonicalId = index === null ? characterId : SLUGGERS_CHARACTER_IDS[index]!
+  let canonicalId = canonicalCharacterId(characterId)
   let mii = /^(.*)-mii-([mf])$/.exec(canonicalId)
   if (mii) return `${titleCase(mii[1]!)} Mii (${mii[2]!.toUpperCase()})`
   if (canonicalId === 'bowser-jr') return 'Bowser Jr.'
@@ -134,10 +135,21 @@ export function displayCharacterName(characterId: string): string {
 }
 
 export function characterHeadshotPath(characterId: string): string {
-  let index = sluggersCharacterIndex(characterId)
-  let canonicalId = index === null ? characterId : SLUGGERS_CHARACTER_IDS[index]!
+  let canonicalId = canonicalCharacterId(characterId)
   let fileName = headshotFileName(canonicalId)
   return `/player-headshots/${fileName.replaceAll(' ', '-')}.png`
+}
+
+export function sluggersCharacterKind(characterId: string): SluggersCharacterKind {
+  let canonicalId = canonicalCharacterId(characterId)
+  if (canonicalId.startsWith('unused-')) return 'unused'
+  if (canonicalId.includes('-mii-')) return 'mii'
+  return 'playable'
+}
+
+function canonicalCharacterId(characterId: string): string {
+  let index = sluggersCharacterIndex(characterId)
+  return index === null ? characterId : SLUGGERS_CHARACTER_IDS[index]!
 }
 
 function headshotFileName(characterId: string): string {
