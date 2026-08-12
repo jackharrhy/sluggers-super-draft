@@ -73,8 +73,10 @@ npm run demo:runner
 
 The command loads the ignored demo credential itself, uses the reviewed local
 checkpoint and seed profile, and keeps polling until interrupted with Ctrl+C.
-Runner options can be forwarded after `--`; for example,
-`npm run demo:runner -- --max-ticks 1` performs one station tick.
+Run it without `--max-ticks` for a playable demo: one tick may only launch the
+game and then deliberately detach it for recovery testing. The continuous
+command remains attached until the game completes and the station reports
+`no-work`.
 The runner uses the game's Random Fill action only to allocate its formation
 buffers. It replaces those buffers with the scheduled captains, batting orders,
 and fielding positions before Begin, then independently reads them back from

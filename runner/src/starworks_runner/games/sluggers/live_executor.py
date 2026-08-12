@@ -672,17 +672,21 @@ class LiveSluggersExecutor:
                 "Dolphin lineup state is unavailable", "runner-crash"
             )
         attempts = max(1, int(self.timeout_seconds / 0.05))
+        observed_epoch = 0
+        observed_mask = 0
         for _ in range(attempts):
             configured = self.session.read_configuration()
+            observed_epoch = configured.lineup_applied_epoch
+            observed_mask = configured.lineup_applied_mask
             if (
-                configured.lineup_applied_epoch
-                == self.runtime_configuration.requested_epoch
-                and configured.lineup_applied_mask & 0x03 == 0x03
+                observed_epoch == self.runtime_configuration.requested_epoch
+                and observed_mask & 0x03 == 0x03
             ):
                 return
             self.sleep(0.05)
         raise AttemptExecutionError(
-            "Dolphin did not acknowledge both immutable team lineups",
+            "Dolphin did not acknowledge both immutable team lineups "
+            f"(epoch {observed_epoch}, mask 0x{observed_mask:02X})",
             "bridge-failure",
         )
 
@@ -747,4 +751,9 @@ class LiveSluggersExecutor:
     def stop(self) -> None:
         if self.session is not None:
             self.session.stop()
+            self.session = None
+
+    def detach(self) -> None:
+        if self.session is not None:
+            self.session.detach()
             self.session = None

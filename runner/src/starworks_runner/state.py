@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from dataclasses import dataclass
@@ -9,11 +10,38 @@ from typing import Any, Literal, Self, cast
 
 from starworks_runner.contracts import validate_contract
 
+if os.name == "nt":
+    import msvcrt
+else:
+    import fcntl
+
 RunStage = Literal["claimed", "preparing", "running"]
 
 
 class ActiveRunConflict(RuntimeError):
     pass
+
+
+class RunnerStateInUse(RuntimeError):
+    pass
+
+
+def _acquire_process_lock(descriptor: int) -> None:
+    if os.name == "nt":
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        os.write(descriptor, b"\0")
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_NBLCK, 1)
+        return
+    fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+
+def _release_process_lock(descriptor: int) -> None:
+    if os.name == "nt":
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        msvcrt.locking(descriptor, msvcrt.LK_UNLCK, 1)
+        return
+    fcntl.flock(descriptor, fcntl.LOCK_UN)
 
 
 @dataclass(frozen=True)
@@ -57,15 +85,42 @@ class RunnerStateStore:
         resolved.parent.mkdir(parents=True, exist_ok=True)
         self.path = resolved
         self._lock = threading.RLock()
-        self._connection = sqlite3.connect(resolved, check_same_thread=False)
-        self._connection.row_factory = sqlite3.Row
-        self._connection.execute("pragma journal_mode = wal")
-        self._connection.execute("pragma foreign_keys = on")
-        self._migrate()
+        self._closed = False
+        self._process_lock_path = resolved.with_name(f"{resolved.name}.lock")
+        self._process_lock_fd = os.open(
+            self._process_lock_path,
+            os.O_CREAT | os.O_RDWR,
+            0o600,
+        )
+        try:
+            _acquire_process_lock(self._process_lock_fd)
+        except OSError as error:
+            os.close(self._process_lock_fd)
+            raise RunnerStateInUse(
+                f"Runner state is already in use by another process: {resolved}"
+            ) from error
+
+        try:
+            self._connection = sqlite3.connect(resolved, check_same_thread=False)
+            self._connection.row_factory = sqlite3.Row
+            self._connection.execute("pragma journal_mode = wal")
+            self._connection.execute("pragma foreign_keys = on")
+            self._migrate()
+        except Exception:
+            _release_process_lock(self._process_lock_fd)
+            os.close(self._process_lock_fd)
+            raise
 
     def close(self) -> None:
         with self._lock:
-            self._connection.close()
+            if self._closed:
+                return
+            try:
+                self._connection.close()
+            finally:
+                _release_process_lock(self._process_lock_fd)
+                os.close(self._process_lock_fd)
+                self._closed = True
 
     def __enter__(self) -> Self:
         return self

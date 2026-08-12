@@ -6,7 +6,7 @@ The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, 
 
 ## Current state
 
-**Last verified:** 2026-08-11 on `codex/starworks-platform`
+**Last verified:** 2026-08-12 on `codex/starworks-platform`
 
 Starworks has a substantial platform and runner foundation, but it is not yet a
 playable alpha. Status claims use three separate meanings:
@@ -21,12 +21,12 @@ playable alpha. Status claims use three separate meanings:
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
 | Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
-| Complete CPU-vs-CPU game | Live proven with both the research Gecko path and adapter-owned CPU control | Repeat to completion with the now-proven scheduled formation path |
-| Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through game start | Exact server-backed teams and active defense passed game-owned read-back; complete a full accepted run |
-| Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; all 16,406 guarded cells match the exact stock DOL and trusted v4.1 editor defaults; representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | Carry a server-published profile through an unattended scheduled match |
+| Complete CPU-vs-CPU game | Live proven in a normal-speed, server-scheduled one-inning game with adapter-owned CPU control | Produce a healthy hook-sourced result from the same path |
+| Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through a complete scheduled game | Repeat on clean-station acceptance runs while telemetry work continues |
+| Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; all 16,406 guarded cells match the exact stock DOL and trusted v4.1 editor defaults; representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven; a published profile has traveled through the scheduled runner path | Repeat with a visibly changed published value in the terminal acceptance run |
 | Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
-| Semantic game telemetry and box-score derivation | Partial, with a complete live DME game trace and a tested conservative appearance reducer | Lifecycle, innings, batter/pitcher changes, cumulative score/hits, game end, ordinary outs/singles, correct half-inning ordering, fail-closed scoring warnings, and runner-slot identity are live proven; live-accept the implemented exact home-run and bases-loaded force attribution, then continue remaining result classes without guessing |
-| Health-gated automatic result confirmation and one-retry recovery | Implemented | Full live server/runner fault matrix |
+| Semantic game telemetry and box-score derivation | Partial; a complete scheduled run uploaded 36 contiguous events, but three scoring plays lacked attribution and the derived 0–2 score disagreed with the game-ended 3–2 score | Move the alpha semantic slice from provisional memory observations to exact bridge hooks and close scorer/RBI attribution |
+| Health-gated automatic result confirmation and one-retry recovery | Implemented; live review routing correctly rejected the inconsistent 3–2 run | Prove healthy auto-confirmation, live reattach, and the full server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
 | RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
 
@@ -49,24 +49,52 @@ appear as unavailable rather than zero.
 
 ### Current critical path
 
-1. Repeat the already-proven adapter-owned full-game path to completion using
-   the now-proven server-backed formation and game-owned read-back gate.
-2. Continue live acceptance of the implemented DME snapshot reducer beyond the
-   now-proven ordinary out and single. Prove walks, strikeouts, hit-by-pitch,
-   extra-base hits, exact home-run and bases-loaded force attribution, and the
-   warning path for every other scoring play. Add remaining outcome attribution
-   only where measured evidence supports it.
-   Capture a complete healthy event stream and keep unavailable metrics explicit
-   in the parity ledger.
-3. Pass the clean-station happy path, network outage, reattach, one-retry, and
+1. Instrument exact game-side hooks for the alpha semantic slice: lifecycle,
+   inning transitions, batter/pitcher changes, completed plate appearances,
+   scorer/RBI attribution, substitutions, errors, and game end. Keep DME
+   snapshots as diagnostics and hook-discovery evidence, not auto-confirmable
+   product telemetry.
+2. Repeat the normal-speed scheduled path until its contiguous hook-sourced
+   stream derives the same final score as the game and auto-confirms. Continue
+   result-class acceptance without guessing, and keep unavailable metrics
+   explicit in the parity ledger.
+3. Pass the clean-station happy path, network outage, live reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
-4. Carry a server-published Stat Editor profile through the unattended match
-   path. Continue focused user acceptance of the now-separated Matches, Teams,
+4. Repeat the unattended match with a visibly changed server-published Stat
+   Editor value. Continue focused user acceptance of the now-separated Matches, Teams,
    Results, and Admin workspaces, following the legacy application's navigation
    and player-first visual language rather than adding dashboard-style
    super-pages.
 
 ### Latest acceptance evidence
+
+On 2026-08-12, scheduled attempt
+`d65b7083-cb1f-4174-b981-177d0c3f5baf` ran from the web queue through the
+native station and stock Dolphin 2606 at enforced `EmulationSpeed = 1.0`. The
+runner restored the managed pre-roster checkpoint, negotiated the DME bridge,
+applied the server-backed teams and rules, passed batting-order and active
+defense read-back, and completed a one-inning CPU-vs-CPU game without manual
+input. Dolphin reported a 3–2 away win. The runner uploaded 36 contiguous
+events from sequence 1 through 36, including one `game-started`, both half
+innings, resolved appearances, and one `game-ended`. This is the first complete
+scheduled-match execution proof; normal emulation speed is not the automation
+blocker.
+
+The same attempt also proved the remaining telemetry gate. Three away scoring
+plays could not be attributed safely from the polled snapshots, so the runner
+emitted explicit provisional warnings. The server derived 0–2 while the
+terminal event reported 3–2 and correctly routed the attempt to commissioner
+review. It did not auto-confirm or update standings from inconsistent data.
+Because every current live event is still marked `memory-observation`, even a
+score-consistent stream remains ineligible for automatic confirmation. The
+next adapter work is therefore exact semantic game hooks, not faster Dolphin,
+more menu automation, or optimistic derivation.
+
+The run also exposed two station lifecycle boundaries now covered by tests.
+An OS file lock prevents two runner processes from sharing one SQLite journal.
+On shutdown, a live Dolphin process is preserved only after its PID and process
+identity are durably journaled for reattachment; an interrupted, unjournaled
+startup is stopped instead of becoming an unrecoverable orphan.
 
 On 2026-08-11, the complete Stat Editor v4 catalogue was rechecked against a
 fresh extraction of the user-owned exact `RMBE01` Rev 0 ISO. The clean
@@ -153,7 +181,7 @@ than sharing the home page. The overview read model redacts standings and
 player totals independently for anonymous visitors, and its season rebuild uses
 one joined derivation query instead of querying once per confirmed attempt.
 The completed verification pass includes 35 contract tests, 79 Remix tests,
-152 runner tests, and all 16 PostgreSQL integration tests.
+154 runner tests, and all 16 PostgreSQL integration tests.
 
 On 2026-08-11 a normal-speed live smoke test also forced a seed
 profile that had disabled throttling back to `EmulationSpeed = 1.0`, restored

@@ -161,10 +161,17 @@ class StationService:
             if self._closed:
                 return
             error: Exception | None = None
-            stop = getattr(self.executor, "stop", None)
-            if callable(stop):
+            active = self.state.load_active_run()
+            release = getattr(
+                self.executor,
+                "detach"
+                if active is not None and active.runtime_metadata is not None
+                else "stop",
+                None,
+            )
+            if callable(release):
                 try:
-                    stop()
+                    release()
                 except Exception as caught:  # noqa: BLE001 - still close the database
                     error = caught
             try:

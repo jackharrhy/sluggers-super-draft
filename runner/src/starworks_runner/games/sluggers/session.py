@@ -75,17 +75,11 @@ FORMATION_SCAN_CHUNK_SIZE = 0x100000
 
 
 def _formation_ids(value: bytes, offset: int) -> set[int]:
-    return {
-        value[offset + slot * FORMATION_SLOT_SIZE + 1]
-        for slot in range(9)
-    }
+    return {value[offset + slot * FORMATION_SLOT_SIZE + 1] for slot in range(9)}
 
 
 def _formation_positions(value: bytes, offset: int) -> set[int]:
-    return {
-        value[offset + slot * FORMATION_SLOT_SIZE + 12]
-        for slot in range(9)
-    }
+    return {value[offset + slot * FORMATION_SLOT_SIZE + 12] for slot in range(9)}
 
 
 def load_game_build_manifest(build_directory: Path) -> dict[str, Any]:
@@ -457,9 +451,7 @@ class LiveSluggersSession:
             home_captain_brand_id=captains[1],
         )
 
-    def apply_final_formation(
-        self, configuration: RuntimeConfigurationBlock
-    ) -> None:
+    def apply_final_formation(self, configuration: RuntimeConfigurationBlock) -> None:
         """Apply both immutable teams at AutoTeam's final formation boundary.
 
         Random Fill is still the reliable way to make the game allocate and
@@ -533,9 +525,7 @@ class LiveSluggersSession:
                         and _formation_ids(value, base + FORMATION_TEAM_SIZE)
                         == home_ids
                         and _formation_positions(value, base) == set(range(9))
-                        and _formation_positions(
-                            value, base + FORMATION_TEAM_SIZE
-                        )
+                        and _formation_positions(value, base + FORMATION_TEAM_SIZE)
                         == set(range(9))
                     ):
                         candidates.add(address + base)
@@ -682,13 +672,12 @@ class LiveSluggersSession:
         return self.controller.save_state_slot_one(timeout_seconds=timeout_seconds)
 
     def stop(self, *, timeout_seconds: float = 5.0) -> None:
-        if self.controller is not None:
-            self.controller.close()
-        if self.transport is not None:
-            self.transport.close()
-            self.transport = None
-        if self.launch is not None:
-            process = self.launch.process
+        launch = self.launch
+        process_id = self.attached_pid
+        process_identity = self.process_identity_sha256
+        self._release_connections()
+        if launch is not None:
+            process = launch.process
             if process.poll() is None:
                 process.terminate()
                 try:
@@ -696,11 +685,9 @@ class LiveSluggersSession:
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=timeout_seconds)
-            self.launch = None
-        elif self.attached_pid is not None and self.process_identity_sha256 is not None:
-            process_id = self.attached_pid
+        elif process_id is not None and process_identity is not None:
             try:
-                if process_identity_sha256(process_id) == self.process_identity_sha256:
+                if process_identity_sha256(process_id) == process_identity:
                     os.kill(process_id, signal.SIGTERM)
                     deadline = time.monotonic() + timeout_seconds
                     while time.monotonic() < deadline:
@@ -710,15 +697,29 @@ class LiveSluggersSession:
                             break
                         time.sleep(0.05)
                     else:
-                        if (
-                            process_identity_sha256(process_id)
-                            == self.process_identity_sha256
-                        ):
+                        if process_identity_sha256(process_id) == process_identity:
                             os.kill(process_id, signal.SIGKILL)
             except (BridgeProtocolError, ProcessLookupError, PermissionError):
                 pass
+        self.launch = None
         self.attached_pid = None
         self.process_identity_sha256 = None
+
+    def detach(self) -> None:
+        """Release runner-owned handles without terminating live Dolphin."""
+
+        if self.launch is not None:
+            self.attached_pid = self.launch.process.pid
+        self._release_connections()
+        self.launch = None
+        self.client = None
+
+    def _release_connections(self) -> None:
+        if self.controller is not None:
+            self.controller.close()
+        if self.transport is not None:
+            self.transport.close()
+            self.transport = None
         self.client = None
 
     def __enter__(self) -> Self:

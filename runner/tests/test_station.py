@@ -15,6 +15,7 @@ class IncrementalExecutor:
     def __init__(self) -> None:
         self.executions = 0
         self.stopped = False
+        self.detached = False
 
     def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         pass
@@ -35,6 +36,16 @@ class IncrementalExecutor:
     def stop(self) -> None:
         self.stopped = True
 
+    def detach(self) -> None:
+        self.detached = True
+
+    def runtime_metadata(self) -> dict[str, Any]:
+        return {
+            "kind": "test-session",
+            "processId": 4242,
+            "processIdentitySha256": "c" * 64,
+        }
+
 
 def create_service(tmp_path: Path) -> tuple[StationService, IncrementalExecutor]:
     envelope, configuration = execution_fixtures()
@@ -53,7 +64,7 @@ def create_service(tmp_path: Path) -> tuple[StationService, IncrementalExecutor]
 
 
 def test_service_owns_registration_tick_and_ui_snapshot(tmp_path: Path) -> None:
-    service, _ = create_service(tmp_path)
+    service, executor = create_service(tmp_path)
     with service:
         registration, created = service.ensure_registered()
         duplicate, created_again = service.ensure_registered()
@@ -73,6 +84,9 @@ def test_service_owns_registration_tick_and_ui_snapshot(tmp_path: Path) -> None:
         assert snapshot.stage == "running"
         assert snapshot.last_tick_status == "running"
 
+    assert executor.detached is True
+    assert executor.stopped is False
+
 
 def test_service_finishes_attempt_and_releases_executor(tmp_path: Path) -> None:
     service, executor = create_service(tmp_path)
@@ -88,6 +102,18 @@ def test_service_finishes_attempt_and_releases_executor(tmp_path: Path) -> None:
 
     service.close()
     assert executor.stopped is True
+    assert executor.detached is False
     service.close()
     with pytest.raises(RuntimeError, match="closed"):
         service.snapshot()
+
+
+def test_service_stops_unjournaled_active_process(tmp_path: Path) -> None:
+    service, executor = create_service(tmp_path)
+    service.ensure_registered()
+    service.state.accept_run(execution_fixtures()[0])
+
+    service.close()
+
+    assert executor.stopped is True
+    assert executor.detached is False

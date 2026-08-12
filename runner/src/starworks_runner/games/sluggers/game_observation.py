@@ -126,9 +126,7 @@ class SluggersMemoryReader:
             bean_ball=int.from_bytes(batter[0x169:0x16A], "big", signed=True),
             home_run=home_run[0],
             base_runner_indices=tuple(
-                int.from_bytes(
-                    runner_indices[offset : offset + 1], "big", signed=True
-                )
+                int.from_bytes(runner_indices[offset : offset + 1], "big", signed=True)
                 for offset in (0, 0x1D4, 0x3A8)
             ),
         )
