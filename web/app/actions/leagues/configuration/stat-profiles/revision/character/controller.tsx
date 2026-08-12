@@ -33,6 +33,8 @@ export default createController(routes.leagues.configuration.statProfiles.revisi
             profileName={detail.revision.name}
             revisionId={detail.revision.revisionId}
             status={detail.revision.status}
+            trajectoryActivation={detail.revision.sluggersTuning?.trajectoryActivation ?? []}
+            trajectoryNames={detail.revision.sluggersTuning?.trajectoryNames ?? []}
           />,
         )
       } catch (error) {

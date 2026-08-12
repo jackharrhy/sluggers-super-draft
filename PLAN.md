@@ -21,9 +21,9 @@ playable alpha. Status claims use three separate meanings:
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
 | Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
-| Complete CPU-vs-CPU game | Live proven in a normal-speed, server-scheduled one-inning game with adapter-owned CPU control | Produce a healthy hook-sourced result from the same path |
+| Complete CPU-vs-CPU game | Live proven in normal-speed, server-scheduled one- and seven-inning games with adapter-owned CPU control | Produce a healthy hook-sourced result from the same path |
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through a complete scheduled game | Repeat on clean-station acceptance runs while telemetry work continues |
-| Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; all 16,406 guarded cells match the exact stock DOL and trusted v4.1 editor defaults; representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven; a published profile has traveled through the scheduled runner path | Repeat with a visibly changed published value in the terminal acceptance run |
+| Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; the local demo imports the trusted v4.1 stock profile instead of synthetic values; known encoded character fields use domain-aware controls; all 16,406 guarded cells match the exact stock DOL and representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | User-accept the editor, then repeat the scheduled path with a visibly changed published value |
 | Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
 | Semantic game telemetry and box-score derivation | Partial; a complete scheduled run uploaded 36 contiguous events, but three scoring plays lacked attribution and the derived 0–2 score disagreed with the game-ended 3–2 score | Move the alpha semantic slice from provisional memory observations to exact bridge hooks and close scorer/RBI attribution |
 | Health-gated automatic result confirmation and one-retry recovery | Implemented; live review routing correctly rejected the inconsistent 3–2 run | Prove healthy auto-confirmation, live reattach, and the full server/runner fault matrix |
@@ -54,8 +54,9 @@ appear as unavailable rather than zero.
    scorer/RBI attribution, substitutions, errors, and game end. Keep DME
    snapshots as diagnostics and hook-discovery evidence, not auto-confirmable
    product telemetry.
-2. Repeat the normal-speed scheduled path until its contiguous hook-sourced
-   stream derives the same final score as the game and auto-confirms. Continue
+2. Replace the provisional memory-observation stream with exact hooks, then
+   repeat the normal-speed scheduled path until it derives the same final score
+   as the game and auto-confirms. Continue
    result-class acceptance without guessing, and keep unavailable metrics
    explicit in the parity ledger.
 3. Pass the clean-station happy path, network outage, live reattach, one-retry, and
@@ -65,6 +66,11 @@ appear as unavailable rather than zero.
    Results, and Admin workspaces, following the legacy application's navigation
    and player-first visual language rather than adding dashboard-style
    super-pages.
+5. Remove leftover pre-release `schemaVersion: 1` fields and `.v1` filenames
+   where they imply compatibility guarantees Starworks does not have. Keep a
+   version only when it belongs to an independently versioned upstream binary
+   format; all Starworks-owned cross-program contracts remain one evolving v0
+   until the first release boundary.
 
 ### Latest acceptance evidence
 
@@ -95,6 +101,21 @@ An OS file lock prevents two runner processes from sharing one SQLite journal.
 On shutdown, a live Dolphin process is preserved only after its PID and process
 identity are durably journaled for reattachment; an interrupted, unjournaled
 startup is stopped instead of becoming an unrecoverable orphan.
+
+A second scheduled attempt,
+`c16ad976-f4b6-4894-ac28-fe19213be5cb`, completed a full seven-inning
+normal-speed game through the same web queue and native station path on
+2026-08-12. It ran for about 35 minutes, reached game frame 123,923, and ended
+18–17 for the home team without manual input. All 207 events from sequence 1
+through 207 arrived contiguously, including a terminal `game-ended` event. This
+is the long-run proof that enforced 1.0x speed, runner polling, DME attachment,
+and station lifetime remain synchronized across a regulation-length game.
+
+The longer run also remained deliberately non-confirmable: 20 scoring plays
+could not be attributed from snapshots, leaving the derived score at 9–10
+versus the terminal 17–18. The server routed it to review and did not update
+standings. Repeating more snapshot-based games is therefore no longer on the
+critical path; exact game-side semantic hooks are.
 
 On 2026-08-11, the complete Stat Editor v4 catalogue was rechecked against a
 fresh extraction of the user-owned exact `RMBE01` Rev 0 ISO. The clean
@@ -140,18 +161,24 @@ operator stop. This proves the scheduled team path through gameplay, but not a
 completed healthy result or automatic confirmation.
 
 The local demo now also includes a full 101-character, 49-field Stat Editor v4
-profile: an immutable published revision supplies the seeded two-team draft
+profile seeded from the trusted v4.1 stock matrices rather than generated test
+numbers: an immutable published revision supplies the seeded two-team draft
 room while an editable next revision remains the Stat Editor sandbox. The
-Remix application accepts real v4 file uploads and provides focused, typed
-screens for characters, chemistry, trajectory names/activation/tables, global
-speed curves, team star gains, star boosts, and handicap parameters. Cloned
+Remix application accepts real v4 file uploads and provides focused screens for
+characters, chemistry, trajectory names/activation/tables, global speed curves,
+team star gains, star boosts, and handicap parameters. Per-character values stay
+numeric in the immutable profile and compiler representation, while the web
+uses named controls for handedness, class, captain abilities, trajectory,
+fielding/baserunning abilities, star moves, and star-pitch type. Genuine scalar
+and still-unknown fields remain explicit numeric controls. Cloned
 revisions show prior values inline only where a field changed. Every section
 preserves the complete profile and exports the original 507-line representation
 losslessly. The profile page is a short section directory rather than a 101-row
 super-page; the dedicated character directory keeps the legacy portrait-first
-language. Stat Editor and AutoTeam numeric roster slots resolve through the
-same readable character catalogue. The local seed is idempotent and prints a
-direct draft-room URL.
+language and separates playable characters, Mii slots, and retained unused game
+slots. Stat Editor and AutoTeam numeric roster slots resolve through the same
+readable character catalogue. The local seed is idempotent and prints a direct
+draft-room URL.
 
 The league workspace now exposes separate Matches, Teams, Results, and Admin
 routes with separate controllers and purpose-sized service read models.
@@ -180,7 +207,7 @@ portrait-first player leaders. Publication policy now belongs to Admin rather
 than sharing the home page. The overview read model redacts standings and
 player totals independently for anonymous visitors, and its season rebuild uses
 one joined derivation query instead of querying once per confirmed attempt.
-The completed verification pass includes 35 contract tests, 79 Remix tests,
+The completed verification pass includes 35 contract tests, 84 Remix tests,
 154 runner tests, and all 16 PostgreSQL integration tests.
 
 On 2026-08-11 a normal-speed live smoke test also forced a seed
@@ -210,6 +237,12 @@ completed-game acceptance result.
 - Use immutable revisions for rules, stats, rosters, lineups, content packs, and game builds so completed matches remain reproducible.
 - Prefer a modular monolith and ordinary background work in the web process until a separate worker is justified by measured load.
 - Use existing tools as behavioral specifications and sources of knowledge, not as permanent compatibility constraints.
+- Keep route controllers thin and give each domain one obvious owner; do not grow
+  generic service layers or cross-feature utility buckets.
+- Refactor high-churn orchestration modules along real lifecycle boundaries when
+  they are touched. File splitting is not a goal by itself, but adding another
+  branch to a god module without extracting a coherent responsibility is not
+  acceptable.
 
 ## Product boundary
 
@@ -430,9 +463,11 @@ event ring remains available for a future measured need; it is not evidence
 that semantic game hooks are installed today.
 
 The current game-side adapter compiles maintainable C and small reviewed
-PowerPC trampolines. Dolphin Memory Engine is the host-side transport. Semantic
-hooks are added only when a concrete DME observation cannot be made reliable;
-replacing or extending game code does not imply replacing DME.
+PowerPC trampolines. Dolphin Memory Engine remains the host-side transport.
+Exact semantic hooks are required for the alpha event stream wherever polled
+snapshots cannot preserve causality or attribution; DME snapshots remain useful
+for diagnostics and hook discovery. Extending game code does not imply
+replacing DME or forking Dolphin.
 
 ### Targeted decompilation
 

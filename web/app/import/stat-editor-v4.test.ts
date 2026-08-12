@@ -1,11 +1,17 @@
 import * as assert from 'remix/assert'
 import { describe, it } from 'remix/test'
+import { readFileSync } from 'node:fs'
 
 import { validateStatProfileRevision } from '@starworks/contracts'
 
 import { PlatformError } from '../platform/errors.ts'
 import { buildStatEditorV4Fixture } from './stat-editor-v4.fixture.ts'
 import { exportStatEditorV4, importStatEditorV4 } from './stat-editor-v4.ts'
+
+const stockProfile = readFileSync(
+  new URL('../../../demo/stat-editor-v4-stock.txt', import.meta.url),
+  'utf8',
+).trimEnd()
 
 describe('Stat Editor v4 importer', () => {
   it('translates character data into a typed Starworks stat profile draft', () => {
@@ -64,6 +70,23 @@ describe('Stat Editor v4 importer', () => {
     assert.equal(exported, source)
     assert.deepEqual(reimported.characterValues, imported.characterValues)
     assert.deepEqual(reimported.sluggersTuning, imported.sluggersTuning)
+  })
+
+  it('imports and exactly exports the trusted v4.1 stock profile', () => {
+    let imported = importStatEditorV4({
+      profileName: 'Stock profile',
+      rawText: stockProfile,
+      sourceVersion: 'v4',
+    })
+
+    assert.equal(imported.characterValues[0]?.values['legacy.stat-editor.stat-12'], 50)
+    assert.equal(imported.characterValues[0]?.values['legacy.stat-editor.size-00'], 1.18)
+    assert.equal(imported.characterValues[0]?.values['legacy.stat-editor.pitching-03'], 0.7)
+    let trajectory = imported.definitions.find((definition) => definition.key === 'legacy.stat-editor.stat-26')
+    assert.equal(trajectory?.dataType, 'integer')
+    if (trajectory?.dataType === 'integer') assert.equal(trajectory.maximum, 5)
+    assert.equal(imported.sluggersTuning.importSource.sha256, '2dc6e06d163e744ebb9d38384ad2bcd52543c86af54a1e9bddbac8f55be08127')
+    assert.equal(exportStatEditorV4(imported), stockProfile)
   })
 
   it('refuses a mislabeled v3 snapshot instead of guessing', () => {
