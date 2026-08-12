@@ -644,9 +644,7 @@ def test_content_composes_with_a_reviewed_non_overlapping_bridge_patch(
     expected = bytearray(bridge_output)
     expected[content_offset : content_offset + 2] = b"\x00`"
     assert (result.game_directory / "sys/main.dol").read_bytes() == bytes(expected)
-    assert [
-        receipt["patchId"] for receipt in result.manifest["patchReceipts"]
-    ] == [
+    assert [receipt["patchId"] for receipt in result.manifest["patchReceipts"]] == [
         bridge_plan.patch_id,
         f"content-pack-{result.manifest['contentPackSha256'][:16]}-main.dol",
     ]

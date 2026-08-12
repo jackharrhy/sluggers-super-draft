@@ -1,6 +1,6 @@
 # Starworks delivery evidence audit
 
-**Date:** 2026-08-10  
+**Last updated:** 2026-08-12
 **Branch:** `codex/starworks-platform`  
 **Source plan:** [`2026-08-10-starworks-platform.md`](2026-08-10-starworks-platform.md)
 
@@ -40,13 +40,12 @@ uv run --project runner --group test pytest runner/tests
 docker compose config --quiet
 ```
 
-The 2026-08-10 baseline passed 35 contract tests, 46 Remix tests (including
-three Chromium workflows), 15 PostgreSQL integration tests, and 114 Python
-runner tests. Web type checking, Ruff formatting/lint, the exact-DOL profile
-target verifier, and `git diff --check` also passed. The system `mise` Node
-installer still has a local GPG keybox problem, so verification used the
-workspace's bundled Node runtime; that environment issue is not a repository
-test failure.
+The latest 2026-08-12 baseline passed 35 contract tests, 79 Remix tests
+(including three Chromium workflows), 16 PostgreSQL integration tests, and 154
+Python runner tests. Web type checking, Ruff formatting/lint, Compose
+validation, and `git diff --check` also passed. The system `mise` Node installer
+still has a local GPG keybox problem, so verification used the workspace's
+bundled Node runtime; that environment issue is not a repository test failure.
 Production image, wheel, Compose, backup/restore, metrics, FFmpeg, and Linux
 runner checks are also represented in CI or the production runbook.
 
@@ -127,9 +126,9 @@ not required.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| An authorized station claims and executes a scheduled match. | **Implemented; live acceptance pending** | One `StationService` owns registration, lease ticks, the local spool, capture, and the real Sluggers executor for both the headless command and PySide6 UI. It selects or builds the exact image, starts/reattaches Dolphin, installs runtime configuration, drives setup, reads DME telemetry, records locally, and tears down. Exact lineup application and healthy full-game acceptance remain open. |
+| An authorized station claims and executes a scheduled match. | **Live proven on macOS arm64; healthy acceptance pending** | Scheduled attempt `d65b7083…f5baf` completed unattended in stock Dolphin 2606 at 1.0× speed after exact teams and active defense passed read-back. Its inconsistent provisional telemetry correctly entered review, so healthy result acceptance remains open. |
 | A second station cannot claim the active lease. | **Verified** | PostgreSQL integration exercises two stations, recovery claims, expiry, replacement attempts, and revocation. |
-| Correct build, teams, lineup, and nonce reach the game. | **Partial live proof on macOS arm64** | Run/configuration binding rejects every mismatch. On exact game build `1016a240…3d00`, DME validated adapter/build/nonce; runtime rules, stadium, captains, both roster sets, and adapter-owned CPU control reached the game without foreground input. The receipt mask proved hook execution, not final formation: live game-owned structures showed randomized batting order and fielding. A new independent read-back gate rejects that run. |
+| Correct build, teams, lineup, and nonce reach the game. | **Live proven on macOS arm64** | Run/configuration binding rejects every mismatch. Attempt `d65b7083…f5baf` validated adapter/build/nonce, applied runtime rules, stadium, captains, both roster sets, batting order, fielding, and adapter-owned CPU control, passed independent game-owned read-back, and completed. |
 | Web disconnection does not lose captured events. | **Verified with synthetic execution** | SQLite persists active work, configuration, lifecycle updates, and telemetry; retry acknowledgements are idempotent. Real full-game disconnect is an external matrix gate. |
 | Cancellation and retry are separate auditable attempts. | **Verified** | Attempt numbers/nonces are immutable and lifecycle/audit records distinguish cancel, fail, expire, replace, and revoke. |
 
@@ -143,7 +142,7 @@ materialized builds never use this API.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| A representative full game produces ordered, duplicate-free events. | **Partial with complete live DME trace** | An unattended seven-inning adapter-owned CPU game completed 4–11 in 1,153.9 seconds and emitted 96 ordered DME events, including game start/end, inning transitions, batter/pitcher changes, and replay-safe cumulative score/hits. Its formation did not pass game-owned read-back, so it is not a healthy scheduled-match stream. Resolved plate appearances and scorer attribution also remain open. |
+| A representative full game produces ordered, duplicate-free events. | **Partial with a complete scheduled DME trace** | Attempt `d65b7083…f5baf` uploaded 36 contiguous events, sequence 1–36, with game start/end, both half innings, batter/pitcher changes, and resolved appearances. Three scoring plays lacked safe scorer attribution, producing explicit warnings and a derived 0–2 score that disagreed with the terminal 3–2 score. |
 | Disconnect/retry does not double count. | **Verified** | Attempt/sequence uniqueness, duplicate acknowledgement, SQLite spooling, and retry tests cover it. |
 | Box scores regenerate from raw events. | **Verified** | Accepted raw events are immutable; the current derivation, box scores, standings, and player totals rebuild deterministically. |
 | Missing/overflowing telemetry blocks automatic finalization. | **Verified** | Sequence gaps, overflow, non-hook observations, missing lifecycle/inning/plate-appearance events, score conflicts, corrections, quits, and forfeits enter review. The final transaction rejects a stream that changes during confirmation. |
@@ -192,11 +191,11 @@ These require exact-game research, live acceptance, owner infrastructure, or
 external permission and must not be replaced with guessed hashes, offsets,
 binaries, or claims:
 
-1. **Real game vertical slice:** make batting order and fielding positions pass
-   the game-owned read-back gate, live-accept a representative stat mutation,
-   finish resolved plate-appearance observation, capture a complete valid
-   adapter-owned CPU game, prove ordered telemetry across disconnect/restart,
-   and validate the one-retry policy.
+1. **Real game vertical slice:** replace provisional memory-observation events
+   with exact bridge-hook events for the alpha semantic slice, finish safe
+   scorer/RBI attribution, auto-confirm a score-consistent scheduled game,
+   live-accept a visible published stat mutation, prove ordered telemetry
+   across disconnect/restart, and validate the one-retry policy.
 2. **Platform hardware matrix:** repeat boot, bridge, telemetry, capture, RTMP,
    recovery, and revocation gates on every platform advertised as supported.
 3. **Deployment acceptance:** push the branch, observe hosted CI, deploy to the
@@ -205,11 +204,11 @@ binaries, or claims:
    Sluggies/MSS DAT Tools and relevant Mii maintainers before importing their
    code or adopting `.sluggie` as a supported local boundary.
 
-Until gates 1–2 pass, release material must say **software preview** and must
-not claim that Starworks can autonomously run and score a complete real Mario
-Super Sluggers match. The minimal bridge itself is now a reviewed release; that
-does not imply that the remaining gameplay mappings have been guessed or
-completed.
+Until gates 1–2 pass, release material must say **software preview**. Starworks
+can now autonomously execute a complete scheduled Mario Super Sluggers game,
+but it cannot yet claim an automatically accepted score: the first such run was
+correctly held for review. The minimal bridge itself is reviewed; that does not
+imply that the remaining semantic gameplay hooks are complete.
 
 ## Decision-gated work, not release blockers
 

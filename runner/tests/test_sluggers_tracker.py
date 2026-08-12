@@ -4,9 +4,9 @@ import json
 
 import pytest
 from starworks_runner.games.sluggers.game_observation import (
+    BASES_ADVANCED_ADDRESS,
     BATTER_BLOCK_ADDRESS,
     BATTER_BLOCK_END,
-    BASES_ADVANCED_ADDRESS,
     GAME_TIMER_ADDRESS,
     GAMEPLAY_BLOCK_ADDRESS,
     GAMEPLAY_BLOCK_END,
@@ -87,9 +87,7 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     gameplay = bytearray(GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS)
     batter = bytearray(BATTER_BLOCK_END - BATTER_BLOCK_ADDRESS)
     pitcher = bytearray(PITCHER_BLOCK_END - PITCHER_BLOCK_ADDRESS)
-    runner_indices = bytearray(
-        RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS
-    )
+    runner_indices = bytearray(RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS)
     gameplay[0] = 2
     gameplay[1] = 3
     gameplay[2] = 1
@@ -293,7 +291,9 @@ def test_tracker_resolves_supported_scoreless_appearances(
     game.observe(snapshot())
     game.observe(snapshot(frame=101, **during))
 
-    events = game.observe(snapshot(frame=102, batter_game_id=2, away_hits=during.get("away_hits", 0)))
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_hits=during.get("away_hits", 0))
+    )
 
     assert events[0].event_type == "plate-appearance-ended"
     assert events[0].payload == {
@@ -437,9 +437,7 @@ def test_tracker_withholds_a_run_before_the_scoreboard_catches_up() -> None:
         )
     )
 
-    events = game.observe(
-        snapshot(frame=102, batter_game_id=2, away_hits=1)
-    )
+    events = game.observe(snapshot(frame=102, batter_game_id=2, away_hits=1))
 
     assert events[0].event_type == "bridge-warning"
     assert "scorer and RBI attribution" in events[0].payload["message"]

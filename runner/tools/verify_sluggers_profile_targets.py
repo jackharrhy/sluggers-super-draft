@@ -24,7 +24,6 @@ from starworks_runner.games.sluggers.content import (
 )
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
 
-
 _EDITOR_DEFAULTS_BY_SOURCE = {
     "character-stats": "defaultStat",
     "chemistry": "defaultChem",
@@ -141,9 +140,9 @@ def main() -> int:
                     )
                 if editor_defaults is not None:
                     editor_matrix = editor_defaults[pattern.source]
-                    editor_value = editor_matrix[
-                        pattern.source_row_start + row
-                    ][pattern.source_column_start + column]
+                    editor_value = editor_matrix[pattern.source_row_start + row][
+                        pattern.source_column_start + column
+                    ]
                     editor_encoded = _encode_scalar(
                         editor_value,
                         pattern.codec,
@@ -259,15 +258,11 @@ def exercise_compiler(
                 "values": {
                     **{
                         f"legacy.stat-editor.stat-{column:02d}": value
-                        for column, value in enumerate(
-                            matrices["character-stats"][row]
-                        )
+                        for column, value in enumerate(matrices["character-stats"][row])
                     },
                     **{
                         f"legacy.stat-editor.size-{column:02d}": value
-                        for column, value in enumerate(
-                            matrices["character-sizes"][row]
-                        )
+                        for column, value in enumerate(matrices["character-sizes"][row])
                     },
                     **{
                         f"legacy.stat-editor.pitching-{column:02d}": value

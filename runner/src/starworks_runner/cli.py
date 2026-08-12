@@ -62,6 +62,7 @@ from starworks_runner.station import (
     SluggersStationConfig,
     create_sluggers_station_service,
 )
+from starworks_runner.state import RunnerStateInUse
 from starworks_runner.support import create_support_bundle
 
 
@@ -751,6 +752,6 @@ def main() -> None:
     arguments = parser.parse_args()
     try:
         raise SystemExit(run(arguments))
-    except (RunnerApiError, SluggersAdapterError) as error:
+    except (RunnerApiError, RunnerStateInUse, SluggersAdapterError) as error:
         print(f"starworks-runner: {error}", file=sys.stderr)
         raise SystemExit(2) from error

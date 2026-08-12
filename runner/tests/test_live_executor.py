@@ -15,6 +15,7 @@ from starworks_runner.games.sluggers.bridge.layout import (
     attempt_nonce_digest,
 )
 from starworks_runner.games.sluggers.checkpoint import seed_profile_sha256
+from starworks_runner.games.sluggers.game_observation import GameSnapshot
 from starworks_runner.games.sluggers.hashing import sha256_file
 from starworks_runner.games.sluggers.live_executor import (
     LiveSluggersExecutor,
@@ -24,7 +25,6 @@ from starworks_runner.games.sluggers.session import (
     RuntimeGameObservation,
     RuntimeLineupObservation,
 )
-from starworks_runner.games.sluggers.game_observation import GameSnapshot
 from starworks_runner.orchestrator import AttemptExecutionError
 
 
@@ -37,6 +37,7 @@ class FakeLiveSession:
         self.started: list[tuple[str, float]] = []
         self.running = True
         self.stopped = 0
+        self.detached = 0
         self.events: list[BridgeEvent] = []
         self.configuration: RuntimeConfigurationBlock | None = None
         self.process_id = 4242
@@ -189,13 +190,15 @@ class FakeLiveSession:
     def wait_for_bridge_frames(self, frames: int, *, timeout_seconds: float) -> None:
         self.bridge_frame_waits.append((frames, timeout_seconds))
 
-    def apply_final_formation(
-        self, configuration: RuntimeConfigurationBlock
-    ) -> None:
+    def apply_final_formation(self, configuration: RuntimeConfigurationBlock) -> None:
         self.final_formations.append(configuration)
 
     def stop(self) -> None:
         self.stopped += 1
+        self.running = False
+
+    def detach(self) -> None:
+        self.detached += 1
         self.running = False
 
     def capture_screenshot(self, *, timeout_seconds: float) -> Path:
@@ -249,6 +252,12 @@ def test_live_executor_starts_once_and_keeps_real_attempt_running(
     assert session.configuration is not None
     assert session.configuration.rules[0] == 7
     assert telemetry == []
+
+    executor.detach()
+
+    assert session.detached == 1
+    assert session.stopped == 0
+    assert executor.session is None
 
 
 def test_live_executor_materializes_and_loads_the_exact_seed_checkpoint(

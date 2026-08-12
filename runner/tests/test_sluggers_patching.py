@@ -255,8 +255,7 @@ def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> 
         "unattended Dolphin 2606 match" in gate for gate in manifest.release_gates
     )
     assert any(
-        "server-published stat profile" in gate
-        for gate in manifest.release_gates
+        "server-published stat profile" in gate for gate in manifest.release_gates
     )
 
 

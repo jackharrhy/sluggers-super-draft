@@ -65,10 +65,14 @@ def match_batting_orders(
         side = team["side"]
         order = tuple(team["lineup"]["lineup"]["battingOrder"])
         if side not in {"away", "home"} or len(order) != 9:
-            raise BridgeProtocolError("Telemetry requires two nine-player batting orders")
+            raise BridgeProtocolError(
+                "Telemetry requires two nine-player batting orders"
+            )
         result[side] = order
     if set(result) != {"away", "home"}:
-        raise BridgeProtocolError("Telemetry requires one away and one home batting order")
+        raise BridgeProtocolError(
+            "Telemetry requires one away and one home batting order"
+        )
     return result
 
 
@@ -134,7 +138,9 @@ class SluggersGameTracker:
         self.home_team_id = home_team_id
         self.character_ids = dict(character_ids)
         if len(away_batting_order) != 9 or len(home_batting_order) != 9:
-            raise BridgeProtocolError("Telemetry batting orders must contain nine players")
+            raise BridgeProtocolError(
+                "Telemetry batting orders must contain nine players"
+            )
         self.batting_orders = {
             "away": tuple(away_batting_order),
             "home": tuple(home_batting_order),
@@ -257,9 +263,7 @@ class SluggersGameTracker:
             last = None
         if raw_pending is not None:
             if not isinstance(raw_pending, dict):
-                raise SluggersAdapterError(
-                    "Saved game tracker appearance is invalid"
-                )
+                raise SluggersAdapterError("Saved game tracker appearance is invalid")
             try:
                 pending = PendingAppearance(
                     **{
@@ -334,9 +338,7 @@ class SluggersGameTracker:
         pending.ball_was_hit = pending.ball_was_hit or snapshot.ball_was_hit == 1
         pending.bean_ball = pending.bean_ball or snapshot.bean_ball == 1
         pending.home_run = (
-            pending.home_run
-            or snapshot.home_run == 1
-            or snapshot.state in {0x13, 0x14}
+            pending.home_run or snapshot.home_run == 1 or snapshot.state in {0x13, 0x14}
         )
 
     @staticmethod
@@ -437,18 +439,14 @@ class SluggersGameTracker:
     ) -> tuple[str, ...] | None:
         if score_delta == 0 and pending.max_runs_this_play == 0:
             return ()
-        if (
-            score_delta <= 0
-            or pending.max_runs_this_play not in {0, score_delta}
-        ):
+        if score_delta <= 0 or pending.max_runs_this_play not in {0, score_delta}:
             return None
         order = self.batting_orders[pending.batting_side]
         indices = pending.base_runner_indices
         occupied = [index for index in indices if index != -1]
-        if (
-            any(not 0 <= index < len(order) for index in occupied)
-            or len(set(occupied)) != len(occupied)
-        ):
+        if any(not 0 <= index < len(order) for index in occupied) or len(
+            set(occupied)
+        ) != len(occupied):
             return None
         runners = tuple(order[index] for index in occupied)
         if batter in runners:
@@ -501,9 +499,7 @@ class SluggersGameTracker:
         )
 
     @staticmethod
-    def _offense_totals(
-        snapshot: GameSnapshot, side: TeamSide
-    ) -> tuple[int, int]:
+    def _offense_totals(snapshot: GameSnapshot, side: TeamSide) -> tuple[int, int]:
         if side == "away":
             return snapshot.away_score, snapshot.away_hits
         return snapshot.home_score, snapshot.home_hits

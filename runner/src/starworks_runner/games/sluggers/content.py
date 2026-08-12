@@ -363,9 +363,9 @@ class ContentCompilationPlan:
                 )
             original = target_path.read_bytes()
             input_sha256 = hashlib.sha256(original).hexdigest()
-            verified_input_sha256 = (
-                verified_base_sha256_by_path or {}
-            ).get(relative_path, input_sha256)
+            verified_input_sha256 = (verified_base_sha256_by_path or {}).get(
+                relative_path, input_sha256
+            )
             for guard in guards_by_path.get(relative_path, []):
                 if verified_input_sha256 not in guard.supported_input_sha256:
                     raise BuildIntegrityError(

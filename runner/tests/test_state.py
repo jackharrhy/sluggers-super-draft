@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from starworks_runner.state import (
     ActiveRunConflict,
+    RunnerStateInUse,
     RunnerStateStore,
     StationRegistration,
 )
@@ -131,3 +132,15 @@ def test_store_refuses_a_different_attempt_while_one_is_active(
         state.accept_run(envelope)
         with pytest.raises(ActiveRunConflict):
             state.accept_run(other)
+
+
+def test_store_has_single_process_ownership(tmp_path: Path) -> None:
+    database_path = tmp_path / "runner.sqlite3"
+    first = RunnerStateStore(database_path)
+
+    with pytest.raises(RunnerStateInUse, match="already in use"):
+        RunnerStateStore(database_path)
+
+    first.close()
+    with RunnerStateStore(database_path):
+        pass

@@ -159,9 +159,7 @@ def test_final_formation_rewrites_only_character_and_position_bytes(
     )
     transport = SparseMemoryTransport()
     home_address = 0x90001090
-    transport.write(
-        FINAL_FORMATION_POINTER_ADDRESS, home_address.to_bytes(4, "big")
-    )
+    transport.write(FINAL_FORMATION_POINTER_ADDRESS, home_address.to_bytes(4, "big"))
     for team, address, untouched in (
         (configuration.away, home_address - FORMATION_TEAM_SIZE, 0xA5),
         (configuration.home, home_address, 0x5A),

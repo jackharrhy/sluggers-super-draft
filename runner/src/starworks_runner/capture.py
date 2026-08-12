@@ -534,3 +534,14 @@ class CapturingAttemptExecutor:
         finally:
             self.last_health = self.capture.stop()
             self.active_attempt_id = None
+
+    def detach(self) -> None:
+        """Stop local capture while preserving a journaled live game."""
+
+        detach_executor = getattr(self.executor, "detach", None)
+        try:
+            if callable(detach_executor):
+                detach_executor()
+        finally:
+            self.last_health = self.capture.stop()
+            self.active_attempt_id = None
