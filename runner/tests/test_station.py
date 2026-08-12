@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 from starworks_runner.orchestrator import ExecutionOutcome, RunnerStation
+from starworks_runner.control import RunnerApiError
 from starworks_runner.state import RunnerStateStore
 from starworks_runner.station import StationService
 from test_orchestrator import FakeControlClient, execution_fixtures
@@ -117,3 +118,17 @@ def test_service_stops_unjournaled_active_process(tmp_path: Path) -> None:
 
     assert executor.stopped is True
     assert executor.detached is False
+
+
+def test_service_reports_a_retryable_api_outage_without_exiting(tmp_path: Path) -> None:
+    service, _executor = create_service(tmp_path)
+    service.ensure_registered()
+    client = cast(FakeControlClient, service.station.client)
+    client.claim_error = RunnerApiError("temporary outage")
+
+    with service:
+        result = service.tick()
+
+        assert result.status == "offline"
+        assert result.attempt_id is None
+        assert result.detail == "temporary outage"

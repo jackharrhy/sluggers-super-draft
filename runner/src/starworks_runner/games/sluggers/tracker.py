@@ -26,14 +26,14 @@ TrackerEventType = Literal[
 ]
 
 
-def _runner_indices(value: object) -> tuple[int, int, int]:
+def _int_tuple(value: object, *, size: int, label: str) -> tuple[int, ...]:
     if (
         not isinstance(value, (list, tuple))
-        or len(value) != 3
+        or len(value) != size
         or any(type(index) is not int for index in value)
     ):
-        raise ValueError("runner indices must contain three integers")
-    return value[0], value[1], value[2]
+        raise ValueError(f"{label} must contain {size} integers")
+    return tuple(value)
 
 
 def match_character_ids(configuration: dict[str, Any]) -> dict[int, str]:
@@ -103,7 +103,9 @@ class PendingAppearance:
     home_run: bool = False
     pitcher_changed: bool = False
     awaiting_play_reset: bool = True
+    batter_lineup_index: int = -1
     base_runner_indices: tuple[int, int, int] = (-1, -1, -1)
+    runner_destinations: tuple[int, ...] = (0,) * 9
 
     @property
     def has_activity(self) -> bool:
@@ -250,8 +252,15 @@ class SluggersGameTracker:
                 last = GameSnapshot(
                     **{
                         **raw_last,
-                        "base_runner_indices": _runner_indices(
-                            raw_last.get("base_runner_indices", (-1, -1, -1))
+                        "base_runner_indices": _int_tuple(
+                            raw_last.get("base_runner_indices", (-1, -1, -1)),
+                            size=3,
+                            label="runner indices",
+                        ),
+                        "base_runner_destinations": _int_tuple(
+                            raw_last.get("base_runner_destinations", (0, 0, 0)),
+                            size=3,
+                            label="runner destinations",
                         ),
                     }
                 )
@@ -268,8 +277,15 @@ class SluggersGameTracker:
                 pending = PendingAppearance(
                     **{
                         **raw_pending,
-                        "base_runner_indices": _runner_indices(
-                            raw_pending.get("base_runner_indices", (-1, -1, -1))
+                        "base_runner_indices": _int_tuple(
+                            raw_pending.get("base_runner_indices", (-1, -1, -1)),
+                            size=3,
+                            label="runner indices",
+                        ),
+                        "runner_destinations": _int_tuple(
+                            raw_pending.get("runner_destinations", (0,) * 9),
+                            size=9,
+                            label="runner destinations",
                         ),
                     }
                 )
@@ -319,7 +335,14 @@ class SluggersGameTracker:
             if not self._play_fields_are_clear(snapshot):
                 return
             pending.awaiting_play_reset = False
+            # The next batter can appear before the defensive lineup finishes
+            # publishing its new pitcher. Bind the pitcher only once the prior
+            # play's result bytes have cleared; a later change is genuinely
+            # ambiguous and must still route the appearance to review.
+            pending.pitcher_game_id = snapshot.pitcher_game_id
+            pending.batter_lineup_index = snapshot.batter_lineup_index
             pending.base_runner_indices = snapshot.base_runner_indices
+        self._record_runner_destinations(pending, snapshot)
         if pending.pitcher_game_id != snapshot.pitcher_game_id:
             pending.pitcher_changed = True
             pending.pitcher_game_id = snapshot.pitcher_game_id
@@ -353,7 +376,31 @@ class SluggersGameTracker:
             and snapshot.bean_ball != 1
             and snapshot.home_run != 1
             and snapshot.state not in {0x13, 0x14, 0x15}
+            and snapshot.batter_destination != 4
+            and 4 not in snapshot.base_runner_destinations
         )
+
+    @staticmethod
+    def _record_runner_destinations(
+        pending: PendingAppearance, snapshot: GameSnapshot
+    ) -> None:
+        destinations = list(pending.runner_destinations)
+        for index, destination in zip(
+            snapshot.base_runner_indices,
+            snapshot.base_runner_destinations,
+            strict=True,
+        ):
+            if 0 <= index < len(destinations):
+                destinations[index] = max(destinations[index], destination)
+        if (
+            snapshot.batter_lineup_index == pending.batter_lineup_index
+            and 0 <= pending.batter_lineup_index < len(destinations)
+        ):
+            destinations[pending.batter_lineup_index] = max(
+                destinations[pending.batter_lineup_index],
+                snapshot.batter_destination,
+            )
+        pending.runner_destinations = tuple(destinations)
 
     def _finish_pending_appearance(
         self,
@@ -451,6 +498,24 @@ class SluggersGameTracker:
         runners = tuple(order[index] for index in occupied)
         if batter in runners:
             return None
+        observed = tuple(
+            order[index]
+            for index in reversed(indices)
+            if index != -1 and pending.runner_destinations[index] == 4
+        )
+        batter_index = pending.batter_lineup_index
+        if (
+            0 <= batter_index < len(order)
+            and order[batter_index] == batter
+            and pending.runner_destinations[batter_index] == 4
+        ):
+            observed += (batter,)
+        if (
+            result in {"single", "double", "triple", "home-run"}
+            and hit_delta == 1
+            and len(observed) == score_delta
+        ):
+            return observed
         if result == "home-run" and hit_delta == 1:
             scorers = tuple(reversed(runners)) + (batter,)
             return scorers if len(scorers) == score_delta else None

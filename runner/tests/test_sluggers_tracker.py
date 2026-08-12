@@ -4,6 +4,8 @@ import json
 
 import pytest
 from starworks_runner.games.sluggers.game_observation import (
+    BASERUNNER_BLOCK_ADDRESS,
+    BASERUNNER_BLOCK_END,
     BASES_ADVANCED_ADDRESS,
     BATTER_BLOCK_ADDRESS,
     BATTER_BLOCK_END,
@@ -13,8 +15,6 @@ from starworks_runner.games.sluggers.game_observation import (
     HOME_RUN_ADDRESS,
     PITCHER_BLOCK_ADDRESS,
     PITCHER_BLOCK_END,
-    RUNNER_INDEX_BLOCK_ADDRESS,
-    RUNNER_INDEX_BLOCK_END,
     GameSnapshot,
     SluggersMemoryReader,
 )
@@ -34,7 +34,7 @@ class FakeMemory:
         raise AssertionError("The game tracker must be read-only")
 
 
-def snapshot(**overrides: int | tuple[int, int, int]) -> GameSnapshot:
+def snapshot(**overrides: object) -> GameSnapshot:
     values = {
         "frame": 100,
         "state": 0x01,
@@ -56,7 +56,10 @@ def snapshot(**overrides: int | tuple[int, int, int]) -> GameSnapshot:
         "ball_was_hit": 0,
         "bean_ball": 0,
         "home_run": 0,
+        "batter_lineup_index": 0,
+        "batter_destination": 0,
         "base_runner_indices": (-1, -1, -1),
+        "base_runner_destinations": (0, 0, 0),
     }
     values.update(overrides)
     return GameSnapshot(**values)
@@ -87,7 +90,7 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     gameplay = bytearray(GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS)
     batter = bytearray(BATTER_BLOCK_END - BATTER_BLOCK_ADDRESS)
     pitcher = bytearray(PITCHER_BLOCK_END - PITCHER_BLOCK_ADDRESS)
-    runner_indices = bytearray(RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS)
+    baserunners = bytearray(BASERUNNER_BLOCK_END - BASERUNNER_BLOCK_ADDRESS)
     gameplay[0] = 2
     gameplay[1] = 3
     gameplay[2] = 1
@@ -105,17 +108,22 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     batter[0x168] = 1
     batter[0x169] = 1
     pitcher[2] = 1
-    runner_indices[0] = 4
-    runner_indices[0x1D4] = 0xFF
-    runner_indices[0x3A8] = 7
+    baserunners[0] = 2
+    baserunners[0x154] = 3
+    baserunners[0x1D4] = 4
+    baserunners[0x328] = 4
+    baserunners[0x3A8] = 0xFF
+    baserunners[0x4FC] = 0
+    baserunners[0x57C] = 7
+    baserunners[0x6D0] = 3
     memory.values[(GAMEPLAY_BLOCK_ADDRESS, len(gameplay))] = bytes(gameplay)
     memory.values[(BATTER_BLOCK_ADDRESS, len(batter))] = bytes(batter)
     memory.values[(PITCHER_BLOCK_ADDRESS, len(pitcher))] = bytes(pitcher)
     memory.values[(GAME_TIMER_ADDRESS, 4)] = (12345).to_bytes(4, "big")
     memory.values[(BASES_ADVANCED_ADDRESS, 1)] = (2).to_bytes(1, "big", signed=True)
     memory.values[(HOME_RUN_ADDRESS, 1)] = b"\x01"
-    memory.values[(RUNNER_INDEX_BLOCK_ADDRESS, len(runner_indices))] = bytes(
-        runner_indices
+    memory.values[(BASERUNNER_BLOCK_ADDRESS, len(baserunners))] = bytes(
+        baserunners
     )
 
     value = SluggersMemoryReader(memory).read()
@@ -140,7 +148,10 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
         ball_was_hit=1,
         bean_ball=1,
         home_run=1,
+        batter_lineup_index=2,
+        batter_destination=3,
         base_runner_indices=(4, -1, 7),
+        base_runner_destinations=(4, 0, 3),
     )
     assert memory.reads == [
         (GAMEPLAY_BLOCK_ADDRESS, GAMEPLAY_BLOCK_END - GAMEPLAY_BLOCK_ADDRESS),
@@ -150,8 +161,8 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
         (BASES_ADVANCED_ADDRESS, 1),
         (HOME_RUN_ADDRESS, 1),
         (
-            RUNNER_INDEX_BLOCK_ADDRESS,
-            RUNNER_INDEX_BLOCK_END - RUNNER_INDEX_BLOCK_ADDRESS,
+            BASERUNNER_BLOCK_ADDRESS,
+            BASERUNNER_BLOCK_END - BASERUNNER_BLOCK_ADDRESS,
         ),
     ]
 
@@ -366,6 +377,89 @@ def test_new_batter_waits_for_previous_play_fields_to_clear() -> None:
     assert second_boundary[1].event_type == "batter-changed"
 
 
+def test_new_appearance_binds_pitcher_after_previous_play_clears() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=150,
+            ball_was_hit=1,
+            outs=1,
+            outs_this_play=1,
+            pitches=1,
+        )
+    )
+
+    # Sluggers publishes the next batter while the prior result and old pitcher
+    # are still visible, then finishes the defensive lineup transition.
+    game.observe(
+        snapshot(
+            frame=200,
+            batter_game_id=2,
+            ball_was_hit=1,
+            outs=1,
+            outs_this_play=1,
+        )
+    )
+    game.observe(
+        snapshot(
+            frame=210,
+            batter_game_id=2,
+            pitcher_game_id=0,
+            outs=1,
+        )
+    )
+    game.observe(
+        snapshot(
+            frame=250,
+            batter_game_id=2,
+            pitcher_game_id=0,
+            strikes=3,
+            pitches=3,
+            outs=1,
+        )
+    )
+
+    events = game.observe(
+        snapshot(
+            frame=300,
+            batter_game_id=1,
+            pitcher_game_id=0,
+            outs=2,
+        )
+    )
+
+    assert events[0].event_type == "plate-appearance-ended"
+    assert events[0].payload["pitcherCharacterId"] == "mario"
+    assert all(event.event_type != "bridge-warning" for event in events)
+
+
+def test_pitcher_change_after_an_appearance_starts_still_requires_review() -> None:
+    game = tracker()
+    game.observe(snapshot())
+    game.observe(
+        snapshot(
+            frame=150,
+            pitcher_game_id=0,
+            strikes=3,
+            pitches=3,
+        )
+    )
+
+    events = game.observe(
+        snapshot(
+            frame=200,
+            batter_game_id=2,
+            pitcher_game_id=0,
+        )
+    )
+
+    assert events[0].event_type == "bridge-warning"
+    assert events[0].payload["message"] == (
+        "Plate appearance for mario crossed a pitcher change"
+    )
+
+
 def test_final_appearance_precedes_the_next_half_inning() -> None:
     game = tracker()
     game.observe(snapshot())
@@ -421,6 +515,35 @@ def test_tracker_withholds_ambiguous_scoring_appearance_and_warns() -> None:
     assert events[0].payload["code"] == "provisional-observation"
     assert "scorer and RBI attribution" in events[0].payload["message"]
     assert all(event.event_type != "plate-appearance-ended" for event in events)
+
+
+def test_tracker_attributes_a_scoring_runner_from_the_game_destination_field() -> None:
+    game = tracker()
+    game.observe(
+        snapshot(
+            base_runner_indices=(1, -1, -1),
+            base_runner_destinations=(1, 0, 0),
+        )
+    )
+    game.observe(
+        snapshot(
+            frame=101,
+            ball_was_hit=1,
+            bases_advanced=1,
+            pitches=1,
+            base_runner_indices=(1, -1, -1),
+            base_runner_destinations=(4, 0, 0),
+        )
+    )
+
+    events = game.observe(
+        snapshot(frame=102, batter_game_id=2, away_score=1, away_hits=1)
+    )
+
+    assert events[0].event_type == "plate-appearance-ended"
+    assert events[0].payload["result"] == "single"
+    assert events[0].payload["rbi"] == 1
+    assert events[0].payload["scorerCharacterIds"] == ["luigi"]
 
 
 def test_tracker_withholds_a_run_before_the_scoreboard_catches_up() -> None:

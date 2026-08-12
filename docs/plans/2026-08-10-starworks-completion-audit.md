@@ -191,11 +191,13 @@ These require exact-game research, live acceptance, owner infrastructure, or
 external permission and must not be replaced with guessed hashes, offsets,
 binaries, or claims:
 
-1. **Real game vertical slice:** replace provisional memory-observation events
-   with exact bridge-hook events for the alpha semantic slice, finish safe
-   scorer/RBI attribution, auto-confirm a score-consistent scheduled game,
-   live-accept a visible published stat mutation, prove ordered telemetry
-   across disconnect/restart, and validate the one-retry policy.
+1. **Real game vertical slice:** finish safe scorer/RBI attribution through the
+   exact-build DME reducer, add a bridge hook only for a named observation gap,
+   auto-confirm a score-consistent scheduled game, live-accept a visible
+   published stat mutation, prove ordered telemetry across disconnect/restart,
+   and live-validate offline sampling, exact orphan teardown, and the one-retry
+   policy. Automated recovery coverage exists, but a web restart exposed that
+   these paths were not yet product-complete.
 2. **Platform hardware matrix:** repeat boot, bridge, telemetry, capture, RTMP,
    recovery, and revocation gates on every platform advertised as supported.
 3. **Deployment acceptance:** push the branch, observe hosted CI, deploy to the
@@ -207,8 +209,8 @@ binaries, or claims:
 Until gates 1–2 pass, release material must say **software preview**. Starworks
 can now autonomously execute a complete scheduled Mario Super Sluggers game,
 but it cannot yet claim an automatically accepted score: the first such run was
-correctly held for review. The minimal bridge itself is reviewed; that does not
-imply that the remaining semantic gameplay hooks are complete.
+correctly held for review. The minimal bridge itself is reviewed; its reserved
+event ring does not make hook telemetry a mandatory architecture.
 
 ## Decision-gated work, not release blockers
 

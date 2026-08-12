@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -11,6 +13,7 @@ from starworks_runner.games.sluggers.bridge.configuration import (
 )
 from starworks_runner.games.sluggers.bridge.layout import (
     BridgeEvent,
+    BridgeProtocolError,
     EventType,
     attempt_nonce_digest,
 )
@@ -24,8 +27,27 @@ from starworks_runner.games.sluggers.live_executor import (
 from starworks_runner.games.sluggers.session import (
     RuntimeGameObservation,
     RuntimeLineupObservation,
+    process_identity_sha256,
+    terminate_matching_process,
 )
 from starworks_runner.orchestrator import AttemptExecutionError
+
+
+def test_expired_lease_teardown_requires_the_exact_process_identity() -> None:
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    try:
+        identity = process_identity_sha256(process.pid)
+        with pytest.raises(BridgeProtocolError, match="identity changed"):
+            terminate_matching_process(process.pid, "0" * 64)
+        assert process.poll() is None
+
+        terminate_matching_process(process.pid, identity)
+
+        assert process.wait(timeout=5) is not None
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=5)
 
 
 class FakeLiveSession:

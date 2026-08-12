@@ -158,6 +158,48 @@ describe('league configuration controller', () => {
     })
   })
 
+  it('keeps the character editor split into focused server-rendered groups', async () => {
+    let imported = importStatEditorV4({
+      profileName: 'Focused stats',
+      rawText: buildStatEditorV4Fixture(),
+      sourceVersion: 'v4',
+    })
+    let revision = {
+      ...imported,
+      createdAt: '2026-08-11T12:00:00.000Z',
+      kind: 'stat-profile-revision' as const,
+      leagueId: league.id,
+      profileId: '66666666-6666-4666-8666-666666666666',
+      publishedAt: null,
+      revisionId: '44444444-4444-4444-8444-444444444444',
+      revisionNumber: 1,
+      status: 'draft' as const,
+    }
+    let configuration = {
+      async getStatProfileRevision() {
+        return { basedOnRevision: null, history: [], issues: [], revision }
+      },
+    } as unknown as ConfigurationApplication
+    let runtime = createRuntime(configuration)
+    let router = createAppRouter({ logging: { sink: () => {} }, runtime })
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let href = routes.leagues.configuration.statProfiles.revision.characters.href({
+      leagueSlug: league.slug,
+      revisionId: revision.revisionId,
+    })
+
+    let playable = await router.fetch(new Request(`http://localhost${href}`, { headers: { cookie: session } }))
+    let playableHtml = await playable.text()
+    assert.match(playableHtml, /Mario/)
+    assert.doesNotMatch(playableHtml, /Red Mii \(M\)/)
+    assert.doesNotMatch(playableHtml, /Unused Yoshi 2/)
+
+    let mii = await router.fetch(new Request(`http://localhost${href}?kind=mii`, { headers: { cookie: session } }))
+    let miiHtml = await mii.text()
+    assert.match(miiHtml, /Red Mii \(M\)/)
+    assert.doesNotMatch(miiHtml, /Unused Yoshi 2/)
+  })
+
   it('exports a lossless Stat Editor v4 text file', async () => {
     let source = buildStatEditorV4Fixture()
     let imported = importStatEditorV4({ profileName: 'Export me', rawText: source, sourceVersion: 'v4' })

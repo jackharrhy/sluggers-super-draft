@@ -20,8 +20,8 @@ PITCHER_BLOCK_END = 0x900D9B48
 GAME_TIMER_ADDRESS = 0x900DFCFC
 BASES_ADVANCED_ADDRESS = 0x900D66D2
 HOME_RUN_ADDRESS = 0x900D953C
-RUNNER_INDEX_BLOCK_ADDRESS = 0x900DB7CD
-RUNNER_INDEX_BLOCK_END = 0x900DBB76
+BASERUNNER_BLOCK_ADDRESS = 0x900DB5F9
+BASERUNNER_BLOCK_END = 0x900DBCCA
 
 INTRO_STATES = frozenset({0x04, 0x05})
 PLAY_STATES = frozenset(
@@ -65,7 +65,10 @@ class GameSnapshot:
     ball_was_hit: int = 0
     bean_ball: int = 0
     home_run: int = 0
+    batter_lineup_index: int = -1
+    batter_destination: int = 0
     base_runner_indices: tuple[int, int, int] = (-1, -1, -1)
+    base_runner_destinations: tuple[int, int, int] = (0, 0, 0)
 
     @property
     def has_started(self) -> bool:
@@ -101,8 +104,8 @@ class SluggersMemoryReader:
             BASES_ADVANCED_ADDRESS, BASES_ADVANCED_ADDRESS + 1
         )
         home_run = self._read_block(HOME_RUN_ADDRESS, HOME_RUN_ADDRESS + 1)
-        runner_indices = self._read_block(
-            RUNNER_INDEX_BLOCK_ADDRESS, RUNNER_INDEX_BLOCK_END
+        baserunners = self._read_block(
+            BASERUNNER_BLOCK_ADDRESS, BASERUNNER_BLOCK_END
         )
         return GameSnapshot(
             frame=int.from_bytes(timer, "big"),
@@ -125,9 +128,14 @@ class SluggersMemoryReader:
             ball_was_hit=batter[0x168],
             bean_ball=int.from_bytes(batter[0x169:0x16A], "big", signed=True),
             home_run=home_run[0],
+            batter_lineup_index=baserunners[0],
+            batter_destination=baserunners[0x154],
             base_runner_indices=tuple(
-                int.from_bytes(runner_indices[offset : offset + 1], "big", signed=True)
-                for offset in (0, 0x1D4, 0x3A8)
+                int.from_bytes(baserunners[offset : offset + 1], "big", signed=True)
+                for offset in (0x1D4, 0x3A8, 0x57C)
+            ),
+            base_runner_destinations=tuple(
+                baserunners[offset] for offset in (0x328, 0x4FC, 0x6D0)
             ),
         )
 

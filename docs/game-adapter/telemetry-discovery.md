@@ -44,8 +44,9 @@ structure layout, trace, and reproducible fixture establish it. Read-only DME
 snapshots are the preferred v0 boundary because the existing tools already
 prove that model and it keeps the implementation in ordinary Python. A game
 hook is justified only for a concrete value that cannot be observed reliably.
-`memory-observation` provenance still blocks automatic finalization until the
-complete reducer and fault matrix are accepted.
+The current blanket `memory-observation` review gate remains until a complete
+destination-aware run and fault matrix prove the exact-build reducer; it is an
+acceptance gate, not a permanent ban on DME-derived results.
 
 ## Trusted tracker baseline
 
@@ -111,14 +112,21 @@ play emitted a review warning without a fabricated RBI or scorer list.
 Ordinary outs, singles, the half-inning order, and scoring-warning path are live
 proven; the remaining classifications still need equivalent live examples.
 
-A focused DME trace then proved the reference tracker's runner model without
+A focused DME trace first proved the reference tracker's runner model without
 copying its mutable scoring fallback. The first-, second-, and third-base slots
 at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` hold signed indices into the
-immutable batting order. Across consecutive singles, Wario moved from lineup
-index 0 on first to index 0 on second while Waluigi appeared as index 1 on
-first. This is sufficient for exact home-run scorer ordering and the forced
-runner from third on a bases-loaded walk/HBP. It is not sufficient for general
-multi-run attribution, so those plays continue to fail closed.
+immutable batting order. The trusted tracker also exposes each runner's
+destination at `0x900DB921`, `0x900DBAF5`, and `0x900DBCC9`, plus the current
+batter's lineup index/destination at `0x900DB5F9` and `0x900DB74D`. Starworks
+now retains the maximum destination by batting-order index across a play and
+accepts scorer identity only when the players reaching destination 4 exactly
+match the scoreboard delta. Scheduled attempt `78cc0b45…` live-proved an
+ordinary RBI single: King Boo batted Boo home from second with no provisional
+warning. The same scheduled run later attributed Bowser Jr., Luigi, and Peach
+on ordinary scoring singles, but one Toad scoring shape remained ambiguous and
+failed closed. The interrupted run did not reach game end, so full-run score
+consistency and additional scoring shapes remain acceptance gates; there is no
+farthest-runner fallback.
 
 ## Semantic event boundary
 

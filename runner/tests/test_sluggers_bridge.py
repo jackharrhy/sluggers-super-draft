@@ -313,6 +313,8 @@ def test_gdb_remote_transport_reads_writes_interrupts_and_breakpoints() -> None:
         + rsp_packet(b"")
         + rsp_reply(b"OK")
         + rsp_reply(b"OK")
+        + rsp_reply(b"OK")
+        + rsp_reply(b"OK")
         + rsp_reply(b"00000001")
     )
     transport = GdbRemoteMemoryTransport(connection=backend)  # type: ignore[arg-type]
@@ -323,6 +325,8 @@ def test_gdb_remote_transport_reads_writes_interrupts_and_breakpoints() -> None:
     assert transport.interrupt_execution() == b"T05"
     transport.add_execute_breakpoint(0x8006AED4)
     transport.remove_execute_breakpoint(0x8006AED4)
+    transport.add_write_watchpoint(0x900D5C28)
+    transport.remove_write_watchpoint(0x900D5C28)
     assert transport.read_register(14) == 1
 
     sent = b"".join(backend.sent)
@@ -332,6 +336,8 @@ def test_gdb_remote_transport_reads_writes_interrupts_and_breakpoints() -> None:
     assert b"\x03" in sent
     assert b"$Z0,8006aed4,4#" in sent
     assert b"$z0,8006aed4,4#" in sent
+    assert b"$Z2,900d5c28,1#" in sent
+    assert b"$z2,900d5c28,1#" in sent
     assert b"$pe#" in sent
 
 
@@ -344,6 +350,13 @@ def test_gdb_remote_transport_preserves_stop_reply_that_races_command_ack() -> N
     transport.add_execute_breakpoint(0x8006AED4)
 
     assert transport.wait_for_stop() == b"T0540:8006aed4;01:9008e158;"
+
+
+def test_gdb_register_value_may_begin_with_error_marker() -> None:
+    backend = FakeRspSocket(rsp_reply(b"E6BD9B73"))
+    transport = GdbRemoteMemoryTransport(connection=backend)  # type: ignore[arg-type]
+
+    assert transport.read_register(6) == 0xE6BD9B73
 
 
 class FakeBootableTransport(ByteArrayMemoryTransport):

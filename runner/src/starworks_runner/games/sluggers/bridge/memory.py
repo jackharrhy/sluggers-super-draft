@@ -209,7 +209,7 @@ class GdbRemoteMemoryTransport:
         if not 0 <= register <= 0xFF:
             raise BridgeProtocolError("Dolphin GDB register index is invalid")
         reply = self._request(f"p{register:x}".encode("ascii"))
-        if reply.startswith(b"E"):
+        if self._is_error_reply(reply):
             raise BridgeProtocolError(
                 f"Dolphin GDB register {register} read failed: "
                 f"{reply.decode('ascii', errors='replace')}"
@@ -226,19 +226,36 @@ class GdbRemoteMemoryTransport:
             )
         return value
 
+    @staticmethod
+    def _is_error_reply(reply: bytes) -> bool:
+        """Distinguish Dolphin's ``Ehh`` packet from a valid hex value."""
+
+        return len(reply) == 3 and reply.startswith(b"E")
+
     def add_execute_breakpoint(self, address: int, *, size: int = 4) -> None:
-        self._execute_breakpoint("Z", address, size)
+        self._breakpoint("Z", 0, address, size)
 
     def remove_execute_breakpoint(self, address: int, *, size: int = 4) -> None:
-        self._execute_breakpoint("z", address, size)
+        self._breakpoint("z", 0, address, size)
 
-    def _execute_breakpoint(self, operation: str, address: int, size: int) -> None:
+    def add_write_watchpoint(self, address: int, *, size: int = 1) -> None:
+        self._breakpoint("Z", 2, address, size)
+
+    def remove_write_watchpoint(self, address: int, *, size: int = 1) -> None:
+        self._breakpoint("z", 2, address, size)
+
+    def _breakpoint(
+        self, operation: str, breakpoint_type: int, address: int, size: int
+    ) -> None:
         if address < 0 or address > 0xFFFFFFFF or size <= 0:
             raise BridgeProtocolError("Dolphin GDB breakpoint range is invalid")
-        reply = self._request(f"{operation}0,{address:x},{size:x}".encode("ascii"))
+        reply = self._request(
+            f"{operation}{breakpoint_type},{address:x},{size:x}".encode("ascii")
+        )
         if reply != b"OK":
+            label = "write watchpoint" if breakpoint_type == 2 else "execute breakpoint"
             raise BridgeProtocolError(
-                "Dolphin GDB refused an execute breakpoint at "
+                f"Dolphin GDB refused a {label} at "
                 f"0x{address:08X}: {reply.decode('ascii', errors='replace')}"
             )
 

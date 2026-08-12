@@ -16,12 +16,14 @@ interface StatProfileCharactersPageProps {
   identity: SessionIdentity
   league: LeagueDetail
   revision: StatProfileRevision
+  selectedKind: SluggersCharacterKind
 }
 
 export function StatProfileCharactersPage(handle: Handle<StatProfileCharactersPageProps>) {
   return () => {
-    let { identity, league, revision } = handle.props
+    let { identity, league, revision, selectedKind } = handle.props
     let groups = groupCharacters(revision.characterValues)
+    let selected = characterSections.find((section) => section.kind === selectedKind)!
     return (
       <AppShell identity={identity} league={league} title={`Characters · ${revision.name} · Starworks`}>
         <header mix={pageHeaderStyle}>
@@ -32,22 +34,20 @@ export function StatProfileCharactersPage(handle: Handle<StatProfileCharactersPa
           <a href={routes.leagues.configuration.statProfiles.revision.show.href({ leagueSlug: league.slug, revisionId: revision.revisionId })}>Back to profile</a>
         </header>
         <main aria-label="Character stats" mix={contentStyle}>
+          <nav aria-label="Character groups" mix={sectionNavStyle}>
+            {characterSections.map((section) => (
+              <a
+                href={characterSectionHref(league.slug, revision.revisionId, section.kind)}
+                aria-current={section.kind === selectedKind ? 'page' : undefined}
+              >
+                {section.heading} <span>{groups[section.kind].length}</span>
+              </a>
+            ))}
+          </nav>
           <CharacterGroup
-            characters={groups.playable}
-            heading="Playable characters"
-            leagueSlug={league.slug}
-            revisionId={revision.revisionId}
-          />
-          <CharacterGroup
-            characters={groups.mii}
-            heading="Mii slots"
-            leagueSlug={league.slug}
-            revisionId={revision.revisionId}
-          />
-          <CharacterGroup
-            characters={groups.unused}
-            description="These game slots are retained so v4 imports and exports remain complete."
-            heading="Unused game slots"
+            characters={groups[selectedKind]}
+            description={selected.description}
+            heading={selected.heading}
             leagueSlug={league.slug}
             revisionId={revision.revisionId}
           />
@@ -55,6 +55,32 @@ export function StatProfileCharactersPage(handle: Handle<StatProfileCharactersPa
       </AppShell>
     )
   }
+}
+
+const characterSections: Array<{
+  description?: string
+  heading: string
+  kind: SluggersCharacterKind
+}> = [
+  { heading: 'Playable characters', kind: 'playable' },
+  { heading: 'Mii slots', kind: 'mii' },
+  {
+    description: 'These game slots are retained so v4 imports and exports remain complete.',
+    heading: 'Unused game slots',
+    kind: 'unused',
+  },
+]
+
+function characterSectionHref(
+  leagueSlug: string,
+  revisionId: string,
+  kind: SluggersCharacterKind,
+): string {
+  let href = routes.leagues.configuration.statProfiles.revision.characters.href({
+    leagueSlug,
+    revisionId,
+  })
+  return kind === 'playable' ? href : `${href}?kind=${kind}`
 }
 
 interface CharacterGroupProps {
@@ -112,6 +138,7 @@ function groupCharacters(characters: StatProfileRevision['characterValues']) {
 
 const pageHeaderStyle = css({ alignItems: 'end', display: 'flex', flexWrap: 'wrap', gap: '20px', justifyContent: 'space-between', '& h1': { fontFamily: 'var(--font-happiness)', fontSize: 'clamp(36px, 6vw, 54px)', lineHeight: 1, margin: 0 }, '& p': { color: 'var(--text-muted)', margin: '8px 0 0' } })
 const contentStyle = css({ display: 'grid', gap: '40px', marginTop: '34px' })
+const sectionNavStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '8px', '& a': { border: '1px solid var(--border)', borderRadius: '999px', color: 'var(--text-primary) !important', padding: '8px 13px', textDecoration: 'none' }, '& a[aria-current="page"]': { background: 'var(--surface-strong)', borderColor: 'var(--border-strong)' }, '& span': { color: 'var(--text-muted)', marginLeft: '4px' } })
 const groupStyle = css({ display: 'grid', gap: '16px' })
 const sectionTitleStyle = css({ alignItems: 'end', display: 'flex', gap: '20px', justifyContent: 'space-between', '& h2': { fontSize: '28px', margin: 0 }, '& p': { color: 'var(--text-muted)', margin: '5px 0 0', maxWidth: '620px' }, '& span': { color: 'var(--text-muted)' } })
 const characterGridStyle = css({ display: 'grid', gap: '12px', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))' })

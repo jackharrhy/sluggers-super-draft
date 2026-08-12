@@ -27,6 +27,7 @@ class FakeControlClient:
         self.heartbeats: list[str] = []
         self.telemetry_sequences: list[int] = []
         self.renew_error: RunnerApiError | None = None
+        self.claim_error: RunnerApiError | None = None
 
     def register(
         self, station_name: str, capabilities: dict[str, Any]
@@ -38,6 +39,8 @@ class FakeControlClient:
         }
 
     def claim(self, runner_id: str) -> dict[str, Any]:
+        if self.claim_error is not None:
+            raise self.claim_error
         if self.claimed:
             return {"run": None}
         self.claimed = True
@@ -78,6 +81,7 @@ class RecordingExecutor:
         self.prepared = 0
         self.executions: list[bool] = []
         self.telemetry = telemetry
+        self.abandoned: list[dict[str, Any]] = []
 
     def prepare(self, envelope: dict[str, Any], configuration: dict[str, Any]) -> None:
         self.prepared += 1
@@ -94,6 +98,9 @@ class RecordingExecutor:
         if self.telemetry:
             emit_telemetry(self.telemetry)
         return ExecutionOutcome()
+
+    def abandon_runtime(self, metadata: dict[str, Any]) -> None:
+        self.abandoned.append(metadata)
 
 
 class IncrementalExecutor(RecordingExecutor):
@@ -145,8 +152,9 @@ def test_runner_recovers_unsent_completion_without_executing_twice(
     with RunnerStateStore(state_path) as state:
         state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
         station = create_station(client, state)
-        with pytest.raises(RunnerApiError, match="temporary outage"):
-            station.run_once(executor)
+        result = station.run_once(executor)
+        assert result.status == "offline"
+        assert result.detail == "temporary outage"
         assert state.load_active_run() is not None
         assert state.list_pending_updates()[0].message["action"] == "complete"
         assert executor.prepared == 1
@@ -173,8 +181,9 @@ def test_runner_spools_telemetry_and_finishes_without_replaying_the_game(
     state_path = tmp_path / "runner.sqlite3"
     with RunnerStateStore(state_path) as state:
         state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
-        with pytest.raises(RunnerApiError, match="telemetry outage"):
-            create_station(client, state).run_once(executor)
+        result = create_station(client, state).run_once(executor)
+        assert result.status == "offline"
+        assert result.detail == "telemetry outage"
         active = state.load_active_run()
         assert active is not None
         assert active.pending_outcome == "complete"
@@ -183,6 +192,7 @@ def test_runner_spools_telemetry_and_finishes_without_replaying_the_game(
             item.sequence
             for item in state.list_pending_telemetry(active.envelope["attemptId"])
         ] == [1]
+        assert state.list_pending_updates() == []
 
     with RunnerStateStore(state_path) as recovered:
         result = create_station(client, recovered).run_once(executor)
@@ -221,7 +231,7 @@ def test_incremental_executor_keeps_the_attempt_running_until_game_end(
         assert client.updates == ["started", "renew", "complete"]
 
 
-def test_runner_releases_local_journal_after_server_rejects_expired_lease(
+def test_running_game_keeps_executing_during_a_temporary_api_outage(
     tmp_path: Path,
 ) -> None:
     envelope, configuration = execution_fixtures()
@@ -233,6 +243,37 @@ def test_runner_releases_local_journal_after_server_rejects_expired_lease(
         station = create_station(client, state)
         assert station.run_once(executor).status == "running"
 
+        client.renew_error = RunnerApiError("temporary outage")
+        result = station.run_once(executor)
+
+        assert result.status == "offline"
+        assert result.detail == "temporary outage"
+        assert executor.executions == [False, True]
+        assert state.load_active_run() is not None
+        assert state.load_active_run().pending_outcome == "complete"  # type: ignore[union-attr]
+
+        client.renew_error = None
+        assert station.run_once(executor).status == "completed"
+        assert executor.executions == [False, True]
+        assert state.load_active_run() is None
+
+
+def test_runner_releases_local_journal_after_server_rejects_expired_lease(
+    tmp_path: Path,
+) -> None:
+    envelope, configuration = execution_fixtures()
+    client = FakeControlClient(envelope, configuration)
+    client.fail_complete_once = False
+    executor = IncrementalExecutor()
+    with RunnerStateStore(tmp_path / "runner.sqlite3") as state:
+        state.save_registration(StationRegistration(RUNNER_ID, 15, 60))
+        station = create_station(client, state)
+        assert station.run_once(executor).status == "running"
+        state.save_runtime_metadata(
+            envelope["attemptId"],
+            {"kind": "test-runtime", "processId": 42},
+        )
+
         client.renew_error = RunnerApiError("Runner lease has expired", status=409)
         result = station.run_once(executor)
 
@@ -241,6 +282,7 @@ def test_runner_releases_local_journal_after_server_rejects_expired_lease(
         assert state.load_active_run() is None
         assert state.list_pending_telemetry(envelope["attemptId"]) == []
         assert executor.executions == [False]
+        assert executor.abandoned == [{"kind": "test-runtime", "processId": 42}]
 
 
 def test_runner_persists_and_restores_live_runtime_identity(tmp_path: Path) -> None:

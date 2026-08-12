@@ -297,12 +297,14 @@ The evidence and revised startup acceptance gates are recorded in
   - Hits, outs, runs, RBIs, errors, walks, strikeouts, and bases.
   - Substitutions and fielding positions.
 
-### Bridge implementation
+### Runtime instrumentation
 
-- Emit events from stable game lifecycle points.
+- Derive events from stable exact-build DME observations; use a bridge hook only
+  for a semantic value whose causality or attribution cannot be retained.
 - Include sequence, frame, attempt nonce, event type, and compact payload.
 - Detect overflow and mark the attempt as requiring review.
-- Where hooks are not yet understood, allow clearly labelled provisional observations from read-only memory tracking.
+- Keep unaccepted observation paths clearly labelled and fail closed instead of
+  guessing missing attribution.
 
 ### Ingestion and derivation
 
