@@ -33,7 +33,6 @@ describe('runner API controller', () => {
           kind: 'runner-registration-response',
           leaseSeconds: 60,
           runnerId: RUNNER_ID,
-          schemaVersion: 1,
         }
       },
     })
@@ -51,7 +50,6 @@ describe('runner API controller', () => {
         runnerVersion: '0.1.0',
       },
       kind: 'runner-registration-request',
-      schemaVersion: 1,
       stationName: 'Broadcast desk',
     }
     let response = await router.fetch(new Request(
@@ -80,7 +78,7 @@ describe('runner API controller', () => {
     let missingBearer = await router.fetch(new Request(
       'http://localhost' + routes.runnerApi.claim.href(),
       {
-        body: JSON.stringify({ kind: 'runner-claim-request', runnerId: RUNNER_ID, schemaVersion: 1 }),
+        body: JSON.stringify({ kind: 'runner-claim-request', runnerId: RUNNER_ID }),
         headers: { 'content-type': 'application/json' },
         method: 'POST',
       },
@@ -113,7 +111,6 @@ describe('runner API controller', () => {
           attemptStatus: 'running',
           expiresAt: null,
           kind: 'runner-lease-update-response',
-          schemaVersion: 1,
         }
       },
     })
@@ -132,7 +129,6 @@ describe('runner API controller', () => {
           leaseId: '44444444-4444-4444-8444-444444444444',
           observedAt: '2026-08-10T12:00:00Z',
           runnerId: RUNNER_ID,
-          schemaVersion: 1,
         }),
         headers: {
           authorization: 'Bearer runner-secret',
@@ -179,7 +175,6 @@ describe('runner API controller', () => {
           attemptStatus: 'provisional',
           expiresAt: null,
           kind: 'runner-lease-update-response',
-          schemaVersion: 1,
         }
       },
     })
@@ -212,7 +207,6 @@ describe('runner API controller', () => {
           leaseId: LEASE_ID,
           observedAt: '2026-08-10T12:00:00Z',
           runnerId: RUNNER_ID,
-          schemaVersion: 1,
         }),
         headers: {
           authorization: 'Bearer runner-secret',
@@ -289,7 +283,6 @@ describe('runner API controller', () => {
           maxAcceptedSequence: 1,
           nextExpectedSequence: 2,
           requiresReview: false,
-          schemaVersion: 1,
         }
       },
       async dashboard() { return [] },
@@ -324,12 +317,11 @@ function createRunnerControl(
 ): RunnerControlApplication {
   return {
     async asset() { throw new Error('Unexpected asset request') },
-    async claim() { return { kind: 'runner-claim-response', run: null, schemaVersion: 1 } },
+    async claim() { return { kind: 'runner-claim-response', run: null } },
     async heartbeat() {
       return {
         accepted: true,
         kind: 'runner-heartbeat-response',
-        schemaVersion: 1,
         serverTime: '2026-08-10T12:00:00Z',
       }
     },
@@ -340,7 +332,6 @@ function createRunnerControl(
         kind: 'runner-registration-response',
         leaseSeconds: 60,
         runnerId: RUNNER_ID,
-        schemaVersion: 1,
       }
     },
     async updateLease() {
@@ -348,7 +339,6 @@ function createRunnerControl(
         attemptStatus: 'leased',
         expiresAt: '2026-08-10T12:01:00Z',
         kind: 'runner-lease-update-response',
-        schemaVersion: 1,
       }
     },
     ...overrides,

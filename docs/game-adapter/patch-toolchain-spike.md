@@ -56,8 +56,8 @@ managed copy rather than modifying the user's installed Dolphin application.
 
 ## Guarded application
 
-Patch-plan schema v2 can append one reviewed artifact slice at the exact input
-EOF in addition to exact-byte-guarded in-place writes. It rejects unknown input
+The current patch plan can append one reviewed artifact slice at the exact
+input EOF in addition to exact-byte-guarded in-place writes. It rejects unknown input
 hashes, changed hook bytes, artifact hash/size mismatches, overlapping artifact
 or target ranges, non-EOF appends, out-of-range writes, and unexpected final
 hashes. The source dump and source extraction are never modified.
@@ -68,6 +68,6 @@ reviewed DOL:
 ```shell
 uv run --project runner python runner/scripts/build_sluggers_bridge.py \
   --base-dol /private/path/to/clean/main.dol \
-  --output runner/src/starworks_runner/games/sluggers/artifacts/bridge-v1-rmbe01.bin \
-  --patch-plan runner/src/starworks_runner/games/sluggers/patches/bridge-v1-rmbe01.json
+  --output runner/src/starworks_runner/games/sluggers/artifacts/bridge-rmbe01.bin \
+  --patch-plan runner/src/starworks_runner/games/sluggers/patches/bridge-rmbe01.json
 ```

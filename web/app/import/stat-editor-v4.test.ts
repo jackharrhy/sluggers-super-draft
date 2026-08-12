@@ -47,7 +47,6 @@ describe('Stat Editor v4 importer', () => {
       publishedAt: null,
       revisionId: '33333333-3333-4333-8333-333333333333',
       revisionNumber: 1,
-      schemaVersion: 1,
       sluggersTuning: result.sluggersTuning,
       status: 'draft',
     }), [])

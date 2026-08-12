@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "adapterVersion": "0.3.3",
   "target": {
     "gameId": "RMBE01",
@@ -7,24 +6,24 @@
   },
   "protocol": {
     "version": 1,
-    "controlBlockSymbol": "StarworksBridgeV1",
+    "controlBlockSymbol": "StarworksBridge",
     "tickSymbol": "StarworksBridgeTick",
-    "memoryMap": "memory_map.v1.json"
+    "memoryMap": "memory_map.json"
   },
   "bridgeSource": {
-    "path": "bridge/bridge_v1.c",
-    "sha256": "851aae023bba680851f1d1822da648dbc6d28a7ad2132a72ec1d9de4df864d89",
+    "path": "bridge/bridge.c",
+    "sha256": "901b9eaf7163e01724285855ea5e6fe23cefafb0d9f4619da1663f347e112491",
     "license": "MIT",
     "status": "reviewed-and-compiled"
   },
   "bridgeBuildSources": [
     {
-      "path": "bridge/trampoline_v1.S",
+      "path": "bridge/trampoline.S",
       "sha256": "ddc0e864d3de80413679bc05ab879316bd8a09d5c8e9e3bfbbf142cedd8ea832",
       "license": "MIT"
     },
     {
-      "path": "bridge/bridge_v1.ld",
+      "path": "bridge/bridge.ld",
       "sha256": "bbaabcb78a226dde8d486437e87590cce2f242c281f75cd1e3902ad267a0dc05",
       "license": "MIT"
     }
@@ -39,7 +38,7 @@
   },
   "artifacts": [
     {
-      "path": "artifacts/bridge-v1-rmbe01.bin",
+      "path": "artifacts/bridge-rmbe01.bin",
       "sha256": "b5a9a75c5836c62741927bb8ab67d568e887be88ab6062a8736f0cd7c81f9161",
       "sizeBytes": 5912,
       "license": "MIT"
@@ -47,13 +46,13 @@
   ],
   "patchPlans": [
     {
-      "path": "patches/bridge-v1-rmbe01.json",
-      "sha256": "914d5b257a970d63666251f8ac9f67c282f4d435543300abd9339115172d27fb"
+      "path": "patches/bridge-rmbe01.json",
+      "sha256": "366e7520fbbc9c2b3dae96ed38bcdf98a7a097d0ef6f8c28574d56ad3a38ebcf"
     }
   ],
   "staticTargetCatalog": {
-    "path": "static_targets.v1.json",
-    "sha256": "a9eba85e93cc78978eac7c9444b97bf89cbdc116a2bd69637f34157b2c260c46",
+    "path": "static_targets.json",
+    "sha256": "bd43e472b106829f4b570559fa8aaa1f9b88109f3a23a0ee1fa5fd3a44579de3",
     "status": "exact-dol-and-live-memory-verified"
   },
   "releaseEvidence": [

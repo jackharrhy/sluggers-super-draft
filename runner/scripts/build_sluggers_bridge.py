@@ -72,12 +72,12 @@ def main() -> int:
         implementation = build / "bridge.o"
         elf = build / "bridge.elf"
         code_path = build / "bridge.bin"
-        run(*common, str(bridge / "trampoline_v1.S"), "-o", str(trampoline))
-        run(*common, str(bridge / "bridge_v1.c"), "-o", str(implementation))
+        run(*common, str(bridge / "trampoline.S"), "-o", str(trampoline))
+        run(*common, str(bridge / "bridge.c"), "-o", str(implementation))
         run(
             linker,
             "-T",
-            str(bridge / "bridge_v1.ld"),
+            str(bridge / "bridge.ld"),
             "--nostdlib",
             "-o",
             str(elf),
@@ -235,14 +235,13 @@ def build_patch_plan(base_dol: bytes, artifact: bytes) -> dict[str, object]:
         ]
     output.extend(artifact[:BRIDGE_REGION_SIZE])
     return {
-        "schemaVersion": 2,
         "kind": "precompiled-patch-plan",
-        "patchId": "starworks-bridge-v1-rmbe01-rev0",
+        "patchId": "starworks-bridge-rmbe01-rev0",
         "targetPath": "sys/main.dol",
         "expectedInputSha256": BASE_DOL_SHA256,
         "expectedOutputSha256": hashlib.sha256(output).hexdigest(),
         "artifact": {
-            "path": "artifacts/bridge-v1-rmbe01.bin",
+            "path": "artifacts/bridge-rmbe01.bin",
             "sha256": hashlib.sha256(artifact).hexdigest(),
             "sizeBytes": len(artifact),
         },

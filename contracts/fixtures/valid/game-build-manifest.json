@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "kind": "game-build-manifest",
   "baseGame": {
     "gameId": "RMBE01",
@@ -25,7 +24,7 @@
   ],
   "patchReceipts": [
     {
-      "patchId": "starworks-bridge-v1",
+      "patchId": "starworks-bridge",
       "targetPath": "sys/main.dol",
       "expectedInputSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "outputSha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"

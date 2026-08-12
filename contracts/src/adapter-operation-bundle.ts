@@ -73,7 +73,6 @@ export const AdapterOperationSchema = z.discriminatedUnion("operation", [
 
 export const AdapterOperationBundleSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("adapter-operation-bundle"),
     adapterId: z.literal("sluggers-rmbe01"),
     adapterVersion: VersionSchema,

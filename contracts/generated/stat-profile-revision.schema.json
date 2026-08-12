@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "stat-profile-revision"
@@ -828,7 +824,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "leagueId",
     "profileId",
@@ -845,5 +840,5 @@
   "additionalProperties": false,
   "title": "StatProfileRevision",
   "description": "The current pre-release stat vocabulary and its independently modeled values.",
-  "$id": "https://starworks.community/contracts/stat-profile-revision/v1.schema.json"
+  "$id": "https://starworks.community/contracts/stat-profile-revision.schema.json"
 }

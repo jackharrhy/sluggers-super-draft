@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "kind": "runner-registration-request",
   "stationName": "Tournament desk one",
   "capabilities": {

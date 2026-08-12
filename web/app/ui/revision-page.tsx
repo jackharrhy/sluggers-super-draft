@@ -79,14 +79,13 @@ export function RevisionHistory(handle: Handle<{
       <h2 id="history-heading" mix={sectionHeadingStyle}>Revision history</h2>
       <div mix={tableScrollerStyle}>
         <table mix={tableStyle}>
-          <thead><tr><th>Revision</th><th>Status</th><th>Created</th><th>Published</th></tr></thead>
+          <thead><tr><th>Revision</th><th>Status</th><th>Saved</th></tr></thead>
           <tbody>
             {handle.props.rows.map((row) => (
               <tr key={row.id}>
                 <td>{row.revisionNumber}</td>
-                <td>{row.status}</td>
-                <td>{formatDate(row.createdAt)}</td>
-                <td>{row.publishedAt ? formatDate(row.publishedAt) : '—'}</td>
+                <td>{row.status === 'published' ? 'Published' : 'Draft'}</td>
+                <td>{formatDate(row.publishedAt ?? row.createdAt)}</td>
               </tr>
             ))}
           </tbody>
@@ -109,4 +108,4 @@ const actionsStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wra
 const issueStyle = css({ borderColor: 'var(--warning-border)', color: 'var(--warning-text)' })
 const historyStyle = css({ display: 'grid', gap: '18px' })
 const tableScrollerStyle = css({ overflowX: 'auto' })
-const tableStyle = css({ borderCollapse: 'collapse', fontSize: '13px', minWidth: '520px', width: '100%', '& th': { color: 'var(--text-muted)', textAlign: 'left' }, '& td, & th': { borderBottom: '1px solid var(--border)', padding: '10px 8px' } })
+const tableStyle = css({ borderCollapse: 'collapse', fontSize: '13px', minWidth: '380px', width: '100%', '& th': { color: 'var(--text-muted)', textAlign: 'left' }, '& td, & th': { borderBottom: '1px solid var(--border)', padding: '10px 8px' } })

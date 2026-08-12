@@ -29,9 +29,9 @@ def test_generated_schema_rejects_unknown_fields(name: str) -> None:
         validate_contract(name, fixture, CONTRACTS_DIRECTORY)  # type: ignore[arg-type]
 
 
-def test_generated_schema_rejects_incompatible_version() -> None:
+def test_generated_schema_rejects_pre_release_compatibility_fields() -> None:
     fixture = load_fixture("run-envelope")
-    fixture["schemaVersion"] = 2
+    fixture["schemaVersion"] = 1
     with pytest.raises(ValidationError):
         validate_contract("run-envelope", fixture, CONTRACTS_DIRECTORY)
 

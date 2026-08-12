@@ -10,7 +10,6 @@ def test_native_capabilities_are_safe_declarative_metadata() -> None:
     validate_contract(
         "runner-control",
         {
-            "schemaVersion": 1,
             "kind": "runner-registration-request",
             "stationName": "Desk one",
             "capabilities": capabilities,

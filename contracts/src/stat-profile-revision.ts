@@ -108,7 +108,6 @@ export const SluggersTuningSchema = z.strictObject({
 
 export const StatProfileRevisionSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("stat-profile-revision"),
     leagueId: UuidSchema,
     profileId: UuidSchema,

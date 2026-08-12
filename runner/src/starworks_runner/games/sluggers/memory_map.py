@@ -45,10 +45,8 @@ class MemoryMap:
 
     @classmethod
     def load(cls, path: Path | None = None) -> MemoryMap:
-        manifest_path = path or Path(__file__).with_name("memory_map.v1.json")
+        manifest_path = path or Path(__file__).with_name("memory_map.json")
         raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if raw.get("schemaVersion") != 1:
-            raise BuildIntegrityError("Unsupported memory-map manifest version")
         space = raw["addressSpace"]
         address_space = MemoryRange(
             identifier="wii-mem1",
@@ -103,13 +101,13 @@ class MemoryMap:
             (
                 item
                 for item in self.reservations
-                if item.identifier == "starworks-bridge-v1"
+                if item.identifier == "starworks-bridge"
             ),
             None,
         )
         if bridge is None:
             raise BuildIntegrityError(
-                "Memory map has no starworks-bridge-v1 reservation"
+                "Memory map has no starworks-bridge reservation"
             )
         if bridge.start != BRIDGE_BASE_ADDRESS or bridge.size != BRIDGE_REGION_SIZE:
             raise BuildIntegrityError(

@@ -88,6 +88,7 @@ let runnerSecret = existingEnvironment.STARWORKS_DEMO_RUNNER_SECRET ?? createOpa
 let databaseUrl = process.env.DATABASE_URL
   ?? 'postgres://starworks:starworks@127.0.0.1:5432/starworks'
 let now = new Date()
+let createdAt = new Date(now.getTime() - 120_000)
 let publishedAt = new Date(now.getTime() - 60_000)
 let connection = createDatabase(databaseUrl, { max: 1 })
 
@@ -182,6 +183,7 @@ try {
     await database.insert(statProfileRevisions).values({
       basedOnRevisionId: null,
       characterValues: profileSource.characterValues,
+      createdAt,
       createdByPersonId: admin.personId,
       definitions: profileSource.definitions,
       id: ids.profileRevision,
@@ -227,6 +229,7 @@ try {
     await database.insert(statProfileRevisions).values({
       basedOnRevisionId: null,
       characterValues: statEditorDraft.characterValues,
+      createdAt,
       createdByPersonId: admin.personId,
       definitions: statEditorDraft.definitions,
       id: seededStatEditorRevisionId,
@@ -274,6 +277,7 @@ try {
     }).onConflictDoNothing()
     await database.insert(rulesetRevisions).values({
       basedOnRevisionId: null,
+      createdAt,
       createdByPersonId: admin.personId,
       id: ids.rulesetRevision,
       leagueId: league.id,
@@ -302,6 +306,7 @@ try {
       createTeamFixture(league.id, ids.awayTeam, ids.awayRoster, ids.awayLineup, demoTeamLineup(demoMatch.away)),
     ]) {
       await database.insert(rosterRevisions).values({
+        createdAt,
         createdByPersonId: admin.personId,
         id: team.rosterRevisionId,
         leagueId: league.id,
@@ -312,6 +317,7 @@ try {
         teamId: team.teamId,
       }).onConflictDoNothing()
       await database.insert(lineupRevisions).values({
+        createdAt,
         createdByPersonId: admin.personId,
         id: team.lineupRevisionId,
         leagueId: league.id,

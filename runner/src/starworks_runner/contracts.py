@@ -54,7 +54,7 @@ def load_schema(
     name: ContractName, contracts_directory: Path | None = None
 ) -> dict[str, Any]:
     root = (contracts_directory or default_contracts_directory()).resolve()
-    schema_path = root / "generated" / f"{name}.v1.schema.json"
+    schema_path = root / "generated" / f"{name}.schema.json"
     with schema_path.open(encoding="utf-8") as schema_file:
         schema = cast(dict[str, Any], json.load(schema_file))
     Draft202012Validator.check_schema(schema)

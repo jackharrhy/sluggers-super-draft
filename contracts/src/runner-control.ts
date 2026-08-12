@@ -37,14 +37,12 @@ export const RunnerComponentHealthSchema = z.strictObject({
 });
 
 export const RunnerRegistrationRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-registration-request"),
   stationName: z.string().min(2).max(100),
   capabilities: RunnerCapabilitiesSchema,
 });
 
 export const RunnerRegistrationResponseSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-registration-response"),
   runnerId: UuidSchema,
   heartbeatSeconds: z.number().int().min(5).max(300),
@@ -57,7 +55,6 @@ export const RunnerRegistrationResponseSchema = z.strictObject({
 });
 
 export const RunnerHeartbeatRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-heartbeat-request"),
   runnerId: UuidSchema,
   sentAt: TimestampSchema,
@@ -69,20 +66,17 @@ export const RunnerHeartbeatRequestSchema = z.strictObject({
 });
 
 export const RunnerHeartbeatResponseSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-heartbeat-response"),
   serverTime: TimestampSchema,
   accepted: z.boolean(),
 });
 
 export const RunnerClaimRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-claim-request"),
   runnerId: UuidSchema,
 });
 
 export const RunnerClaimResponseSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-claim-response"),
   run: RunEnvelopeSchema.nullable(),
 });
@@ -95,7 +89,6 @@ export const RunnerFailureKindSchema = z.enum([
 ]);
 
 export const RunnerLeaseUpdateRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-lease-update-request"),
   runnerId: UuidSchema,
   attemptId: UuidSchema,
@@ -110,7 +103,6 @@ export const RunnerLeaseUpdateRequestSchema = z.strictObject({
 });
 
 export const RunnerLeaseUpdateResponseSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("runner-lease-update-response"),
   attemptStatus: z.enum(["leased", "running", "provisional", "confirmed", "cancelled", "failed", "review"]),
   expiresAt: TimestampSchema.nullable(),

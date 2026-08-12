@@ -59,7 +59,6 @@ class SyntheticSluggersExecutor:
         self.event_count = len(events)
         emit_telemetry(
             {
-                "schemaVersion": 1,
                 "kind": "telemetry-envelope",
                 "protocolVersion": 1,
                 "correlationId": envelope["correlationId"],

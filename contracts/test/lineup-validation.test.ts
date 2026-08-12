@@ -27,7 +27,6 @@ describe("shared lineup validation", () => {
   for (const fixtureCase of fixture.cases) {
     it(fixtureCase.name, () => {
       let revision = TeamLineupRevisionSchema.parse({
-        schemaVersion: 1,
         kind: "team-lineup-revision",
         leagueId: "11111111-1111-4111-8111-111111111111",
         teamId: "22222222-2222-4222-8222-222222222222",

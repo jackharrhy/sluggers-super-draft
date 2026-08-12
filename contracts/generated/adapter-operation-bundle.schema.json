@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "adapter-operation-bundle"
@@ -526,7 +522,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "adapterId",
     "adapterVersion",
@@ -542,5 +537,5 @@
   "additionalProperties": false,
   "title": "AdapterOperationBundle",
   "description": "Symbolic, bounded operations translated by the current game adapter; never raw memory writes.",
-  "$id": "https://starworks.community/contracts/adapter-operation-bundle/v1.schema.json"
+  "$id": "https://starworks.community/contracts/adapter-operation-bundle.schema.json"
 }

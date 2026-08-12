@@ -49,10 +49,8 @@ class DiscVerification:
 
 
 def load_dtk_release(path: Path | None = None) -> DtkRelease:
-    manifest_path = path or Path(__file__).with_name("tool_manifest.v1.json")
+    manifest_path = path or Path(__file__).with_name("tool_manifest.json")
     raw = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if raw.get("schemaVersion") != 1:
-        raise ToolVerificationError("Unsupported pinned-tool manifest version")
     dtk = raw["tools"]["dtk"]
     assets = {
         key: ToolAsset(

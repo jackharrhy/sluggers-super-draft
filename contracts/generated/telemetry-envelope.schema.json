@@ -4,10 +4,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -90,7 +86,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -111,10 +106,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -203,7 +194,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -224,10 +214,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -318,7 +304,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -339,10 +324,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -433,7 +414,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -454,10 +434,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -548,7 +524,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -569,10 +544,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -720,7 +691,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -741,10 +711,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -857,7 +823,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -878,10 +843,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -980,7 +941,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -1001,10 +961,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-envelope"
@@ -1103,7 +1059,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "protocolVersion",
         "correlationId",
@@ -1124,5 +1079,5 @@
   ],
   "title": "TelemetryEnvelope",
   "description": "One ordered, idempotently ingestible game event.",
-  "$id": "https://starworks.community/contracts/telemetry-envelope/v1.schema.json"
+  "$id": "https://starworks.community/contracts/telemetry-envelope.schema.json"
 }

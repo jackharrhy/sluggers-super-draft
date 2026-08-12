@@ -94,7 +94,6 @@ export function parseTelemetryEventPayload(
 }
 
 const TelemetryEnvelopeFields = {
-    schemaVersion: z.literal(1),
     kind: z.literal("telemetry-envelope"),
     protocolVersion: z.literal(1),
     correlationId: UuidSchema,
@@ -139,7 +138,6 @@ export const TelemetryEnvelopeSchema = z.discriminatedUnion("eventType", [
 export type TelemetryEnvelope = z.infer<typeof TelemetryEnvelopeSchema>;
 
 export const TelemetryUploadRequestSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("telemetry-upload-request"),
   runnerId: UuidSchema,
   attemptId: UuidSchema,
@@ -148,7 +146,6 @@ export const TelemetryUploadRequestSchema = z.strictObject({
 });
 
 export const TelemetryUploadResponseSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("telemetry-upload-response"),
   attemptId: UuidSchema,
   acceptedSequences: z.array(z.number().int().positive()).max(256),

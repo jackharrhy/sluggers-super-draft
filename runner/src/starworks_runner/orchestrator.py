@@ -225,7 +225,6 @@ class RunnerStation:
         ):
             response = self.client.upload_telemetry(
                 {
-                    "schemaVersion": 1,
                     "kind": "telemetry-upload-request",
                     "runnerId": runner_id,
                     "attemptId": active.envelope["attemptId"],
@@ -275,7 +274,6 @@ class RunnerStation:
         failure_kind: FailureKind | None = None,
     ) -> dict[str, Any]:
         return {
-            "schemaVersion": 1,
             "kind": "runner-lease-update-request",
             "runnerId": runner_id,
             "attemptId": active.envelope["attemptId"],

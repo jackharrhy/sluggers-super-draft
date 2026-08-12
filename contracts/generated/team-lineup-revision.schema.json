@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "team-lineup-revision"
@@ -162,7 +158,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "leagueId",
     "teamId",
@@ -180,5 +175,5 @@
   "additionalProperties": false,
   "title": "TeamLineupRevision v1",
   "description": "A roster revision and independently versioned legal lineup.",
-  "$id": "https://starworks.community/contracts/team-lineup-revision/v1.schema.json"
+  "$id": "https://starworks.community/contracts/team-lineup-revision.schema.json"
 }

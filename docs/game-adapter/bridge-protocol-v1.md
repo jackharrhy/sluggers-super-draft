@@ -8,7 +8,7 @@ addresses or executable code.
 All multibyte values are unsigned and big-endian, matching the Wii's
 PowerPC CPU. The v1 reservation is `0x1700` bytes at virtual address
 `0x80001900`. The machine-readable source of truth is
-`runner/src/starworks_runner/games/sluggers/memory_map.v1.json`.
+`runner/src/starworks_runner/games/sluggers/memory_map.json`.
 
 The exact DOL map disproved the earlier `0x807A5000` candidate because it falls
 inside the static stack. The supported low-memory reservation instead begins

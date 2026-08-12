@@ -304,7 +304,6 @@ function representativeGame(fixture: Awaited<ReturnType<typeof createFixture>>):
     matchId: fixture.matchId,
     observationSource: 'bridge-hook',
     protocolVersion: 1,
-    schemaVersion: 1,
     sequence,
   })
   return [
@@ -344,7 +343,6 @@ function upload(fixture: Awaited<ReturnType<typeof createFixture>>, events: Tele
     kind: 'telemetry-upload-request',
     leaseId: fixture.leaseId,
     runnerId: fixture.stationId,
-    schemaVersion: 1,
   }
 }
 

@@ -17,7 +17,7 @@ function readFixture(name: ContractName): unknown {
   );
 }
 
-describe("Starworks v1 contracts", () => {
+describe("Starworks contracts", () => {
   for (const [name, schema] of Object.entries(contractSchemas)) {
     it(`accepts the shared ${name} fixture`, () => {
       expect(schema.safeParse(readFixture(name as ContractName)).success).toBe(
@@ -36,12 +36,12 @@ describe("Starworks v1 contracts", () => {
     });
   }
 
-  it("rejects an incompatible schema version", () => {
+  it("rejects pre-release compatibility fields", () => {
     const fixture = readFixture("run-envelope");
     expect(
       contractSchemas["run-envelope"].safeParse({
         ...(fixture as Record<string, unknown>),
-        schemaVersion: 2,
+        schemaVersion: 1,
       }).success,
     ).toBe(false);
   });

@@ -127,7 +127,6 @@ def compile_adapter_operations(
         )
 
     return {
-        "schemaVersion": 1,
         "kind": "adapter-operation-bundle",
         "adapterId": "sluggers-rmbe01",
         "adapterVersion": adapter_version,

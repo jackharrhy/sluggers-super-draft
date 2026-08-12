@@ -19,6 +19,7 @@ playable alpha. Status claims use three separate meanings:
 | Area | Status | Next gate |
 | --- | --- | --- |
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
+| Web/runner contracts | One strict, evolving pre-release contract set; dummy `schemaVersion` fields, `.v1.schema.json` artifacts, and `/api/v1` routing have been removed | Add compatibility versions only when the first real external-consumer boundary exists |
 | Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven | Complete and accept a scheduled match |
 | Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
 | Complete CPU-vs-CPU game | Live proven in normal-speed, server-scheduled one- and seven-inning games with adapter-owned CPU control | Produce a healthy hook-sourced result from the same path |
@@ -66,13 +67,27 @@ appear as unavailable rather than zero.
    Results, and Admin workspaces, following the legacy application's navigation
    and player-first visual language rather than adding dashboard-style
    super-pages.
-5. Remove leftover pre-release `schemaVersion: 1` fields and `.v1` filenames
-   where they imply compatibility guarantees Starworks does not have. Keep a
-   version only when it belongs to an independently versioned upstream binary
-   format; all Starworks-owned cross-program contracts remain one evolving v0
-   until the first release boundary.
+
+Pre-release contract cleanup is complete. Starworks-owned JSON contracts and
+local manifests evolve in place, generated schemas use unversioned filenames,
+and the private station API is `/api/runner`. The frozen legacy snapshot keeps
+its source-format marker. Telemetry keeps a numeric bridge protocol discriminator
+because the runner must prove that it can decode the exact binary memory layout;
+that is runtime safety metadata, not a public compatibility promise.
 
 ### Latest acceptance evidence
+
+On 2026-08-12, the pre-release contract surface was flattened across Zod,
+generated JSON Schema, Remix, and Python. Removing the unused `schemaVersion`
+field deleted compatibility ceremony from every shared payload, while strict
+objects and `kind` discriminators continue to reject unknown or mismatched
+messages. The runner endpoints moved from `/api/v1/runner` to `/api/runner`;
+local adapter, memory-map, supported-base, tool, static-target, bridge, and
+patch files likewise dropped premature version suffixes. A fresh PowerPC bridge
+build remained byte-for-byte identical to the pinned artifact at SHA-256
+`b5a9a75c5836c62741927bb8ab67d568e887be88ab6062a8736f0cd7c81f9161`.
+All 35 contract tests, 84 Remix tests, and 154 runner tests passed after the
+change.
 
 On 2026-08-12, scheduled attempt
 `d65b7083-cb1f-4174-b981-177d0c3f5baf` ran from the web queue through the
@@ -176,9 +191,11 @@ preserves the complete profile and exports the original 507-line representation
 losslessly. The profile page is a short section directory rather than a 101-row
 super-page; the dedicated character directory keeps the legacy portrait-first
 language and separates playable characters, Mii slots, and retained unused game
-slots. Stat Editor and AutoTeam numeric roster slots resolve through the same
-readable character catalogue. The local seed is idempotent and prints a direct
-draft-room URL.
+slots. Revision history now presents one meaningful saved timestamp instead of
+redundant created/published columns, and fresh fixture revisions preserve valid
+creation-before-publication ordering. Stat Editor and AutoTeam numeric roster
+slots resolve through the same readable character catalogue. The local seed is
+idempotent and prints a direct draft-room URL.
 
 The league workspace now exposes separate Matches, Teams, Results, and Admin
 routes with separate controllers and purpose-sized service read models.

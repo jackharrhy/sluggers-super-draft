@@ -71,7 +71,6 @@ def create_support_bundle(
     }
     state = _support_state(state_path)
     manifest = {
-        "schemaVersion": 1,
         "kind": "starworks-runner-support-bundle",
         "createdAt": created_at.isoformat().replace("+00:00", "Z"),
         "privacy": {

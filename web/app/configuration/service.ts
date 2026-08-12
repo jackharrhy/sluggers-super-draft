@@ -145,7 +145,6 @@ export class ConfigurationService {
     this.#requireLeagueAdmin(identity, leagueId)
     let now = this.#clock()
     let revision = StatProfileRevisionSchema.parse({
-      schemaVersion: 1,
       kind: 'stat-profile-revision',
       leagueId,
       profileId: this.#createId(),
@@ -298,7 +297,6 @@ export class ConfigurationService {
     this.#requireLeagueAdmin(identity, leagueId)
     let now = this.#clock()
     let revision = RulesetRevisionSchema.parse({
-      schemaVersion: 1,
       kind: 'ruleset-revision',
       leagueId,
       rulesetId: this.#createId(),
@@ -418,7 +416,6 @@ export class ConfigurationService {
     let [rosterMax] = await this.database.select({ value: max(rosterRevisions.revisionNumber) }).from(rosterRevisions).where(and(eq(rosterRevisions.leagueId, leagueId), eq(rosterRevisions.teamId, teamId)))
     let [lineupMax] = await this.database.select({ value: max(lineupRevisions.revisionNumber) }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.teamId, teamId)))
     let revision = TeamLineupRevisionSchema.parse({
-      schemaVersion: 1,
       kind: 'team-lineup-revision',
       leagueId,
       teamId,
@@ -594,7 +591,6 @@ export class ConfigurationService {
     }
     let now = this.#clock()
     let override = MatchLineupOverrideSchema.parse({
-      schemaVersion: 1,
       kind: 'match-lineup-override',
       baseLineupRevisionId: input.baseLineupRevisionId,
       createdAt: now.toISOString(),
@@ -647,17 +643,17 @@ export class ConfigurationService {
 
   async #loadStatRevision(leagueId: string, revisionId: string): Promise<StatProfileRevision | null> {
     let [row] = await this.database.select().from(statProfileRevisions).where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.id, revisionId))).limit(1)
-    return row ? StatProfileRevisionSchema.parse({ schemaVersion: 1, kind: 'stat-profile-revision', leagueId: row.leagueId, profileId: row.profileId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, definitions: row.definitions, characterValues: row.characterValues, sluggersTuning: row.sluggersTuning ?? undefined, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
+    return row ? StatProfileRevisionSchema.parse({ kind: 'stat-profile-revision', leagueId: row.leagueId, profileId: row.profileId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, definitions: row.definitions, characterValues: row.characterValues, sluggersTuning: row.sluggersTuning ?? undefined, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
   }
 
   async #loadRulesetRevision(leagueId: string, revisionId: string): Promise<RulesetRevision | null> {
     let [row] = await this.database.select().from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.id, revisionId))).limit(1)
-    return row ? RulesetRevisionSchema.parse({ schemaVersion: 1, kind: 'ruleset-revision', leagueId: row.leagueId, rulesetId: row.rulesetId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, settings: row.settings, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
+    return row ? RulesetRevisionSchema.parse({ kind: 'ruleset-revision', leagueId: row.leagueId, rulesetId: row.rulesetId, revisionId: row.id, revisionNumber: row.revisionNumber, status: row.status, name: row.name, settings: row.settings, basedOnRevisionId: row.basedOnRevisionId, createdAt: row.createdAt.toISOString(), publishedAt: row.publishedAt?.toISOString() ?? null }) : null
   }
 
   async #loadLineupRevision(leagueId: string, teamId: string, revisionId: string): Promise<TeamLineupRevision | null> {
     let [row] = await this.database.select({ lineup: lineupRevisions, roster: rosterRevisions }).from(lineupRevisions).innerJoin(rosterRevisions, and(eq(rosterRevisions.leagueId, lineupRevisions.leagueId), eq(rosterRevisions.teamId, lineupRevisions.teamId), eq(rosterRevisions.id, lineupRevisions.rosterRevisionId))).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.teamId, teamId), eq(lineupRevisions.id, revisionId))).limit(1)
-    return row ? TeamLineupRevisionSchema.parse({ schemaVersion: 1, kind: 'team-lineup-revision', leagueId: row.lineup.leagueId, teamId: row.lineup.teamId, rosterRevisionId: row.roster.id, rosterRevisionNumber: row.roster.revisionNumber, lineupRevisionId: row.lineup.id, lineupRevisionNumber: row.lineup.revisionNumber, status: row.lineup.status, rosterCharacterIds: row.roster.rosterCharacterIds, lineup: row.lineup.lineup, basedOnLineupRevisionId: row.lineup.basedOnRevisionId, createdAt: row.lineup.createdAt.toISOString(), publishedAt: row.lineup.publishedAt?.toISOString() ?? null }) : null
+    return row ? TeamLineupRevisionSchema.parse({ kind: 'team-lineup-revision', leagueId: row.lineup.leagueId, teamId: row.lineup.teamId, rosterRevisionId: row.roster.id, rosterRevisionNumber: row.roster.revisionNumber, lineupRevisionId: row.lineup.id, lineupRevisionNumber: row.lineup.revisionNumber, status: row.lineup.status, rosterCharacterIds: row.roster.rosterCharacterIds, lineup: row.lineup.lineup, basedOnLineupRevisionId: row.lineup.basedOnRevisionId, createdAt: row.lineup.createdAt.toISOString(), publishedAt: row.lineup.publishedAt?.toISOString() ?? null }) : null
   }
 
   #requireLeagueAdmin(identity: SessionIdentity | null, leagueId: string): asserts identity is SessionIdentity {

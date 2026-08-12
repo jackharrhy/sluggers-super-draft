@@ -59,7 +59,7 @@ typedef struct {
     volatile sw_u16 payload_size;
     volatile sw_u32 flags;
     volatile sw_u8 payload[SW_EVENT_PAYLOAD_SIZE];
-} StarworksEventV1;
+} StarworksEvent;
 
 typedef struct {
     volatile sw_u32 magic;
@@ -81,8 +81,8 @@ typedef struct {
     volatile sw_u64 request_epoch;
     volatile sw_u64 acknowledged_epoch;
     volatile sw_u8 reserved[88];
-    volatile StarworksEventV1 events[SW_EVENT_CAPACITY];
-} StarworksBridgeV1;
+    volatile StarworksEvent events[SW_EVENT_CAPACITY];
+} StarworksBridge;
 
 static void StarworksCopyDigest(volatile sw_u8 *destination,
                                 volatile const sw_u8 *source) {
@@ -96,12 +96,12 @@ static void StarworksPublishBarrier(void) {
     __asm__ volatile("sync" ::: "memory");
 }
 
-static void StarworksPublishEvent(volatile StarworksBridgeV1 *bridge,
+static void StarworksPublishEvent(volatile StarworksBridge *bridge,
                                   sw_u16 event_type,
                                   volatile const sw_u8 *payload,
                                   sw_u16 payload_size,
                                   sw_u32 flags) {
-    volatile StarworksEventV1 *event;
+    volatile StarworksEvent *event;
     sw_u64 sequence;
     sw_u32 index;
 
@@ -131,23 +131,23 @@ static void StarworksPublishEvent(volatile StarworksBridgeV1 *bridge,
 }
 
 void StarworksEmitGameStarted(void) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[1] = {0};
     StarworksPublishEvent(bridge, SW_EVENT_GAME_STARTED, payload, 0, 0);
 }
 
 void StarworksEmitInningStarted(sw_u8 inning, sw_u8 half) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[2] = {inning, half};
     StarworksPublishEvent(bridge, SW_EVENT_INNING_STARTED, payload, 2, 0);
 }
 
 void StarworksEmitCharacterChanged(sw_u16 event_type, sw_u8 character,
                                    sw_u8 side) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[2] = {character, side};
     if (event_type == SW_EVENT_BATTER_CHANGED ||
         event_type == SW_EVENT_PITCHER_CHANGED) {
@@ -159,8 +159,8 @@ void StarworksEmitPlateAppearanceEnded(
     sw_u8 batter, sw_u8 pitcher, sw_u8 side, sw_u8 result,
     sw_u8 outs_recorded, sw_u8 rbi, sw_u8 error_by, sw_u8 scorer_count,
     sw_u8 scorer_0, sw_u8 scorer_1, sw_u8 scorer_2, sw_u8 scorer_3) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[12] = {
         batter, pitcher, side, result, outs_recorded, rbi, error_by,
         scorer_count, scorer_0, scorer_1, scorer_2, scorer_3
@@ -171,16 +171,16 @@ void StarworksEmitPlateAppearanceEnded(
 
 void StarworksEmitSubstitution(sw_u8 incoming, sw_u8 outgoing,
                                sw_u8 position, sw_u8 side) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[4] = {incoming, outgoing, position, side};
     StarworksPublishEvent(bridge, SW_EVENT_SUBSTITUTION, payload, 4, 0);
 }
 
 void StarworksEmitGameEnded(sw_u16 away_runs, sw_u16 home_runs,
                             sw_u8 reason) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[5] = {
         (sw_u8)(away_runs >> 8), (sw_u8)away_runs,
         (sw_u8)(home_runs >> 8), (sw_u8)home_runs, reason
@@ -189,8 +189,8 @@ void StarworksEmitGameEnded(sw_u16 away_runs, sw_u16 home_runs,
 }
 
 void StarworksEmitWarning(sw_u8 code, sw_u32 dropped_events) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[5] = {
         code, (sw_u8)(dropped_events >> 24), (sw_u8)(dropped_events >> 16),
         (sw_u8)(dropped_events >> 8), (sw_u8)dropped_events
@@ -352,8 +352,8 @@ void StarworksApplyCpuControl(volatile sw_u8 *state) {
  * it must be derived from a lawful RMBE01 base and reviewed before release.
  */
 void StarworksBridgeTick(void) {
-    volatile StarworksBridgeV1 *bridge =
-        (volatile StarworksBridgeV1 *)SW_BRIDGE_ADDRESS;
+    volatile StarworksBridge *bridge =
+        (volatile StarworksBridge *)SW_BRIDGE_ADDRESS;
     volatile sw_u8 payload[8] = {0, 0, 0, 0, 0, 0, 0, 1};
 
     if (bridge->magic != SW_MAGIC ||

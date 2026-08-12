@@ -25,7 +25,6 @@ const AwayConfigurationSchema = z.strictObject({
 
 export const MatchConfigurationPackageSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("match-configuration-package"),
     adapterId: z.literal("sluggers-rmbe01"),
     adapterVersion: VersionSchema,

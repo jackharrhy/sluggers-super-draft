@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "ruleset-revision"
@@ -131,7 +127,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "leagueId",
     "rulesetId",
@@ -147,5 +142,5 @@
   "additionalProperties": false,
   "title": "RulesetRevision v1",
   "description": "An immutable-on-publication ruleset with explicit loading phases.",
-  "$id": "https://starworks.community/contracts/ruleset-revision/v1.schema.json"
+  "$id": "https://starworks.community/contracts/ruleset-revision.schema.json"
 }
