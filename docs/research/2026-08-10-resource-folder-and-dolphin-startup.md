@@ -153,10 +153,11 @@ implementations:
   and emits Gecko writes, but it has no included license and its large text
   format is not a Starworks contract.
 
-These are excellent leads for provenance notes, clean-room tests, address
-guards, and schema design. They are not a reason to inherit the editor's file
-format or copy unlicensed implementation code. Starworks should continue to
-define versioned web contracts with Zod/JSON Schema and compile them into
+These are excellent leads for provenance notes, address guards, and schema
+design. Stat Editor is a trusted direct implementation source through active
+contributor collaboration, so its proven behavior and suitable code may be
+adapted with attribution. Its file format still does not become a Starworks
+contract automatically; Starworks compiles its web-owned schema into
 game-specific operations at the runner boundary.
 
 ## Deterministic startup design

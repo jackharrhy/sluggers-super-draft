@@ -58,7 +58,7 @@ runner checks are also represented in CI or the production runbook.
 | --- | --- | --- |
 | Root Compose starts the web dependencies. | **Verified** | [`compose.yml`](../../compose.yml) defines Remix, PostgreSQL, Garage, migrations, and optional Mailpit. Compose validation and `/readyz` were exercised against running containers. |
 | One command validates representative contracts in TypeScript and Python. | **Verified** | `npm run contracts:check`; Zod sources and generated schemas live in [`contracts/`](../../contracts), and the runner wheel bundles the same schemas. |
-| No unlicensed/incompatible source was copied into Starworks packages. | **Verified for repository contents** | [`PRIOR_ART.md`](../../PRIOR_ART.md) records provenance and licensing constraints. New adapter and platform implementations are clean-room MIT code. |
+| Community implementation reuse is authorized and attributable. | **Verified for repository contents** | [`PRIOR_ART.md`](../../PRIOR_ART.md) records provenance and licensing constraints. Stat Editor, Stat Tracker, and AutoTeam are trusted direct sources through active contributor/maintainer collaboration; unrelated sources still require their own permission boundary. |
 | Product vocabulary and boundaries are documented once. | **Verified** | [`PLAN.md`](../../PLAN.md) is the architectural source of truth and is linked from [`README.md`](../../README.md). |
 
 The new Remix application lives in `web/`; the original site is preserved in

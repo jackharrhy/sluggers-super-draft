@@ -29,6 +29,7 @@ from starworks_runner.games.sluggers.tools import DtkDiscTool
 from starworks_runner.games.sluggers.tracker import (
     SluggersGameTracker,
     TrackerEvent,
+    match_batting_orders,
     match_character_ids,
 )
 from starworks_runner.orchestrator import AttemptExecutionError, ExecutionOutcome
@@ -237,10 +238,13 @@ class LiveSluggersExecutor:
                 team["side"]: team["lineup"]["teamId"]
                 for team in configuration["teams"]
             }
+            batting_orders = match_batting_orders(configuration)
             tracker = SluggersGameTracker(
                 away_team_id=team_ids["away"],
                 home_team_id=team_ids["home"],
                 character_ids=match_character_ids(configuration),
+                away_batting_order=batting_orders["away"],
+                home_batting_order=batting_orders["home"],
             )
             if self.recovery_state is not None:
                 tracker_state = self.recovery_state.get("tracker")

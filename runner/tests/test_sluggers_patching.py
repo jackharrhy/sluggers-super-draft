@@ -252,7 +252,7 @@ def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> 
     assert len(manifest.trusted_patch_set().plans) == 1
     assert manifest.static_target_catalog.name == "static_targets.v1.json"
     assert any(
-        "Live Dolphin 2606 acceptance" in gate for gate in manifest.release_gates
+        "unattended Dolphin 2606 match" in gate for gate in manifest.release_gates
     )
     assert any(
         "server-published stat profile" in gate

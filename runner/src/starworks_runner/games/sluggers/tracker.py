@@ -8,41 +8,13 @@ from starworks_runner.games.sluggers.bridge.configuration import (
     CHARACTER_IDS,
 )
 from starworks_runner.games.sluggers.bridge.layout import BridgeProtocolError
-from starworks_runner.games.sluggers.bridge.memory import MemoryTransport
 from starworks_runner.games.sluggers.errors import SluggersAdapterError
-
-# These addresses are exact-RMBE01 research leads documented in
-# docs/game-adapter/telemetry-discovery.md. Keeping the reader here, rather than
-# spreading addresses through the runner, gives us one narrow place to replace
-# a lead when live trace evidence disproves it.
-GAMEPLAY_BLOCK_ADDRESS = 0x900D5AA7
-GAMEPLAY_BLOCK_END = 0x900D5E36
-BATTER_BLOCK_ADDRESS = 0x900D692C
-BATTER_BLOCK_END = 0x900D6A96
-PITCHER_BLOCK_ADDRESS = 0x900D9B45
-PITCHER_BLOCK_END = 0x900D9B48
-GAME_TIMER_ADDRESS = 0x900DFCFC
-BASES_ADVANCED_ADDRESS = 0x900D66D2
-HOME_RUN_ADDRESS = 0x900D953C
-
-INTRO_STATES = frozenset({0x04, 0x05})
-PLAY_STATES = frozenset(
-    {
-        0x01,  # batting
-        0x02,  # fielding
-        0x03,  # mid-inning transition
-        0x07,  # celebration
-        0x08,  # load next batter
-        0x0F,  # fielding transition
-        0x13,  # home-run celebration
-        0x14,  # home-run bases
-        0x15,  # RBI celebration
-        0x16,  # pre-pitch cutscene
-    }
+from starworks_runner.games.sluggers.game_observation import (
+    PLAY_STATES,
+    GameSnapshot,
+    TeamSide,
 )
-END_STATES = frozenset({0x09, 0x0E, 0x1B})
 
-TeamSide = Literal["away", "home"]
 TrackerEventType = Literal[
     "game-started",
     "inning-started",
@@ -52,6 +24,16 @@ TrackerEventType = Literal[
     "bridge-warning",
     "game-ended",
 ]
+
+
+def _runner_indices(value: object) -> tuple[int, int, int]:
+    if (
+        not isinstance(value, (list, tuple))
+        or len(value) != 3
+        or any(type(index) is not int for index in value)
+    ):
+        raise ValueError("runner indices must contain three integers")
+    return value[0], value[1], value[2]
 
 
 def match_character_ids(configuration: dict[str, Any]) -> dict[int, str]:
@@ -73,46 +55,21 @@ def match_character_ids(configuration: dict[str, Any]) -> dict[int, str]:
     return result
 
 
-@dataclass(frozen=True)
-class GameSnapshot:
-    frame: int
-    state: int
-    inning: int
-    half: int
-    away_score: int
-    home_score: int
-    away_hits: int
-    home_hits: int
-    balls: int
-    strikes: int
-    outs: int
-    pitches: int
-    batter_game_id: int
-    pitcher_game_id: int
-    runs_this_play: int
-    outs_this_play: int
-    bases_advanced: int = 0
-    ball_was_hit: int = 0
-    bean_ball: int = 0
-    home_run: int = 0
+def match_batting_orders(
+    configuration: dict[str, Any],
+) -> dict[TeamSide, tuple[str, ...]]:
+    """Return the immutable batting order used by game runner-slot indices."""
 
-    @property
-    def has_started(self) -> bool:
-        if self.state in INTRO_STATES:
-            return True
-        return self.state in PLAY_STATES | END_STATES and 1 <= self.inning <= 99
-
-    @property
-    def has_ended(self) -> bool:
-        return self.state in END_STATES
-
-    @property
-    def batting_side(self) -> TeamSide | None:
-        if self.half == 0:
-            return "away"
-        if self.half == 1:
-            return "home"
-        return None
+    result: dict[TeamSide, tuple[str, ...]] = {}
+    for team in configuration["teams"]:
+        side = team["side"]
+        order = tuple(team["lineup"]["lineup"]["battingOrder"])
+        if side not in {"away", "home"} or len(order) != 9:
+            raise BridgeProtocolError("Telemetry requires two nine-player batting orders")
+        result[side] = order
+    if set(result) != {"away", "home"}:
+        raise BridgeProtocolError("Telemetry requires one away and one home batting order")
+    return result
 
 
 @dataclass(frozen=True)
@@ -142,6 +99,7 @@ class PendingAppearance:
     home_run: bool = False
     pitcher_changed: bool = False
     awaiting_play_reset: bool = True
+    base_runner_indices: tuple[int, int, int] = (-1, -1, -1)
 
     @property
     def has_activity(self) -> bool:
@@ -160,62 +118,6 @@ class PendingAppearance:
         )
 
 
-class SluggersMemoryReader:
-    """Read the smallest useful live-game snapshot through DME.
-
-    The fields are grouped into a few bounded reads. This is substantially
-    cheaper and easier to trace than refreshing dozens of one-byte wrappers.
-    """
-
-    def __init__(self, transport: MemoryTransport) -> None:
-        self.transport = transport
-
-    def read(self) -> GameSnapshot:
-        gameplay = self._read_block(GAMEPLAY_BLOCK_ADDRESS, GAMEPLAY_BLOCK_END)
-        batter = self._read_block(BATTER_BLOCK_ADDRESS, BATTER_BLOCK_END)
-        pitcher = self._read_block(PITCHER_BLOCK_ADDRESS, PITCHER_BLOCK_END)
-        timer = self.transport.read(GAME_TIMER_ADDRESS, 4)
-        bases_advanced = self.transport.read(BASES_ADVANCED_ADDRESS, 1)
-        home_run = self.transport.read(HOME_RUN_ADDRESS, 1)
-        if len(timer) != 4:
-            raise SluggersAdapterError("Dolphin returned a short game-timer read")
-        if len(bases_advanced) != 1:
-            raise SluggersAdapterError("Dolphin returned a short bases-advanced read")
-        if len(home_run) != 1:
-            raise SluggersAdapterError("Dolphin returned a short home-run read")
-        return GameSnapshot(
-            frame=int.from_bytes(timer, "big"),
-            state=gameplay[0x181],
-            inning=gameplay[0x2F0],
-            half=gameplay[0x37E],
-            away_score=int.from_bytes(gameplay[0x2F1:0x2F3], "big"),
-            home_score=int.from_bytes(gameplay[0x30B:0x30D], "big"),
-            away_hits=gameplay[0x326],
-            home_hits=gameplay[0x340],
-            balls=gameplay[1],
-            strikes=gameplay[0],
-            outs=gameplay[2],
-            pitches=batter[0],
-            batter_game_id=batter[0xC3],
-            pitcher_game_id=pitcher[2],
-            runs_this_play=gameplay[0x389],
-            outs_this_play=gameplay[0x38A],
-            bases_advanced=int.from_bytes(bases_advanced, "big", signed=True),
-            ball_was_hit=batter[0x168],
-            bean_ball=int.from_bytes(batter[0x169:0x16A], "big", signed=True),
-            home_run=home_run[0],
-        )
-
-    def _read_block(self, start: int, end: int) -> bytes:
-        expected = end - start
-        value = self.transport.read(start, expected)
-        if len(value) != expected:
-            raise SluggersAdapterError(
-                f"Dolphin returned a short game-memory read at 0x{start:08X}"
-            )
-        return value
-
-
 class SluggersGameTracker:
     """Convert exact-build memory snapshots into a small semantic event stream."""
 
@@ -225,10 +127,18 @@ class SluggersGameTracker:
         away_team_id: str,
         home_team_id: str,
         character_ids: dict[int, str],
+        away_batting_order: tuple[str, ...],
+        home_batting_order: tuple[str, ...],
     ) -> None:
         self.away_team_id = away_team_id
         self.home_team_id = home_team_id
         self.character_ids = dict(character_ids)
+        if len(away_batting_order) != 9 or len(home_batting_order) != 9:
+            raise BridgeProtocolError("Telemetry batting orders must contain nine players")
+        self.batting_orders = {
+            "away": tuple(away_batting_order),
+            "home": tuple(home_batting_order),
+        }
         self.last: GameSnapshot | None = None
         self.started = False
         self.ended = False
@@ -331,7 +241,14 @@ class SluggersGameTracker:
             if not isinstance(raw_last, dict):
                 raise SluggersAdapterError("Saved game tracker snapshot is invalid")
             try:
-                last = GameSnapshot(**raw_last)
+                last = GameSnapshot(
+                    **{
+                        **raw_last,
+                        "base_runner_indices": _runner_indices(
+                            raw_last.get("base_runner_indices", (-1, -1, -1))
+                        ),
+                    }
+                )
             except (TypeError, ValueError) as error:
                 raise SluggersAdapterError(
                     "Saved game tracker snapshot is invalid"
@@ -344,7 +261,14 @@ class SluggersGameTracker:
                     "Saved game tracker appearance is invalid"
                 )
             try:
-                pending = PendingAppearance(**raw_pending)
+                pending = PendingAppearance(
+                    **{
+                        **raw_pending,
+                        "base_runner_indices": _runner_indices(
+                            raw_pending.get("base_runner_indices", (-1, -1, -1))
+                        ),
+                    }
+                )
             except (TypeError, ValueError) as error:
                 raise SluggersAdapterError(
                     "Saved game tracker appearance is invalid"
@@ -391,6 +315,7 @@ class SluggersGameTracker:
             if not self._play_fields_are_clear(snapshot):
                 return
             pending.awaiting_play_reset = False
+            pending.base_runner_indices = snapshot.base_runner_indices
         if pending.pitcher_game_id != snapshot.pitcher_game_id:
             pending.pitcher_changed = True
             pending.pitcher_game_id = snapshot.pitcher_game_id
@@ -454,9 +379,7 @@ class SluggersGameTracker:
             )
             return
         cumulative_outs = max(0, snapshot.outs - pending.start_outs)
-        outs_recorded = min(
-            3, max(pending.max_outs_this_play, cumulative_outs)
-        )
+        outs_recorded = min(3, max(pending.max_outs_this_play, cumulative_outs))
         result = self._appearance_result(pending, hit_delta, outs_recorded)
         if result is None:
             self._append_provisional_warning(
@@ -472,7 +395,14 @@ class SluggersGameTracker:
                 f"Plate appearance for {batter} crossed a pitcher change",
             )
             return
-        if score_delta != 0 or pending.max_runs_this_play != 0:
+        scorers = self._scorers(
+            pending,
+            batter=batter,
+            result=result,
+            score_delta=score_delta,
+            hit_delta=hit_delta,
+        )
+        if scorers is None:
             self._append_provisional_warning(
                 events,
                 snapshot,
@@ -490,11 +420,50 @@ class SluggersGameTracker:
                     "outsRecorded": outs_recorded,
                     "pitcherCharacterId": pitcher,
                     "result": result,
-                    "rbi": 0,
-                    "scorerCharacterIds": [],
+                    "rbi": len(scorers),
+                    "scorerCharacterIds": list(scorers),
                 },
             )
         )
+
+    def _scorers(
+        self,
+        pending: PendingAppearance,
+        *,
+        batter: str,
+        result: str,
+        score_delta: int,
+        hit_delta: int,
+    ) -> tuple[str, ...] | None:
+        if score_delta == 0 and pending.max_runs_this_play == 0:
+            return ()
+        if (
+            score_delta <= 0
+            or pending.max_runs_this_play not in {0, score_delta}
+        ):
+            return None
+        order = self.batting_orders[pending.batting_side]
+        indices = pending.base_runner_indices
+        occupied = [index for index in indices if index != -1]
+        if (
+            any(not 0 <= index < len(order) for index in occupied)
+            or len(set(occupied)) != len(occupied)
+        ):
+            return None
+        runners = tuple(order[index] for index in occupied)
+        if batter in runners:
+            return None
+        if result == "home-run" and hit_delta == 1:
+            scorers = tuple(reversed(runners)) + (batter,)
+            return scorers if len(scorers) == score_delta else None
+        if (
+            result in {"walk", "hit-by-pitch"}
+            and hit_delta == 0
+            and len(occupied) == 3
+            and score_delta == 1
+        ):
+            return (order[indices[2]],)
+        return None
 
     @staticmethod
     def _appearance_result(

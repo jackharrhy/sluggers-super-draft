@@ -50,7 +50,7 @@ complete reducer and fault matrix are accepted.
 ## Trusted tracker baseline
 
 The reducer was reconciled on 2026-08-11 with the current trusted Stat Tracker
-`origin/main` at `6791f8ee10a92fc1825e369cd70e3616e0e6c1b9`. Starworks uses its proven
+`origin/main` at `72547b8909086b1bd2b4ba287afee4f61a1e963b`. Starworks uses its proven
 RMBE01 addresses and transition knowledge directly, while keeping the smaller
 immutable-event boundary needed by the web application. In particular, the
 reference tracker accumulates pitch state across batting, fielding, home-run,
@@ -90,11 +90,13 @@ Two trace findings constrain the reducer:
 Walk, strikeout, hit-by-pitch, home run, ordinary hit, and ordinary out can be
 resolved by the v0 reducer from the trusted fields. Until the new reads and
 reducer are live-accepted, only scoreless supported appearances are emitted.
-A scoring appearance, pitcher change within an appearance, inconsistent
-counter delta, or unknown result emits a `provisional-observation` warning and
-withholds the appearance. Error, sacrifice, RBI, and scorer attribution remain
-unavailable until a trace supplies unambiguous evidence; Starworks will not
-collapse them into a guessed result or zero-fill missing attribution.
+A pitcher change within an appearance, inconsistent counter delta, unknown
+result, or ambiguous scoring play emits a `provisional-observation` warning and
+withholds the appearance. Error and sacrifice attribution remain unavailable.
+Scorer and RBI attribution is implemented only for a home run with valid
+occupied-base slots and a bases-loaded walk or hit-by-pitch; it still requires
+live acceptance. Starworks will not collapse other plays into a guessed result
+or zero-fill missing attribution.
 
 A normal-speed live run on 2026-08-11 exposed one more boundary rule: the game
 retains prior-play result bytes briefly after it installs the next batter. The
@@ -108,6 +110,15 @@ half. A clean follow-up run live-proved that corrected ordering, and a one-run
 play emitted a review warning without a fabricated RBI or scorer list.
 Ordinary outs, singles, the half-inning order, and scoring-warning path are live
 proven; the remaining classifications still need equivalent live examples.
+
+A focused DME trace then proved the reference tracker's runner model without
+copying its mutable scoring fallback. The first-, second-, and third-base slots
+at `0x900DB7CD`, `0x900DB9A1`, and `0x900DBB75` hold signed indices into the
+immutable batting order. Across consecutive singles, Wario moved from lineup
+index 0 on first to index 0 on second while Waluigi appeared as index 1 on
+first. This is sufficient for exact home-run scorer ordering and the forced
+runner from third on a bases-loaded walk/HBP. It is not sufficient for general
+multi-run attribution, so those plays continue to fail closed.
 
 ## Semantic event boundary
 

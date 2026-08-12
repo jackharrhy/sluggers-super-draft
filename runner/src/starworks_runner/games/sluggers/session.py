@@ -33,7 +33,10 @@ from starworks_runner.games.sluggers.bridge.memory import (
 from starworks_runner.games.sluggers.controller import DolphinPipeController
 from starworks_runner.games.sluggers.dolphin import DolphinLaunch, DolphinLauncher
 from starworks_runner.games.sluggers.errors import BuildIntegrityError
-from starworks_runner.games.sluggers.tracker import GameSnapshot, SluggersMemoryReader
+from starworks_runner.games.sluggers.game_observation import (
+    GameSnapshot,
+    SluggersMemoryReader,
+)
 
 
 class LiveMemoryTransport(MemoryTransport, Protocol):
