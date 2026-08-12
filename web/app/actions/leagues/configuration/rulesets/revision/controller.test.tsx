@@ -25,7 +25,6 @@ describe('ruleset revision controller', () => {
       revisionId: '44444444-4444-4444-8444-444444444444',
       revisionNumber: 2,
       rulesetId: '66666666-6666-4666-8666-666666666666',
-      schemaVersion: 1 as const,
       settings,
       status: 'draft' as const,
     }

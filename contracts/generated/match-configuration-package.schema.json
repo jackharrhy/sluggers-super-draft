@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "match-configuration-package"
@@ -42,10 +38,6 @@
         {
           "type": "object",
           "properties": {
-            "schemaVersion": {
-              "type": "number",
-              "const": 1
-            },
             "kind": {
               "type": "string",
               "const": "content-pack-manifest"
@@ -221,7 +213,6 @@
             }
           },
           "required": [
-            "schemaVersion",
             "kind",
             "contentPackId",
             "revisionId",
@@ -245,10 +236,6 @@
     "statProfile": {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "stat-profile-revision"
@@ -1071,7 +1058,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "leagueId",
         "profileId",
@@ -1092,10 +1078,6 @@
     "ruleset": {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "ruleset-revision"
@@ -1221,7 +1203,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "leagueId",
         "rulesetId",
@@ -1253,10 +1234,6 @@
                 "lineup": {
                   "type": "object",
                   "properties": {
-                    "schemaVersion": {
-                      "type": "number",
-                      "const": 1
-                    },
                     "kind": {
                       "type": "string",
                       "const": "team-lineup-revision"
@@ -1413,7 +1390,6 @@
                     }
                   },
                   "required": [
-                    "schemaVersion",
                     "kind",
                     "leagueId",
                     "teamId",
@@ -1449,10 +1425,6 @@
                 "lineup": {
                   "type": "object",
                   "properties": {
-                    "schemaVersion": {
-                      "type": "number",
-                      "const": 1
-                    },
                     "kind": {
                       "type": "string",
                       "const": "team-lineup-revision"
@@ -1609,7 +1581,6 @@
                     }
                   },
                   "required": [
-                    "schemaVersion",
                     "kind",
                     "leagueId",
                     "teamId",
@@ -1650,10 +1621,6 @@
                 "lineup": {
                   "type": "object",
                   "properties": {
-                    "schemaVersion": {
-                      "type": "number",
-                      "const": 1
-                    },
                     "kind": {
                       "type": "string",
                       "const": "team-lineup-revision"
@@ -1810,7 +1777,6 @@
                     }
                   },
                   "required": [
-                    "schemaVersion",
                     "kind",
                     "leagueId",
                     "teamId",
@@ -1846,10 +1812,6 @@
                 "lineup": {
                   "type": "object",
                   "properties": {
-                    "schemaVersion": {
-                      "type": "number",
-                      "const": 1
-                    },
                     "kind": {
                       "type": "string",
                       "const": "team-lineup-revision"
@@ -2006,7 +1968,6 @@
                     }
                   },
                   "required": [
-                    "schemaVersion",
                     "kind",
                     "leagueId",
                     "teamId",
@@ -2129,7 +2090,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "adapterId",
     "adapterVersion",
@@ -2149,5 +2109,5 @@
   "additionalProperties": false,
   "title": "MatchConfigurationPackage",
   "description": "Published declarative inputs for one leased attempt; contains no game buffers, addresses, or executable patches.",
-  "$id": "https://starworks.community/contracts/match-configuration-package/v1.schema.json"
+  "$id": "https://starworks.community/contracts/match-configuration-package.schema.json"
 }

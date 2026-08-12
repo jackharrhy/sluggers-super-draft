@@ -15,10 +15,10 @@ const staleArtifacts: string[] = [];
 for (const [name, schema] of Object.entries(contractSchemas)) {
   const artifact = {
     ...z.toJSONSchema(schema, { target: "draft-2020-12" }),
-    $id: `https://starworks.community/contracts/${name}/v1.schema.json`,
+    $id: `https://starworks.community/contracts/${name}.schema.json`,
   };
   const serialized = `${JSON.stringify(artifact, null, 2)}\n`;
-  const outputPath = path.join(generatedDirectory, `${name}.v1.schema.json`);
+  const outputPath = path.join(generatedDirectory, `${name}.schema.json`);
 
   if (checkOnly) {
     const existing = await readFile(outputPath, "utf8").catch(() => null);

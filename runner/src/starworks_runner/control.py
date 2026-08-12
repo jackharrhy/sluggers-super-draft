@@ -82,9 +82,8 @@ class RunnerControlClient:
         self, station_name: str, capabilities: dict[str, Any]
     ) -> dict[str, Any]:
         return self._send(
-            "/api/v1/runner/register",
+            "/api/runner/register",
             {
-                "schemaVersion": 1,
                 "kind": "runner-registration-request",
                 "stationName": station_name,
                 "capabilities": capabilities,
@@ -104,7 +103,6 @@ class RunnerControlClient:
         component_health: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         message: dict[str, Any] = {
-            "schemaVersion": 1,
             "kind": "runner-heartbeat-request",
             "runnerId": runner_id,
             "sentAt": sent_at,
@@ -116,16 +114,15 @@ class RunnerControlClient:
         if component_health is not None:
             message["components"] = component_health
         return self._send(
-            "/api/v1/runner/heartbeat",
+            "/api/runner/heartbeat",
             message,
             expected_kind="runner-heartbeat-response",
         )
 
     def claim(self, runner_id: str) -> dict[str, Any]:
         return self._send(
-            "/api/v1/runner/claim",
+            "/api/runner/claim",
             {
-                "schemaVersion": 1,
                 "kind": "runner-claim-request",
                 "runnerId": runner_id,
             },
@@ -137,7 +134,7 @@ class RunnerControlClient:
         if not isinstance(lease_id, str):
             raise TypeError("Lease update requires leaseId")
         return self._send(
-            f"/api/v1/runner/leases/{quote(lease_id, safe='')}",
+            f"/api/runner/leases/{quote(lease_id, safe='')}",
             message,
             expected_kind="runner-lease-update-response",
         )
@@ -145,7 +142,7 @@ class RunnerControlClient:
     def configuration(self, attempt_id: str) -> dict[str, Any]:
         return self._request(
             "GET",
-            f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/configuration",
+            f"/api/runner/attempts/{quote(attempt_id, safe='')}/configuration",
             None,
             response_contract="match-configuration-package",
             expected_kind="match-configuration-package",
@@ -166,7 +163,7 @@ class RunnerControlClient:
         response = self.transport.request(
             "GET",
             self.base_url
-            + f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/assets/{sha256}",
+            + f"/api/runner/attempts/{quote(attempt_id, safe='')}/assets/{sha256}",
             {
                 "accept": "application/octet-stream",
                 "authorization": f"Bearer {self._credential}",
@@ -205,7 +202,7 @@ class RunnerControlClient:
             raise TypeError("Telemetry upload requires attemptId")
         return self._request(
             "POST",
-            f"/api/v1/runner/attempts/{quote(attempt_id, safe='')}/telemetry",
+            f"/api/runner/attempts/{quote(attempt_id, safe='')}/telemetry",
             message,
             response_contract="telemetry-upload",
             expected_kind="telemetry-upload-response",

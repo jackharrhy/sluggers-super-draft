@@ -35,7 +35,6 @@ export const MatchExecutionSchema = z.strictObject({
 
 export const RunEnvelopeSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("run-envelope"),
     correlationId: UuidSchema,
     createdByActorId: UuidSchema,

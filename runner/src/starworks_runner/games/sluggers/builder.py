@@ -223,7 +223,6 @@ class GameBuildService:
                 )
 
             report = {
-                "schemaVersion": 1,
                 "kind": "game-build-report",
                 "generatedAt": self.clock()
                 .astimezone(UTC)
@@ -302,7 +301,6 @@ class GameBuildService:
         patch_receipts: list[dict[str, str]],
     ) -> dict[str, Any]:
         deterministic_receipt = {
-            "schemaVersion": 1,
             "kind": "game-build-manifest",
             "baseGame": base.manifest_value(),
             "adapterVersion": request.adapter_version,

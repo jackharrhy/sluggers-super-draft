@@ -216,7 +216,6 @@ export class TelemetryService implements TelemetryApplication {
       maxAcceptedSequence: result.health.lastSequence,
       nextExpectedSequence: result.health.nextExpectedSequence,
       requiresReview: result.health.requiresReview,
-      schemaVersion: 1,
     })
   }
 
@@ -757,7 +756,6 @@ function rowToEnvelope(
     observationSource: row.observationSource,
     payload: row.payload,
     protocolVersion: row.protocolVersion,
-    schemaVersion: 1,
     sequence: row.sequence,
     stateFingerprint: row.stateFingerprint ?? undefined,
   })

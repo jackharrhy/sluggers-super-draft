@@ -66,9 +66,7 @@ class PrecompiledPatchPlan:
             raw = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise BuildIntegrityError(f"Patch plan is unreadable: {path}") from error
-        schema_version = raw.get("schemaVersion")
         expected_keys = {
-            "schemaVersion",
             "kind",
             "patchId",
             "targetPath",
@@ -77,11 +75,11 @@ class PrecompiledPatchPlan:
             "artifact",
             "writes",
         }
-        if schema_version == 2:
+        if "append" in raw:
             expected_keys.add("append")
         if set(raw) != expected_keys:
             raise BuildIntegrityError("Patch plan has missing or unknown fields")
-        if schema_version not in {1, 2} or raw["kind"] != "precompiled-patch-plan":
+        if raw["kind"] != "precompiled-patch-plan":
             raise BuildIntegrityError("Unsupported patch-plan contract")
         artifact = raw["artifact"]
         if set(artifact) != {"path", "sha256", "sizeBytes"}:
@@ -116,7 +114,7 @@ class PrecompiledPatchPlan:
                 raise BuildIntegrityError("Guarded write sizes or offsets are invalid")
             writes.append(write)
         append = None
-        if schema_version == 2:
+        if "append" in raw:
             append_value = raw["append"]
             if set(append_value) != {
                 "targetOffset",

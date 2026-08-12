@@ -335,7 +335,6 @@ export class RunnerAdminService {
       publishedAt: profile.publishedAt?.toISOString() ?? null,
       revisionId: profile.id,
       revisionNumber: profile.revisionNumber,
-      schemaVersion: 1,
       sluggersTuning: profile.sluggersTuning ?? undefined,
       status: profile.status,
     })
@@ -349,7 +348,6 @@ export class RunnerAdminService {
       revisionId: ruleset.id,
       revisionNumber: ruleset.revisionNumber,
       rulesetId: ruleset.rulesetId,
-      schemaVersion: 1,
       settings: ruleset.settings,
       status: ruleset.status,
     })
@@ -512,7 +510,6 @@ export class RunnerAdminService {
       rosterCharacterIds: row.roster.rosterCharacterIds,
       rosterRevisionId: row.roster.id,
       rosterRevisionNumber: row.roster.revisionNumber,
-      schemaVersion: 1,
       status: row.lineup.status,
       teamId: row.lineup.teamId,
     })

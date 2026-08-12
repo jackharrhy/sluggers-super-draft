@@ -5,15 +5,14 @@
     "targetOffset": 7434016
   },
   "artifact": {
-    "path": "artifacts/bridge-v1-rmbe01.bin",
+    "path": "artifacts/bridge-rmbe01.bin",
     "sha256": "b5a9a75c5836c62741927bb8ab67d568e887be88ab6062a8736f0cd7c81f9161",
     "sizeBytes": 5912
   },
   "expectedInputSha256": "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151",
   "expectedOutputSha256": "c7af12d07e3b5722b1a66d609e9faecfbf5c16dcda9af41238645998c64b1bcc",
   "kind": "precompiled-patch-plan",
-  "patchId": "starworks-bridge-v1-rmbe01-rev0",
-  "schemaVersion": 2,
+  "patchId": "starworks-bridge-rmbe01-rev0",
   "targetPath": "sys/main.dol",
   "writes": [
     {

@@ -69,7 +69,6 @@ def memory_tracker_telemetry(
     configuration: dict[str, Any],
 ) -> dict[str, Any]:
     return {
-        "schemaVersion": 1,
         "kind": "telemetry-envelope",
         "protocolVersion": 1,
         "correlationId": envelope["correlationId"],
@@ -308,7 +307,6 @@ class LiveSluggersExecutor:
         ruleset = bound.configuration["ruleset"]
         return ContentPackInput(
             manifest={
-                "schemaVersion": 1,
                 "kind": "content-pack-manifest",
                 "contentPackId": profile["profileId"],
                 "revisionId": profile["revisionId"],

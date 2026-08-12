@@ -119,10 +119,8 @@ class SupportedBaseRegistry:
 
     @classmethod
     def load(cls, path: Path | None = None) -> SupportedBaseRegistry:
-        registry_path = path or Path(__file__).with_name("supported_bases.v1.json")
+        registry_path = path or Path(__file__).with_name("supported_bases.json")
         raw = json.loads(registry_path.read_text(encoding="utf-8"))
-        if raw.get("schemaVersion") != 1:
-            raise UnsupportedBaseError("Unsupported base-fingerprint registry version")
         if raw.get("gameId") != "RMBE01" or raw.get("region") != "NTSC-U":
             raise UnsupportedBaseError("Base registry targets the wrong game or region")
         entries = tuple(

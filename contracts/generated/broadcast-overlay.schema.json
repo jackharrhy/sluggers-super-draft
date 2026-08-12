@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "broadcast-overlay"
@@ -339,7 +335,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "updatedAt",
     "league",
@@ -351,5 +346,5 @@
     "recentEvents"
   ],
   "additionalProperties": false,
-  "$id": "https://starworks.community/contracts/broadcast-overlay/v1.schema.json"
+  "$id": "https://starworks.community/contracts/broadcast-overlay.schema.json"
 }

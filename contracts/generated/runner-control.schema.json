@@ -4,10 +4,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-registration-request"
@@ -88,7 +84,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "stationName",
         "capabilities"
@@ -98,10 +93,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-registration-response"
@@ -150,7 +141,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "runnerId",
         "heartbeatSeconds",
@@ -161,10 +151,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-heartbeat-request"
@@ -277,7 +263,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "runnerId",
         "sentAt",
@@ -291,10 +276,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-heartbeat-response"
@@ -309,7 +290,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "serverTime",
         "accepted"
@@ -319,10 +299,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-claim-request"
@@ -334,7 +310,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "runnerId"
       ],
@@ -343,10 +318,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-claim-response"
@@ -356,10 +327,6 @@
             {
               "type": "object",
               "properties": {
-                "schemaVersion": {
-                  "type": "number",
-                  "const": 1
-                },
                 "kind": {
                   "type": "string",
                   "const": "run-envelope"
@@ -677,7 +644,6 @@
                 }
               },
               "required": [
-                "schemaVersion",
                 "kind",
                 "correlationId",
                 "createdByActorId",
@@ -707,7 +673,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "run"
       ],
@@ -716,10 +681,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-lease-update-request"
@@ -772,7 +733,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "runnerId",
         "attemptId",
@@ -786,10 +746,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "runner-lease-update-response"
@@ -820,7 +776,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "attemptStatus",
         "expiresAt"
@@ -830,5 +785,5 @@
   ],
   "title": "RunnerControlMessage",
   "description": "Registration, heartbeat, claim, and lease messages shared by Remix and the native runner.",
-  "$id": "https://starworks.community/contracts/runner-control/v1.schema.json"
+  "$id": "https://starworks.community/contracts/runner-control.schema.json"
 }

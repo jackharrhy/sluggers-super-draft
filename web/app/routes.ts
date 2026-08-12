@@ -2,7 +2,7 @@ import { get, post, route } from 'remix/routes'
 
 export const routes = route({
   assets: get('/assets/*path'),
-  broadcastData: get('/api/v1/public/leagues/:leagueSlug/matches/:matchId/overlay'),
+  broadcastData: get('/api/public/leagues/:leagueSlug/matches/:matchId/overlay'),
   broadcastOverlay: get('/overlays/:leagueSlug/matches/:matchId'),
   home: '/',
   system: {
@@ -20,7 +20,7 @@ export const routes = route({
     newLeague: get('leagues/new'),
     createLeague: post('leagues/new'),
   }),
-  runnerApi: route('api/v1/runner', {
+  runnerApi: route('api/runner', {
     register: post('register'),
     heartbeat: post('heartbeat'),
     claim: post('claim'),

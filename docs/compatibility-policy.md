@@ -6,11 +6,11 @@ protocol variants or promise cross-build compatibility yet.
 
 ## JSON contracts
 
-Every network and artifact contract contains `schemaVersion` and `kind`, but
-the current discriminator is not a promise that Starworks supports multiple
-historical schemas. During v0, a change updates the one checked-in contract,
-its fixtures, generated JSON Schema, web producer/consumer, and Python
-producer/consumer together.
+Every network and artifact contract is a strict object with a narrow `kind`
+discriminator. During v0, a change updates the one checked-in contract, its
+fixtures, generated JSON Schema, web producer/consumer, and Python
+producer/consumer together. There is no `schemaVersion` field or versioned API
+path until Starworks has a real compatibility boundary to maintain.
 
 - Do not introduce parallel v1/v2 models during v0.
 - Breaking changes replace the current pre-release shape and require all
@@ -73,7 +73,7 @@ Once Starworks starts producing supported releases, each release should include:
 
 - web image tag and digest;
 - runner wheel SHA-256;
-- JSON schema versions;
+- JSON Schema digest and any versions introduced at the release boundary;
 - supported runner platforms and remaining hardware gates;
 - adapter ID, adapter version/build ID, supported-base registry revision, and
   bridge protocol version;

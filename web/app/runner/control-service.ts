@@ -176,7 +176,6 @@ export class RunnerControlService {
       kind: 'runner-registration-response',
       leaseSeconds: this.#leaseSeconds,
       runnerId: stationId,
-      schemaVersion: 1,
       versionPolicy: {
         minimumRunnerVersion: this.#minimumRunnerVersion,
         recommendedRunnerVersion: this.#recommendedRunnerVersion,
@@ -232,7 +231,6 @@ export class RunnerControlService {
     return RunnerHeartbeatResponseSchema.parse({
       accepted: true,
       kind: 'runner-heartbeat-response',
-      schemaVersion: 1,
       serverTime: now.toISOString(),
     })
   }
@@ -346,7 +344,6 @@ export class RunnerControlService {
     return RunnerClaimResponseSchema.parse({
       kind: 'runner-claim-response',
       run,
-      schemaVersion: 1,
     })
   }
 
@@ -485,7 +482,6 @@ export class RunnerControlService {
       attemptStatus: result.status,
       expiresAt: result.expiresAt?.toISOString() ?? null,
       kind: 'runner-lease-update-response',
-      schemaVersion: 1,
     })
   }
 
@@ -563,7 +559,6 @@ export class RunnerControlService {
       revisionId: ruleset.id,
       revisionNumber: ruleset.revisionNumber,
       rulesetId: ruleset.rulesetId,
-      schemaVersion: 1,
       settings: ruleset.settings,
       status: ruleset.status,
     })
@@ -579,7 +574,6 @@ export class RunnerControlService {
       publishedAt: profile.publishedAt?.toISOString() ?? null,
       revisionId: profile.id,
       revisionNumber: profile.revisionNumber,
-      schemaVersion: 1,
       sluggersTuning: profile.sluggersTuning ?? undefined,
       status: profile.status,
     })
@@ -607,7 +601,6 @@ export class RunnerControlService {
       matchId: execution.match.id,
       ruleset: rulesetDocument.data,
       requiredGameBuildSha256: execution.attempt.requiredGameBuildSha256,
-      schemaVersion: 1,
       statProfile: profileDocument.data,
       teams: [{ side: 'home', lineup: home }, { side: 'away', lineup: away }],
     })
@@ -752,7 +745,6 @@ export class RunnerControlService {
       matchId: row.match.id,
       requiredGameBuildSha256: row.attempt.requiredGameBuildSha256,
       rulesetRevisionId: row.attempt.rulesetRevisionId,
-      schemaVersion: 1,
       seasonId: row.match.seasonId,
       statProfileRevisionId: row.attempt.statProfileRevisionId,
       teams: [
@@ -800,7 +792,6 @@ export class RunnerControlService {
       rosterCharacterIds: row.roster.rosterCharacterIds,
       rosterRevisionId: row.roster.id,
       rosterRevisionNumber: row.roster.revisionNumber,
-      schemaVersion: 1,
       status: row.lineup.status,
       teamId: row.lineup.teamId,
     })

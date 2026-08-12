@@ -30,7 +30,6 @@ export const EffectiveLineupSchema = z.strictObject({
 
 export const TeamLineupRevisionSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("team-lineup-revision"),
     leagueId: UuidSchema,
     teamId: UuidSchema,
@@ -51,7 +50,6 @@ export const TeamLineupRevisionSchema = z
   });
 
 export const MatchLineupOverrideSchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("match-lineup-override"),
   overrideId: UuidSchema,
   leagueId: UuidSchema,

@@ -356,7 +356,6 @@ export class ContentService implements ContentApplication {
       kind: 'content-pack-manifest',
       revisionId,
       rulesetRevisionId: revision.revision.rulesetRevisionId,
-      schemaVersion: 1,
       statProfileRevisionId: revision.revision.statProfileRevisionId,
       targetGame: {
         gameId: 'RMBE01',

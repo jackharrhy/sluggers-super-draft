@@ -165,7 +165,6 @@ test(
             kind: 'runner-heartbeat-request',
             lastCapturedSequence: 12,
             runnerId: firstRegistration.runnerId,
-            schemaVersion: 1,
             sentAt: now.toISOString(),
             state: 'preparing',
           })
@@ -263,7 +262,6 @@ test(
               kind: 'runner-heartbeat-request',
               lastCapturedSequence: null,
               runnerId: secondRegistration.runnerId,
-              schemaVersion: 1,
               sentAt: now.toISOString(),
               state: 'running',
             }),
@@ -419,7 +417,6 @@ async function createContentPackFixture(
     kind: 'content-pack-manifest',
     revisionId,
     rulesetRevisionId: fixture.rulesetRevisionId,
-    schemaVersion: 1,
     statProfileRevisionId: fixture.statProfileRevisionId,
     targetGame: { gameId: 'RMBE01', supportedRevisions: [{ mainDolSha256: 'f'.repeat(64), region: 'NTSC-U', revision: 0 }] },
   })
@@ -524,13 +521,12 @@ function registration(stationName: string): RunnerRegistrationRequest {
       runnerVersion: '0.1.0',
     },
     kind: 'runner-registration-request' as const,
-    schemaVersion: 1 as const,
     stationName,
   }
 }
 
 function claim(runnerId: string) {
-  return { kind: 'runner-claim-request' as const, runnerId, schemaVersion: 1 as const }
+  return { kind: 'runner-claim-request' as const, runnerId }
 }
 
 function leaseUpdate(
@@ -547,7 +543,6 @@ function leaseUpdate(
     leaseId: run.lease.leaseId,
     observedAt: observedAt.toISOString(),
     runnerId,
-    schemaVersion: 1 as const,
   }
 }
 

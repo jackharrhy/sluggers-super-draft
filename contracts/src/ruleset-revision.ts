@@ -20,7 +20,6 @@ export const RuleSettingSchema = z.strictObject({
 
 export const RulesetRevisionSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("ruleset-revision"),
     leagueId: UuidSchema,
     rulesetId: UuidSchema,

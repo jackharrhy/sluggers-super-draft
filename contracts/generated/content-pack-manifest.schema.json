@@ -2,10 +2,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "schemaVersion": {
-      "type": "number",
-      "const": 1
-    },
     "kind": {
       "type": "string",
       "const": "content-pack-manifest"
@@ -181,7 +177,6 @@
     }
   },
   "required": [
-    "schemaVersion",
     "kind",
     "contentPackId",
     "revisionId",
@@ -196,5 +191,5 @@
   "additionalProperties": false,
   "title": "ContentPackManifest v1",
   "description": "Distributable, declarative inputs for a local Sluggers game build.",
-  "$id": "https://starworks.community/contracts/content-pack-manifest/v1.schema.json"
+  "$id": "https://starworks.community/contracts/content-pack-manifest.schema.json"
 }

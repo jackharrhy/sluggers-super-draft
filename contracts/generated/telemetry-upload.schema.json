@@ -4,10 +4,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-upload-request"
@@ -36,10 +32,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -122,7 +114,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -143,10 +134,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -235,7 +222,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -256,10 +242,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -350,7 +332,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -371,10 +352,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -465,7 +442,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -486,10 +462,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -580,7 +552,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -601,10 +572,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -752,7 +719,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -773,10 +739,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -889,7 +851,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -910,10 +871,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -1012,7 +969,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -1033,10 +989,6 @@
               {
                 "type": "object",
                 "properties": {
-                  "schemaVersion": {
-                    "type": "number",
-                    "const": 1
-                  },
                   "kind": {
                     "type": "string",
                     "const": "telemetry-envelope"
@@ -1135,7 +1087,6 @@
                   }
                 },
                 "required": [
-                  "schemaVersion",
                   "kind",
                   "protocolVersion",
                   "correlationId",
@@ -1160,7 +1111,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "runnerId",
         "attemptId",
@@ -1172,10 +1122,6 @@
     {
       "type": "object",
       "properties": {
-        "schemaVersion": {
-          "type": "number",
-          "const": 1
-        },
         "kind": {
           "type": "string",
           "const": "telemetry-upload-response"
@@ -1227,7 +1173,6 @@
         }
       },
       "required": [
-        "schemaVersion",
         "kind",
         "attemptId",
         "acceptedSequences",
@@ -1242,5 +1187,5 @@
   ],
   "title": "TelemetryUploadMessage",
   "description": "Bounded, retry-safe upload of locally spooled telemetry events.",
-  "$id": "https://starworks.community/contracts/telemetry-upload/v1.schema.json"
+  "$id": "https://starworks.community/contracts/telemetry-upload.schema.json"
 }

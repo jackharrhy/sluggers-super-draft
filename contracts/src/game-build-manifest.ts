@@ -20,7 +20,6 @@ const PatchReceiptSchema = z.strictObject({
 
 export const GameBuildManifestSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("game-build-manifest"),
     baseGame: z.strictObject({
       gameId: z.literal("RMBE01"),

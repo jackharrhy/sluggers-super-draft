@@ -313,7 +313,6 @@ def telemetry_fixture(
     envelope: dict[str, Any], configuration: dict[str, Any]
 ) -> dict[str, Any]:
     return {
-        "schemaVersion": 1,
         "kind": "telemetry-envelope",
         "protocolVersion": 1,
         "correlationId": envelope["correlationId"],

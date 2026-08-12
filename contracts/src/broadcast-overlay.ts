@@ -34,7 +34,6 @@ const BroadcastRecentEventSchema = z.strictObject({
 });
 
 export const BroadcastOverlaySchema = z.strictObject({
-  schemaVersion: z.literal(1),
   kind: z.literal("broadcast-overlay"),
   updatedAt: TimestampSchema,
   league: z.strictObject({

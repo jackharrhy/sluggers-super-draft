@@ -92,7 +92,6 @@ export class BroadcastService implements BroadcastApplication {
           observationSource: event.observationSource,
           payload: event.payload,
           protocolVersion: event.protocolVersion,
-          schemaVersion: 1,
           sequence: event.sequence,
           stateFingerprint: event.stateFingerprint ?? undefined,
         }) satisfies TelemetryEnvelope,
@@ -145,7 +144,6 @@ export class BroadcastService implements BroadcastApplication {
         teamId: statistics.teamId,
       })).sort((left, right) => right.hits - left.hits || left.characterId.localeCompare(right.characterId)),
       recentEvents,
-      schemaVersion: 1,
       teams: [
         {
           errors: score.teams.away.errors,

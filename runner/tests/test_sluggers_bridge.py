@@ -227,7 +227,7 @@ def test_checked_in_memory_map_is_collision_free_and_matches_protocol() -> None:
     bridge = next(
         item
         for item in memory_map.reservations
-        if item.identifier == "starworks-bridge-v1"
+        if item.identifier == "starworks-bridge"
     )
     assert bridge.start == BridgeLayout().base_address
     assert bridge.size == BridgeLayout().region_size

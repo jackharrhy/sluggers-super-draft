@@ -114,7 +114,6 @@ export function compileAdapterOperations(
   }
 
   return AdapterOperationBundleSchema.parse({
-    schemaVersion: 1,
     kind: "adapter-operation-bundle",
     adapterId: "sluggers-rmbe01",
     adapterVersion: input.adapterVersion,

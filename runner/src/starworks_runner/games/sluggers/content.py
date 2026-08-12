@@ -120,7 +120,7 @@ class StaticTargetCatalog:
 
     @classmethod
     def load(cls, path: Path | None = None) -> StaticTargetCatalog:
-        catalog_path = path or Path(__file__).with_name("static_targets.v1.json")
+        catalog_path = path or Path(__file__).with_name("static_targets.json")
         try:
             raw = json.loads(catalog_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
@@ -130,7 +130,6 @@ class StaticTargetCatalog:
         _exact_keys(
             raw,
             {
-                "schemaVersion",
                 "kind",
                 "adapterVersion",
                 "target",
@@ -142,7 +141,7 @@ class StaticTargetCatalog:
             },
             "Static target catalog",
         )
-        if raw["schemaVersion"] != 1 or raw["kind"] != "sluggers-static-target-catalog":
+        if raw["kind"] != "sluggers-static-target-catalog":
             raise BuildIntegrityError("Unsupported static target catalog")
         if raw["target"] != {"gameId": "RMBE01", "region": "NTSC-U", "revision": 0}:
             raise BuildIntegrityError(

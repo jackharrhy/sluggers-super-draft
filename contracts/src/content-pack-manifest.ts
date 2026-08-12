@@ -23,7 +23,6 @@ const CharacterAssetAssignmentSchema = z.strictObject({
 
 export const ContentPackManifestSchema = z
   .strictObject({
-    schemaVersion: z.literal(1),
     kind: z.literal("content-pack-manifest"),
     contentPackId: UuidSchema,
     revisionId: UuidSchema,

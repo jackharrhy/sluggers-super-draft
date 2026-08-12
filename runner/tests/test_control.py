@@ -20,7 +20,6 @@ class FakeTransport:
             status=201,
             body=json.dumps(
                 {
-                    "schemaVersion": 1,
                     "kind": "runner-registration-response",
                     "runnerId": "11111111-1111-4111-8111-111111111111",
                     "heartbeatSeconds": 15,
@@ -71,7 +70,7 @@ def test_registration_uses_versioned_json_and_keeps_credential_in_header() -> No
 
     assert response["runnerId"] == "11111111-1111-4111-8111-111111111111"
     request = transport.requests[0]
-    assert request["url"] == "https://starworks.example/api/v1/runner/register"
+    assert request["url"] == "https://starworks.example/api/runner/register"
     assert request["headers"]["authorization"] == "Bearer secret-runner-credential"
     assert "secret-runner-credential" not in json.dumps(request["body"])
     assert request["body"]["kind"] == "runner-registration-request"
@@ -101,7 +100,6 @@ def test_heartbeat_reports_component_health_without_credentials_in_its_body() ->
         status=200,
         body=json.dumps(
             {
-                "schemaVersion": 1,
                 "kind": "runner-heartbeat-response",
                 "serverTime": "2026-08-10T12:00:00Z",
                 "accepted": True,
@@ -185,7 +183,6 @@ def test_telemetry_upload_uses_the_shared_batch_contract() -> None:
         status=200,
         body=json.dumps(
             {
-                "schemaVersion": 1,
                 "kind": "telemetry-upload-response",
                 "attemptId": upload["attemptId"],
                 "acceptedSequences": [1],

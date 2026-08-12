@@ -64,7 +64,6 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         lease_seconds=60,
     )
     update = {
-        "schemaVersion": 1,
         "kind": "runner-lease-update-request",
         "runnerId": registration.runner_id,
         "attemptId": envelope["attemptId"],
@@ -86,7 +85,6 @@ def test_active_run_and_pending_terminal_update_survive_restart(tmp_path: Path) 
         }
         state.save_runtime_metadata(envelope["attemptId"], runtime_metadata)
         telemetry = {
-            "schemaVersion": 1,
             "kind": "telemetry-envelope",
             "protocolVersion": 1,
             "correlationId": envelope["correlationId"],

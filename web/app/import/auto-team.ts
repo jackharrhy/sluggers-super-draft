@@ -86,7 +86,6 @@ export function importAutoTeamSnapshot(input: unknown, teamName: string): AutoTe
     rosterCharacterIds: draft.rosterCharacterIds,
     rosterRevisionId: '33333333-3333-4333-8333-333333333333',
     rosterRevisionNumber: 1,
-    schemaVersion: 1,
     status: 'draft',
     teamId: '44444444-4444-4444-8444-444444444444',
   })

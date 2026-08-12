@@ -47,15 +47,13 @@ class AdapterManifest:
 
     @classmethod
     def load(cls, path: Path | None = None) -> AdapterManifest:
-        manifest_path = path or Path(__file__).with_name("adapter_manifest.v1.json")
+        manifest_path = path or Path(__file__).with_name("adapter_manifest.json")
         try:
             raw = json.loads(manifest_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise BuildIntegrityError(
                 f"Adapter manifest is unreadable: {manifest_path}"
             ) from error
-        if raw.get("schemaVersion") != 1:
-            raise BuildIntegrityError("Unsupported adapter-manifest version")
         target = raw.get("target", {})
         if target != {"gameId": "RMBE01", "revision": 0}:
             raise BuildIntegrityError("Adapter manifest targets the wrong game base")

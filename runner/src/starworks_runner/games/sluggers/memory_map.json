@@ -1,5 +1,4 @@
 {
-  "schemaVersion": 1,
   "game": {
     "gameId": "RMBE01",
     "revision": 0,
@@ -36,7 +35,7 @@
   ],
   "reservations": [
     {
-      "id": "starworks-bridge-v1",
+      "id": "starworks-bridge",
       "start": "0x80001900",
       "endExclusive": "0x80003000",
       "sizeBytes": 5888,

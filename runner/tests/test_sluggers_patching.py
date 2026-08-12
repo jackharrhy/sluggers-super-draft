@@ -33,7 +33,7 @@ def create_plan(
     source = root / "main.dol"
     artifact_directory = root / "artifacts"
     artifact_directory.mkdir()
-    artifact = artifact_directory / "bridge-v1.bin"
+    artifact = artifact_directory / "bridge.bin"
     source.write_bytes(source_bytes)
     artifact.write_bytes(artifact_bytes)
     output = bytearray(source_bytes)
@@ -47,14 +47,13 @@ def create_plan(
         }
     ]
     plan_value = {
-        "schemaVersion": 1,
         "kind": "precompiled-patch-plan",
         "patchId": "synthetic-clean-room-hook-v1",
         "targetPath": "sys/main.dol",
         "expectedInputSha256": sha256(source_bytes),
         "expectedOutputSha256": sha256(output),
         "artifact": {
-            "path": "bridge-v1.bin",
+            "path": "bridge.bin",
             "sha256": sha256(artifact_bytes),
             "sizeBytes": len(artifact_bytes),
         },
@@ -124,7 +123,7 @@ def test_modified_artifact_and_in_place_patch_fail_closed(tmp_path: Path) -> Non
         artifact_bytes=b"ABCD",
     )
     plan = PrecompiledPatchPlan.load(plan_path)
-    (tmp_path / "artifacts/bridge-v1.bin").write_bytes(b"WXYZ")
+    (tmp_path / "artifacts/bridge.bin").write_bytes(b"WXYZ")
 
     with pytest.raises(BuildIntegrityError, match="artifact hash or size"):
         PrecompiledPatchApplier().apply(
@@ -174,7 +173,7 @@ def test_overlapping_patch_writes_and_invalid_branches_are_rejected(
         encode_ppc_branch(0x80000000, 0x84000000)
 
 
-def test_schema_v2_appends_a_reviewed_artifact_slice_at_exact_eof(
+def test_plan_appends_a_reviewed_artifact_slice_at_exact_eof(
     tmp_path: Path,
 ) -> None:
     source_bytes = bytes.fromhex("0000000011223344")
@@ -186,7 +185,6 @@ def test_schema_v2_appends_a_reviewed_artifact_slice_at_exact_eof(
     output[0:4] = b"TAIL"
     output.extend(b"PATCHED")
     plan_value = {
-        "schemaVersion": 2,
         "kind": "precompiled-patch-plan",
         "patchId": "append-v2",
         "targetPath": "sys/main.dol",
@@ -246,11 +244,11 @@ def test_adapter_manifest_exports_source_protocol_memory_and_release_gates() -> 
     manifest = AdapterManifest.load()
     assert manifest.adapter_version == "0.3.3"
     assert manifest.protocol_version == 1
-    assert manifest.bridge_source.name == "bridge_v1.c"
+    assert manifest.bridge_source.name == "bridge.c"
     assert len(manifest.artifacts) == 1
     assert len(manifest.patch_plans) == 1
     assert len(manifest.trusted_patch_set().plans) == 1
-    assert manifest.static_target_catalog.name == "static_targets.v1.json"
+    assert manifest.static_target_catalog.name == "static_targets.json"
     assert any(
         "unattended Dolphin 2606 match" in gate for gate in manifest.release_gates
     )
