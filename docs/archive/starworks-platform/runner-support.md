@@ -1,5 +1,8 @@
 # Runner installation, updates, and support matrix
 
+> Preserved Starworks experiment guide. Source-checkout commands are run from
+> `experiments/starworks-platform/`; release instructions refer to that experiment.
+
 Starworks uses one Python 3.12 runner core for the native PySide6 application,
 diagnostic CLI, and experimental Linux container. The web server never receives
 a game image or materialized game build.
@@ -116,7 +119,7 @@ be used only as an optional startup cache pinned to the exact emulator, game,
 adapter, and controller configuration; it is never the durable save or an
 acceptance signal. The deterministic startup and validation procedure is
 documented in
-[`2026-08-10-resource-folder-and-dolphin-startup.md`](research/2026-08-10-resource-folder-and-dolphin-startup.md).
+[`2026-08-10-resource-folder-and-dolphin-startup.md`](../../research/2026-08-10-resource-folder-and-dolphin-startup.md).
 
 The native release-support gate for a row is:
 
@@ -137,7 +140,7 @@ and cross-platform build support are documented in the
 tag 2606 and commit `6094cfcf7b8fba733b3116fdf3414d51c1c0e4a4`. Match runtime
 memory uses Dolphin Memory Engine 1.3.1; the GDB findings and the live DME proof
 are recorded in the
-[instrumentation decision](research/2026-08-10-dolphin-instrumentation.md).
+[instrumentation decision](../../research/2026-08-10-dolphin-instrumentation.md).
 
 ## Recovery and diagnostics
 

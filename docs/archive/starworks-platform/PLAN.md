@@ -1,5 +1,9 @@
 # Starworks
 
+> Archived platform plan. Source now lives in `experiments/starworks-platform/`;
+> historical paths below describe the pre-reorganization layout. This is not
+> the default architecture for new work.
+
 Starworks is a multi-league platform for running Mario Super Sluggers leagues from league creation through draft, game execution, stat tracking, and broadcast.
 
 The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, MSS AutoTeam, Project Rio, Sluggies DAT Tools, and public Sluggers reverse-engineering projects are research and implementation inputs. Stat Editor, Stat Tracker, and AutoTeam are trusted direct code references through active contributor and maintainer collaboration; reuse their proven implementation knowledge with attribution. None of these projects' current architectures, file formats, or boundaries are automatically part of Starworks.
@@ -45,7 +49,7 @@ The runner may reattach to the same valid live process. Otherwise it fails the
 attempt and the web queues exactly one fresh attempt; a second failure or any
 telemetry inconsistency enters commissioner review. Extended legacy tracker
 metrics may be deferred only in the
-[tracked parity ledger](docs/game-adapter/tracker-parity-ledger.md) and must
+[tracked parity ledger](../../game-adapter/tracker-parity-ledger.md) and must
 appear as unavailable rather than zero.
 
 ### Current critical path
@@ -764,7 +768,7 @@ Adopt it after a prototype proves that the game can reliably load replacement re
 ## Delivery roadmap
 
 The detailed sequence, acceptance criteria, and risk gates live in
-[`docs/plans/2026-08-10-starworks-platform.md`](docs/plans/2026-08-10-starworks-platform.md).
+[`plans/2026-08-10-starworks-platform.md`](plans/2026-08-10-starworks-platform.md).
 The evidence ledger is
-[`docs/plans/2026-08-10-starworks-completion-audit.md`](docs/plans/2026-08-10-starworks-completion-audit.md);
+[`plans/2026-08-10-starworks-completion-audit.md`](plans/2026-08-10-starworks-completion-audit.md);
 it may demonstrate a gate but cannot redefine the status in this file.

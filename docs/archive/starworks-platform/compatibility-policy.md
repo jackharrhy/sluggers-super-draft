@@ -1,5 +1,8 @@
 # Starworks pre-release compatibility policy
 
+> Preserved policy for `experiments/starworks-platform/`, not a repository-wide
+> contract for new applications or harnesses.
+
 Starworks is v0. The web, runner, contracts, and Sluggers adapter evolve as one
 current system until the first real release boundary. We do not maintain old
 protocol variants or promise cross-build compatibility yet.

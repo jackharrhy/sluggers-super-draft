@@ -3,6 +3,10 @@
 .git
 .github
 .env
+.env.*
+.starworks
+research
+tmp
 docs
 legacy
 node_modules

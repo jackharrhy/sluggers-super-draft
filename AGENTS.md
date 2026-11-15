@@ -1,18 +1,23 @@
-# Starworks — Agent Guide
+# Sluggers workspace — Agent Guide
 
-Starworks is a multi-league Mario Super Sluggers platform. The repository is a
-workspace, not a continuation of the original single-tenant web application.
+The original league application and the preserved Starworks experiment are
+independent projects. Do not assume experimental architecture is the default
+for new work.
 
 ## Repository boundaries
 
-- `web/` is the new Remix 3 application. Follow `web/AGENTS.md` and its
-  generated Remix skill before editing it.
-- `runner/` is the Python 3.12 native/headless runner and Sluggers adapter.
-- `contracts/` owns Zod contracts and generated JSON Schema.
-- `legacy/` contains prior implementations for migration and behavioral
-  reference. Do not add new product features there.
-- `compose.yml` owns local infrastructure; production topology lives in
-  `deploy/prod/`.
+- `apps/sluggers-super-draft/` is the canonical original React Router v7 /
+  Express application. Follow its `AGENTS.md`; it is not Remix 3.
+- `experiments/starworks-platform/` preserves the complete multi-league platform.
+  Follow its `AGENTS.md` and the web-local Remix skill when working there.
+- `test/<thing>/` is for standalone test harnesses, not relocated application
+  unit tests. Each harness should document its inputs and run command.
+- `docs/game-adapter/` and `docs/research/` keep durable findings and provenance.
+- `docs/archive/starworks-platform/` contains historical plans and operating
+  guides, not a mandate to rebuild the platform.
+
+Keep each project's dependencies, migrations, tests, configuration, and deployment
+with that project. Do not extract shared packages without a concrete need.
 
 Existing file formats and single-tenant assumptions are not Starworks public
 contracts. Sluggers Stat Tracker, Sluggers Stat Editor, and MSS AutoTeam are
@@ -28,6 +33,13 @@ Run the narrowest test while developing, then the root checks before a commit:
 npm run contracts:check
 npm run typecheck
 npm test
+npm run build
 ```
 
-Runner tests use `uv run --project runner --group test pytest runner/tests`.
+The root development/build commands target the original app. Root tests target
+the experiment because the original app has no test suite. Runner-only tests:
+
+```shell
+cd experiments/starworks-platform
+uv run --project runner --group test pytest runner/tests
+```

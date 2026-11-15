@@ -1,11 +1,15 @@
 # Starworks delivery evidence audit
 
+> Historical evidence ledger. The platform is preserved under
+> `experiments/starworks-platform/`; inline paths and milestone status describe
+> the layout and acceptance evidence at the time of the audit.
+
 **Last updated:** 2026-08-12
 **Branch:** `codex/starworks-platform`  
 **Source plan:** [`2026-08-10-starworks-platform.md`](2026-08-10-starworks-platform.md)
 
 This is an evidence ledger for the delivery plan. It does not declare Starworks
-complete: [`PLAN.md`](../../PLAN.md) owns product status and the current
+complete: [`PLAN.md`](../PLAN.md) owns product status and the current
 critical path. This ledger separates repository implementation, exact-game
 live proof, and complete product workflows from external or owner-operated
 gates.
@@ -55,10 +59,10 @@ runner checks are also represented in CI or the production runbook.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
-| Root Compose starts the web dependencies. | **Verified** | [`compose.yml`](../../compose.yml) defines Remix, PostgreSQL, Garage, migrations, and optional Mailpit. Compose validation and `/readyz` were exercised against running containers. |
-| One command validates representative contracts in TypeScript and Python. | **Verified** | `npm run contracts:check`; Zod sources and generated schemas live in [`contracts/`](../../contracts), and the runner wheel bundles the same schemas. |
-| Community implementation reuse is authorized and attributable. | **Verified for repository contents** | [`PRIOR_ART.md`](../../PRIOR_ART.md) records provenance and licensing constraints. Stat Editor, Stat Tracker, and AutoTeam are trusted direct sources through active contributor/maintainer collaboration; unrelated sources still require their own permission boundary. |
-| Product vocabulary and boundaries are documented once. | **Verified** | [`PLAN.md`](../../PLAN.md) is the architectural source of truth and is linked from [`README.md`](../../README.md). |
+| Root Compose starts the web dependencies. | **Verified** | [`compose.yml`](../../../../experiments/starworks-platform/compose.yml) defines Remix, PostgreSQL, Garage, migrations, and optional Mailpit. Compose validation and `/readyz` were exercised against running containers. |
+| One command validates representative contracts in TypeScript and Python. | **Verified** | `npm run contracts:check`; Zod sources and generated schemas live in [`contracts/`](../../../../experiments/starworks-platform/contracts), and the runner wheel bundles the same schemas. |
+| Community implementation reuse is authorized and attributable. | **Verified for repository contents** | [`PRIOR_ART.md`](../../../../PRIOR_ART.md) records provenance and licensing constraints. Stat Editor, Stat Tracker, and AutoTeam are trusted direct sources through active contributor/maintainer collaboration; unrelated sources still require their own permission boundary. |
+| Product vocabulary and boundaries are documented once. | **Verified** | [`PLAN.md`](../PLAN.md) is the architectural source of truth and is linked from the [experiment README](../../../../experiments/starworks-platform/README.md). |
 
 The new Remix application lives in `web/`; the original site is preserved in
 `legacy/sluggers-super-draft/` and is not an active package.
@@ -72,7 +76,7 @@ The new Remix application lives in `web/`; the original site is preserved in
 | Python completes a nonce-bound handshake with the game. | **Live proven on macOS arm64** | Python DME 1.3.1 attached to the runner-managed Dolphin 2606 copy, verified the exact adapter and game-build digests, negotiated the attempt nonce, and observed an advancing heartbeat. GDB is no longer part of the supported match path. |
 | A synthetic event survives pause/recovery and cannot cross attempts. | **Verified** | Bridge, execution binding, event-spool, lease-recovery, and synthetic executor tests cover attribution, duplicates, overflow, and interrupted uploads. |
 | Unsupported dumps and modified hooks fail closed. | **Verified** | The provisioned exact fingerprint registry, expected-byte patch guards, target hash checks, and launch-time whole-tree verification reject unknown inputs. The real supported base completed the positive path. |
-| Bridge build approach is selected from evidence. | **Verified** | [`patch-toolchain-spike.md`](../game-adapter/patch-toolchain-spike.md) records the pinned LLVM 22.1.8 build, reviewed symbols, low-memory reservation, exact-byte/EOF guards, artifact hashes, and live acceptance; end users need no compiler. |
+| Bridge build approach is selected from evidence. | **Verified** | [`patch-toolchain-spike.md`](../../../game-adapter/patch-toolchain-spike.md) records the pinned LLVM 22.1.8 build, reviewed symbols, low-memory reservation, exact-byte/EOF guards, artifact hashes, and live acceptance; end users need no compiler. |
 
 The adapter evidence is machine-readable. The configuration handshake, both
 roster hook calls, and adapter-owned CPU-control receipt are live proven.
@@ -181,7 +185,7 @@ stock-emulator runtime memory boundary.
 | Running Compose `/readyz` proves PostgreSQL and Garage. | **Verified** | The built web image was run against root Compose and reported ready only after both dependencies passed. |
 | Metrics auth leaks no configuration or tenant data and covers required categories. | **Verified** | Constant-time bearer comparison and aggregate-only match/build/bridge/telemetry/runner/stream metrics are unit tested; Traefik does not route the endpoint publicly. |
 | Empty/non-empty Garage and PostgreSQL pass isolated restore. | **Verified locally; deployment drill still required** | Production backup scripts checksum the logical dump and S3 tree; isolated Compose restore drills passed both object-count cases. Each target deployment must repeat the drill. |
-| CI covers contracts, web, database, runner, lint, audit, Compose, wheel, and images. | **Verified as workflow definition** | [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) includes Chromium and Linux/macOS/Windows runner jobs. A hosted run requires pushing the branch. |
+| CI covers contracts, web, database, runner, lint, audit, Compose, wheel, and images. | **Verified as workflow definition** | [`.github/workflows/ci.yml`](../../../../.github/workflows/ci.yml) includes Chromium and Linux/macOS/Windows runner jobs. A hosted run requires pushing the branch. |
 | A clean wheel validates bundled contracts. | **Verified** | Wheel build/install smoke passed; tagged releases publish the wheel and `SHA256SUMS`. |
 | Production is gated on restore/revocation and supported runner hardware. | **Verified as policy; deployment acceptance pending** | [`production-runbook.md`](../operations/production-runbook.md), [`runner-support.md`](../runner-support.md), and release workflow encode the gates. |
 

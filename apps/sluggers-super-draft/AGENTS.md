@@ -63,4 +63,5 @@ tk add-note <id> "text"
 # Partial ID matching works (e.g., tk show 5c4)
 ```
 
-Plans for tickets go in `docs/plans/YYYY-MM-DD-<topic>.md`.
+Plans for tickets go in the repository-root `docs/plans/YYYY-MM-DD-<topic>.md`
+(relative to this application: `../../docs/plans/`).

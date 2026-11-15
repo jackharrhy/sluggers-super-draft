@@ -1,10 +1,14 @@
 # Starworks Platform Delivery Plan
 
+> Archived delivery plan, not a backlog for new work. The platform is preserved
+> under `experiments/starworks-platform/`; historical source paths below refer
+> to the pre-reorganization layout.
+
 **Date:** 2026-08-10
 
 **Goal:** Evolve the existing Sluggers projects into one multi-league platform with a Remix web application and a Python runner that can build, launch, automate, track, and broadcast Mario Super Sluggers matches.
 
-**Architectural source of truth:** [`PLAN.md`](../../PLAN.md)
+**Architectural source of truth:** [`PLAN.md`](../PLAN.md)
 
 ## Implementation status
 
@@ -15,7 +19,7 @@ platform is not yet a playable alpha because no scheduled match has completed
 unattended with real semantic telemetry and health-gated finalization. The
 criterion-by-criterion evidence record is
 [`2026-08-10-starworks-completion-audit.md`](2026-08-10-starworks-completion-audit.md).
-[`PLAN.md`](../../PLAN.md) is authoritative for product status and the current
+[`PLAN.md`](../PLAN.md) is authoritative for product status and the current
 critical path.
 
 No pending hardware or game-data gate should be interpreted as a reason to
@@ -265,7 +269,7 @@ This milestone deliberately precedes a large web rewrite. It retires the highest
 - Prevent two runners or two attempts from submitting as the same execution.
 
 The evidence and revised startup acceptance gates are recorded in
-[`2026-08-10-resource-folder-and-dolphin-startup.md`](../research/2026-08-10-resource-folder-and-dolphin-startup.md).
+[`2026-08-10-resource-folder-and-dolphin-startup.md`](../../../research/2026-08-10-resource-folder-and-dolphin-startup.md).
 
 ### Recovery
 
