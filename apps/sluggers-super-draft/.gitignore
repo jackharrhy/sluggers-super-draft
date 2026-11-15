@@ -1,0 +1,16 @@
+.react-router/
+build/
+dist/
+data/
+public/images/
+*.tsbuildinfo
+backups/
+tmp/
+
+# Chemistry editor Python tooling.
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
