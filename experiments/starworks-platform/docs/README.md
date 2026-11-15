@@ -12,5 +12,6 @@ those workflows below are historical; checks and releases must be run manually.
 - [Configuration imports](migration/configuration-imports.md)
 - [Compatibility policy](compatibility-policy.md)
 
-Obsolete architecture plans and milestone audits were removed. Technical findings
-remain in `docs/game-adapter/` and `docs/research/` at the repository root.
+- [Game and adapter findings](game-adapter/)
+- [Research notes](research/)
+- [Community sources and licensing](../PRIOR_ART.md)

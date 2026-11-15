@@ -44,4 +44,4 @@ upstream changes, and rerun CI plus the restore drill.
 
 The complete deployment, league-request, backup/restore, observability, audit,
 credential-revocation, release, and incident procedures live in
-[production runbook](../../../../docs/archive/starworks-platform/operations/production-runbook.md).
+[production runbook](../../docs/operations/production-runbook.md).

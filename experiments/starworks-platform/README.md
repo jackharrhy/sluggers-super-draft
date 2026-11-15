@@ -38,5 +38,6 @@ Miis are unsupported. Re-provision identity-bound checkpoints instead of moving
 old profiles blindly. `demo:clean` deletes the demo league's operational records.
 
 Checks: `npm run contracts:check`, `npm run typecheck`, and `npm test`.
-See the [runner guide](runner/README.md), [operating guides](../../docs/archive/starworks-platform/README.md),
-and [game acceptance evidence](../../docs/game-adapter/request-acceptance.md).
+See the [runner guide](runner/README.md), [operating guides](docs/README.md),
+[game acceptance evidence](docs/game-adapter/request-acceptance.md), and
+[community sources](PRIOR_ART.md).

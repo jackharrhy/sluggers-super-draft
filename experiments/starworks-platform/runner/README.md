@@ -28,7 +28,7 @@ the runner-local cache, and rechecked before reuse. Game images, retail files,
 materialized builds, and raw memory instructions never cross the Starworks API.
 
 Tagged releases include a wheel with bundled contract schemas and checksums.
-See the [runner installation, update, support, and recovery policy](../../../docs/archive/starworks-platform/runner-support.md)
+See the [runner installation, update, support, and recovery policy](../docs/runner-support.md)
 before installing a station outside a source checkout.
 
 Registration compares the installed runner version with the server's minimum

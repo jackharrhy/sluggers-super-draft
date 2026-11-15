@@ -12,5 +12,3 @@ Root `test` and `contracts:check` run its suites; `typecheck` checks both projec
 
 Use `test/<thing>/` for small standalone investigations. Keep game images,
 credentials, and emulator state out of Git.
-
-See [PRIOR_ART.md](PRIOR_ART.md) for community sources and licensing notes.
