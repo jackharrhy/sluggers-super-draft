@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import os
 import plistlib
 import subprocess
 from datetime import UTC, datetime
@@ -74,6 +75,8 @@ def create_fake_dtk(
     version: str = "1.8.3",
     redump_line: str = "Mario Super Sluggers (USA)",
 ) -> str:
+    if os.name != "posix":
+        pytest.skip("The fake dtk executable uses a POSIX shebang")
     script = f"""#!/usr/bin/env python3
 import pathlib
 import sys
