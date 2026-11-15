@@ -1,15 +1,13 @@
-# Starworks platform archive
+# Starworks reference
 
-These documents preserve the platform's design, delivery history, migration
-procedures, and operating guides. They describe the experiment at
-[`experiments/starworks-platform/`](../../../experiments/starworks-platform/),
-not the default architecture for new work.
+Retained instructions for the preserved experiment. Use only when working on
+Starworks by request; run source commands from `experiments/starworks-platform/`.
 
-Unless a document says otherwise, commands and paths such as `web/`, `runner/`,
-`contracts/`, `deploy/`, and `compose.yml` are relative to that experiment's root.
-Historical repository paths in plans describe the layout at the time they were
-written. The original app now lives at `apps/sluggers-super-draft/`.
+- [Production operations](operations/production-runbook.md)
+- [Runner installation and recovery](runner-support.md)
+- [Legacy data import](migration/legacy-super-draft.md)
+- [Configuration imports](migration/configuration-imports.md)
+- [Compatibility policy](compatibility-policy.md)
 
-Game discoveries remain under [`docs/game-adapter/`](../../game-adapter/) and
-[`docs/research/`](../../research/). See the repository
-[README](../../../README.md) for the current project map.
+Obsolete architecture plans and milestone audits were removed. Technical findings
+remain in `docs/game-adapter/` and `docs/research/` at the repository root.
