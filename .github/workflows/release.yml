@@ -12,6 +12,9 @@ jobs:
   runner-wheel:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: experiments/starworks-platform
 
     steps:
       - uses: actions/checkout@v7

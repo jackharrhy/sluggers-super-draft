@@ -1,5 +1,8 @@
 # Configuration import boundaries
 
+> Preserved Starworks experiment guide. Commands and package paths are relative
+> to `experiments/starworks-platform/`.
+
 Starworks treats the existing community tools as migration sources, not as permanent
 storage or execution APIs.
 

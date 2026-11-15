@@ -7,7 +7,7 @@ cd "$repository_root"
 
 image="${STARWORKS_SLUGGERS_IMAGE:-$HOME/Downloads/Mario Super Sluggers (USA) (En,Fr,Es).iso}"
 dolphin_source="${STARWORKS_DOLPHIN_APP:-/Applications/Dolphin.app}"
-seed_source="${STARWORKS_SLUGGERS_SEED_SOURCE:-$repository_root/research/dolphin-profiles/rmbe01-seed-dolphin-2606}"
+seed_source="${STARWORKS_SLUGGERS_SEED_SOURCE:-$repository_root/../../research/dolphin-profiles/rmbe01-seed-dolphin-2606}"
 managed_dolphin="$repository_root/.starworks/tools/Dolphin-DME.app"
 managed_executable="$managed_dolphin/Contents/MacOS/Dolphin"
 seed_profile="$repository_root/.starworks/profiles/rmbe01-managed-pre-roster-seed"

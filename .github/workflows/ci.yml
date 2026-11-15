@@ -16,6 +16,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: experiments/starworks-platform
     env:
       DATABASE_URL: postgres://starworks:starworks@127.0.0.1:5432/starworks_test
       STARWORKS_TEST_DATABASE_URL: postgres://starworks:starworks@127.0.0.1:5432/starworks_test
@@ -43,8 +46,8 @@ jobs:
           node-version: 24.14.0
           cache: npm
           cache-dependency-path: |
-            contracts/package-lock.json
-            web/package-lock.json
+            experiments/starworks-platform/contracts/package-lock.json
+            experiments/starworks-platform/web/package-lock.json
 
       - uses: actions/setup-python@v7
         with:
@@ -53,7 +56,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
-          cache-dependency-glob: runner/uv.lock
+          cache-dependency-glob: experiments/starworks-platform/runner/uv.lock
 
       - name: Install JavaScript dependencies
         run: |
@@ -128,12 +131,33 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: starworks-runner-wheel
-          path: dist/runner/*.whl
+          path: experiments/starworks-platform/dist/runner/*.whl
+
+  original-app:
+    name: Original application
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/sluggers-super-draft
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.14.0
+          cache: npm
+          cache-dependency-path: apps/sluggers-super-draft/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
 
   runner-platforms:
     name: Runner · ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: experiments/starworks-platform
     strategy:
       fail-fast: false
       matrix:
@@ -149,7 +173,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
-          cache-dependency-glob: runner/uv.lock
+          cache-dependency-glob: experiments/starworks-platform/runner/uv.lock
 
       - name: Install runner dependencies
         run: uv sync --project runner --locked --group test

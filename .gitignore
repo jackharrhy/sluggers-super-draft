@@ -39,5 +39,6 @@ public/images
 backups
 .starworks/
 /research/
-deploy/prod/.env
-deploy/prod/garage.toml
+experiments/starworks-platform/deploy/prod/.env
+experiments/starworks-platform/deploy/prod/garage.toml
+tmp/

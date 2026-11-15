@@ -1,4 +1,4 @@
-name: Build and Push Docker Image to ghcr.io
+name: Build and Push Starworks experimental image to ghcr.io
 
 env:
   REGISTRY: ghcr.io
@@ -38,6 +38,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
+          context: experiments/starworks-platform
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

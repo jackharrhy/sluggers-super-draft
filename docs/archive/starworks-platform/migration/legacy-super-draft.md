@@ -1,7 +1,10 @@
 # Legacy Sluggers Super Draft import
 
+> Preserved Starworks experiment guide. Commands and package paths are relative
+> to `experiments/starworks-platform/`, unless marked repository-relative.
+
 The importer is a one-time boundary around the preserved application in
-`legacy/sluggers-super-draft`. It does not make that application's PostgreSQL
+`apps/sluggers-super-draft` (repository-relative). It does not make that application's PostgreSQL
 schema, CSV files, or generated assets part of the Starworks contract.
 
 ## Scope

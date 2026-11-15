@@ -1,5 +1,8 @@
 # Starworks production runbook
 
+> Preserved experimental deployment guide, not an assertion of a current live
+> deployment. Run repository commands from `experiments/starworks-platform/`.
+
 This runbook covers the single-host Compose topology in `deploy/prod`. It is a
 production-capable starting point, not a claim of high availability. PostgreSQL
 and Garage are private services, Traefik is the only public listener, and
