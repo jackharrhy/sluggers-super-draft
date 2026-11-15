@@ -184,6 +184,7 @@ def test_controller_collects_a_native_dolphin_save_state(tmp_path: Path) -> None
         os.close(hotkey_reader)
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Dolphin FIFO backend is POSIX-only")
 def test_controller_refuses_to_replace_a_regular_file(tmp_path: Path) -> None:
     path = tmp_path / "Pipes/starworks"
     path.parent.mkdir(parents=True)

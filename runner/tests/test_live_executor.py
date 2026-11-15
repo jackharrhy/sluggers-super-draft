@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -42,9 +43,19 @@ from starworks_runner.games.sluggers.session import (
 from starworks_runner.orchestrator import AttemptExecutionError
 
 
+@pytest.mark.skipif(os.name != "posix", reason="Process reattachment is POSIX-only")
 def test_expired_lease_teardown_requires_the_exact_process_identity() -> None:
-    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-c",
+            "import time; print('ready', flush=True); time.sleep(30)",
+        ],
+        stdout=subprocess.PIPE,
+    )
     try:
+        assert process.stdout is not None
+        assert process.stdout.readline() == b"ready\n"
         identity = process_identity_sha256(process.pid)
         with pytest.raises(BridgeProtocolError, match="identity changed"):
             terminate_matching_process(process.pid, "0" * 64)
@@ -57,6 +68,8 @@ def test_expired_lease_teardown_requires_the_exact_process_identity() -> None:
         if process.poll() is None:
             process.kill()
             process.wait(timeout=5)
+        if process.stdout is not None:
+            process.stdout.close()
 
 
 class FakeLiveSession:
