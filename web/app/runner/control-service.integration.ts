@@ -9,7 +9,7 @@ import {
   TeamLineupRevisionSchema,
   type RunnerRegistrationRequest,
 } from '@starworks/contracts'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 
 import lineupFixture from '../../../contracts/fixtures/valid/team-lineup-revision.json' with { type: 'json' }
 import rulesetFixture from '../../../contracts/fixtures/valid/ruleset-revision.json' with { type: 'json' }
@@ -69,7 +69,7 @@ test(
           let match = await admin.scheduleMatch(fixture.identity, fixture.leagueId, {
             awayTeamId: fixture.away.teamId,
             homeTeamId: fixture.home.teamId,
-            scheduledAt: new Date('2026-08-10T12:30:00Z'),
+            scheduledAt: now,
             seasonId: fixture.seasonId,
           })
           let invalidProfileId = randomUUID()
@@ -103,12 +103,39 @@ test(
             }),
             (error: unknown) => error instanceof PlatformError && error.code === 'invalid_input',
           )
+          await assert.rejects(
+            admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
+              awayLineupRevisionId: fixture.away.lineupRevisionId,
+              dynamicRuleOverrides: {},
+              gameStadiumId: 'unreviewed-stadium',
+              homeLineupRevisionId: fixture.home.lineupRevisionId,
+              requiredGameBuildSha256: '0'.repeat(64),
+              rulesetRevisionId: fixture.rulesetRevisionId,
+              statProfileRevisionId: fixture.statProfileRevisionId,
+            }),
+            (error: unknown) => error instanceof PlatformError && error.code === 'invalid_input',
+          )
           let firstAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, match.id, {
             awayLineupRevisionId: fixture.away.lineupRevisionId,
             contentPackRevisionId: content.revisionId,
             dynamicRuleOverrides: { 'game.innings': 7 },
             homeLineupRevisionId: fixture.home.lineupRevisionId,
             requiredGameBuildSha256: 'a'.repeat(64),
+            rulesetRevisionId: fixture.rulesetRevisionId,
+            statProfileRevisionId: fixture.statProfileRevisionId,
+          })
+
+          let futureMatch = await admin.scheduleMatch(fixture.identity, fixture.leagueId, {
+            awayTeamId: fixture.away.teamId,
+            homeTeamId: fixture.home.teamId,
+            scheduledAt: new Date('2026-08-10T12:30:00Z'),
+            seasonId: fixture.seasonId,
+          })
+          let futureAttempt = await admin.queueAttempt(fixture.identity, fixture.leagueId, futureMatch.id, {
+            awayLineupRevisionId: fixture.away.lineupRevisionId,
+            dynamicRuleOverrides: {},
+            homeLineupRevisionId: fixture.home.lineupRevisionId,
+            requiredGameBuildSha256: 'd'.repeat(64),
             rulesetRevisionId: fixture.rulesetRevisionId,
             statProfileRevisionId: fixture.statProfileRevisionId,
           })
@@ -139,6 +166,27 @@ test(
             configuration.teams.map((team) => [team.side, team.lineup.teamId]),
             [['home', fixture.home.teamId], ['away', fixture.away.teamId]],
           )
+          let sourceLineup = TeamLineupRevisionSchema.parse(lineupFixture).lineup
+          await database.execute(sql`alter table lineup_revisions disable trigger user`)
+          try {
+            await database.update(lineupRevisions).set({
+              lineup: { ...sourceLineup, captainCharacterId: 'toad' },
+            }).where(eq(lineupRevisions.id, fixture.home.lineupRevisionId))
+            await assert.rejects(
+              control.configuration(
+                fixture.credentials.first.raw,
+                firstAttempt.attemptId,
+              ),
+              (error: unknown) => error instanceof PlatformError
+                && error.code === 'conflict'
+                && error.message.includes('unsupported-captain'),
+            )
+            await database.update(lineupRevisions).set({
+              lineup: sourceLineup,
+            }).where(eq(lineupRevisions.id, fixture.home.lineupRevisionId))
+          } finally {
+            await database.execute(sql`alter table lineup_revisions enable trigger user`)
+          }
           assert.deepEqual(
             await control.asset(fixture.credentials.first.raw, firstAttempt.attemptId, content.sha256),
             { bytes: content.bytes, mediaType: 'image/png', sha256: content.sha256 },
@@ -151,7 +199,10 @@ test(
             admin.matchDashboard(fixture.identity, fixture.leagueId),
             admin.stationDashboard(fixture.identity, fixture.leagueId),
           ])
-          assert.equal(matchDashboard.matches[0]?.attempts[0]?.status, 'leased')
+          assert.equal(
+            matchDashboard.matches.find((candidate) => candidate.id === match.id)?.attempts[0]?.status,
+            'leased',
+          )
           assert.equal(stationDashboard.stations.length, 2)
           let recoveryClaim = await control.claim(fixture.credentials.first.raw, claim(firstRegistration.runnerId))
           assert.deepEqual(recoveryClaim.run, firstClaim.run)
@@ -282,6 +333,7 @@ test(
               [cancellationClaim.run.attemptId]: ['cancelled', 'claimed', 'queued'],
               [expiringClaim.run.attemptId]: ['claimed', 'lease-expired', 'queued'],
               [firstAttempt.attemptId]: ['claimed', 'completed', 'queued', 'renewed', 'started'],
+              [futureAttempt.attemptId]: ['queued'],
             },
           )
           throw new RollbackFixture()

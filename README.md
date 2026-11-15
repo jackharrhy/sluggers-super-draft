@@ -35,14 +35,20 @@ one-time Discord invitation for its first administrator. There is no public regi
 
 ### Local interactive demo
 
-Seed a private demo league, browser session, two published teams, one queued
-CPU-vs-CPU attempt, and a runner credential without configuring Discord:
+Provision or rebuild the complete local demo from the owned Sluggers image,
+Dolphin 2606, and the local unlocked seed profile:
 
 ```shell
-docker compose up -d db garage
-npm run demo:seed
-docker compose --env-file .starworks/demo.env up -d --build web
+npm run demo:setup
 ```
+
+The command is safe to rerun. It installs the checksum-pinned extraction tool,
+creates a private DME-enabled copy of `/Applications/Dolphin.app`, verifies and
+builds the exact image from `~/Downloads/Mario Super Sluggers (USA)
+(En,Fr,Es).iso`, recreates the guarded pre-roster checkpoint when missing,
+seeds the website, and starts Remix. Override those local inputs with
+`STARWORKS_SLUGGERS_IMAGE`, `STARWORKS_DOLPHIN_APP`, or
+`STARWORKS_SLUGGERS_SEED_SOURCE`.
 
 Open <http://127.0.0.1:3000/auth/local-demo>. The local login endpoint exists
 only when the ignored, mode-`0600` `.starworks/demo.env` explicitly enables it,
@@ -58,6 +64,13 @@ publish the exact teams and queue a fresh server-backed attempt with:
 npm run demo:queue
 ```
 
+For runner and telemetry iteration, queue the same real workflow as a
+one-inning game instead of waiting for the seven-inning demo:
+
+```shell
+npm run demo:queue:smoke
+```
+
 This uses the same lineup publication, scheduling, lease, and configuration
 path as the web product; it is not a separate hard-coded Dolphin demo. The
 Operations page can also schedule matches, issue station credentials, and
@@ -69,6 +82,12 @@ local CPU-vs-CPU station with:
 
 ```shell
 npm run demo:runner
+```
+
+For a fresh one-inning attempt followed immediately by the station, use:
+
+```shell
+npm run demo:play
 ```
 
 The command loads the ignored demo credential itself, uses the reviewed local
@@ -129,7 +148,7 @@ uv sync --project runner --group test
 Start local infrastructure:
 
 ```shell
-docker compose up -d
+docker compose up -d db garage
 ```
 
 Garage's S3 API is available on `127.0.0.1:3900`. Email is not required; start

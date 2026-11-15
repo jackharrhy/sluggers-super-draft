@@ -4,6 +4,7 @@ export const routes = route({
   assets: get('/assets/*path'),
   broadcastData: get('/api/public/leagues/:leagueSlug/matches/:matchId/overlay'),
   broadcastOverlay: get('/overlays/:leagueSlug/matches/:matchId'),
+  devKitchenSink: get('/dev/kitchen-sink'),
   home: '/',
   system: {
     health: get('/healthz'),

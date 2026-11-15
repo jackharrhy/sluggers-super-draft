@@ -45,6 +45,7 @@ export const runnerDashboard: RunnerOperationsDashboard = {
     targetType: 'runner_station',
   }],
   contentPacks: [],
+  defaultGameBuildSha256: null,
   matches: [],
   rulesets: [],
   seasons: [],
@@ -55,6 +56,7 @@ export const runnerDashboard: RunnerOperationsDashboard = {
 
 const runnerMatchDashboard: RunnerMatchDashboard = {
   contentPacks: runnerDashboard.contentPacks,
+  defaultGameBuildSha256: runnerDashboard.defaultGameBuildSha256,
   matches: runnerDashboard.matches,
   rulesets: runnerDashboard.rulesets,
   seasons: runnerDashboard.seasons,

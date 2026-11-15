@@ -6,29 +6,29 @@
   },
   "artifact": {
     "path": "artifacts/bridge-rmbe01.bin",
-    "sha256": "b5a9a75c5836c62741927bb8ab67d568e887be88ab6062a8736f0cd7c81f9161",
-    "sizeBytes": 5912
+    "sha256": "699c581f13077a62011d20a57e524d066bec624118c2ccf1dc2cf49495d3d4f2",
+    "sizeBytes": 5916
   },
   "expectedInputSha256": "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151",
-  "expectedOutputSha256": "c7af12d07e3b5722b1a66d609e9faecfbf5c16dcda9af41238645998c64b1bcc",
+  "expectedOutputSha256": "6f9d0302e99c3f9602d9e79d35a43c311ce08e9f1ea0bfeea7b1c90af45c8695",
   "kind": "precompiled-patch-plan",
   "patchId": "starworks-bridge-rmbe01-rev0",
   "targetPath": "sys/main.dol",
   "writes": [
     {
-      "artifactOffset": 5900,
+      "artifactOffset": 5904,
       "expectedBytesHex": "00000000",
       "sizeBytes": 4,
       "targetOffset": 60
     },
     {
-      "artifactOffset": 5904,
+      "artifactOffset": 5908,
       "expectedBytesHex": "00000000",
       "sizeBytes": 4,
       "targetOffset": 132
     },
     {
-      "artifactOffset": 5908,
+      "artifactOffset": 5912,
       "expectedBytesHex": "00000000",
       "sizeBytes": 4,
       "targetOffset": 204
@@ -50,6 +50,12 @@
       "expectedBytesHex": "88080018",
       "sizeBytes": 4,
       "targetOffset": 14924
+    },
+    {
+      "artifactOffset": 5900,
+      "expectedBytesHex": "546007fe",
+      "sizeBytes": 4,
+      "targetOffset": 2549668
     }
   ]
 }

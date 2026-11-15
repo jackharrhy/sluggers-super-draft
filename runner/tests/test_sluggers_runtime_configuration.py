@@ -3,21 +3,25 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from starworks_runner.games.sluggers.bridge.configuration import (
     CHARACTER_GAME_IDS,
     CONFIGURATION_SIZE,
+    PLAYABLE_CHARACTER_COUNT,
     STADIUM_IDS,
     RuntimeConfigurationBlock,
+    TeamSelection,
 )
 from starworks_runner.games.sluggers.bridge.layout import BridgeProtocolError
 from starworks_runner.games.sluggers.session import (
-    FINAL_FORMATION_POINTER_ADDRESS,
     FORMATION_SLOT_SIZE,
     FORMATION_TEAM_SIZE,
     LiveSluggersSession,
+    RuntimeGameObservation,
 )
+from starworks_runner.games.sluggers.setup_observation import OrderSelectionObservation
 from starworks_runner.match_configuration import compile_match_configuration
 
 
@@ -110,6 +114,35 @@ def test_unknown_characters_and_rule_targets_fail_before_dolphin_launch() -> Non
         RuntimeConfigurationBlock.from_operation_bundles(unknown_rule, compiled.away)
 
 
+def test_unused_roster_records_fail_before_dolphin_launch() -> None:
+    _, compiled = compiled_configuration()
+    unused_character = copy.deepcopy(compiled.home)
+    batting = next(
+        operation
+        for operation in unused_character["operations"]
+        if operation["operation"] == "set-batting-slot"
+        and operation["characterId"] != "mario"
+    )
+    original = batting["characterId"]
+    for operation in unused_character["operations"]:
+        if operation.get("characterId") == original:
+            operation["characterId"] = "rmbe01-character-071"
+
+    with pytest.raises(BridgeProtocolError, match="not playable in RMBE01"):
+        RuntimeConfigurationBlock.from_operation_bundles(
+            unused_character,
+            compiled.away,
+        )
+
+    entries = tuple((index, index, index) for index in range(9))
+    invalid = TeamSelection(
+        captain_brand_id=0,
+        entries=entries[:-1] + ((PLAYABLE_CHARACTER_COUNT, 8, 8),),
+    )
+    with pytest.raises(BridgeProtocolError, match="not playable in RMBE01"):
+        invalid.pack()
+
+
 def test_execution_and_stadium_are_bounded_before_dolphin_launch() -> None:
     configuration, compiled = compiled_configuration()
     execution = copy.deepcopy(configuration["execution"])
@@ -149,6 +182,40 @@ class SparseMemoryTransport:
         )
 
 
+def test_runtime_observation_requires_matching_distinct_bridge_frames(
+    tmp_path: Path,
+) -> None:
+    session = LiveSluggersSession(
+        build_directory=tmp_path,
+        dolphin_executable=tmp_path / "Dolphin",
+        profile_directory=tmp_path / "profile",
+        adapter_build_sha256="a" * 64,
+        game_build_sha256="b" * 64,
+    )
+    observations = iter(
+        RuntimeGameObservation(
+            rules=(1, 0, 0, 0),
+            stadium_id=2,
+            stadium_time=0,
+            away_captain_brand_id=away,
+            home_captain_brand_id=0,
+        )
+        for away in (0, 2, 0, 2, 2)
+    )
+    heartbeats = iter(SimpleNamespace(heartbeat=value) for value in range(1, 6))
+    session._require_running_process = lambda _stage: None  # type: ignore[method-assign]
+    session.read_runtime_observation = lambda: next(observations)  # type: ignore[method-assign]
+    session.read_control = lambda: next(heartbeats)  # type: ignore[method-assign]
+
+    observed = session.wait_for_runtime_observation(
+        lambda value: value.away_captain_brand_id == 2,
+        "away captain",
+        timeout_seconds=1,
+    )
+
+    assert observed.away_captain_brand_id == 2
+
+
 def test_final_formation_rewrites_only_character_and_position_bytes(
     tmp_path: Path,
 ) -> None:
@@ -159,7 +226,6 @@ def test_final_formation_rewrites_only_character_and_position_bytes(
     )
     transport = SparseMemoryTransport()
     home_address = 0x90001090
-    transport.write(FINAL_FORMATION_POINTER_ADDRESS, home_address.to_bytes(4, "big"))
     for team, address, untouched in (
         (configuration.away, home_address - FORMATION_TEAM_SIZE, 0xA5),
         (configuration.home, home_address, 0x5A),
@@ -179,6 +245,12 @@ def test_final_formation_rewrites_only_character_and_position_bytes(
         game_build_sha256="b" * 64,
     )
     session.transport = transport  # type: ignore[assignment]
+    session.wait_for_order_next = lambda **_kwargs: OrderSelectionObservation(  # type: ignore[method-assign]
+        task_address=0x9032A9B4,
+        state=5,
+        away_formation_address=home_address - FORMATION_TEAM_SIZE,
+        home_formation_address=home_address,
+    )
 
     session.apply_final_formation(configuration)
 

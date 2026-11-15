@@ -19,12 +19,19 @@ from starworks_runner.games.sluggers.checkpoint import SeedCheckpoint
 from starworks_runner.games.sluggers.content import ContentPackInput
 from starworks_runner.games.sluggers.errors import SluggersAdapterError
 from starworks_runner.games.sluggers.fingerprints import SupportedBaseRegistry
+from starworks_runner.games.sluggers.menu_observation import MenuScene
 from starworks_runner.games.sluggers.session import (
     LiveSluggersSession,
     RuntimeGameObservation,
     RuntimeLineupObservation,
     load_game_build_manifest,
     terminate_matching_process,
+)
+from starworks_runner.games.sluggers.setup_observation import CPU_LEVEL_4_SELECTION
+from starworks_runner.games.sluggers.stadium_navigation import (
+    selector_target_for_stadium,
+    shortest_stadium_path,
+    stadium_entry_step,
 )
 from starworks_runner.games.sluggers.tools import DtkDiscTool
 from starworks_runner.games.sluggers.tracker import (
@@ -434,9 +441,7 @@ class LiveSluggersExecutor:
                         timeout_seconds=self.timeout_seconds,
                     )
                     self.live_stage = "configured"
-                    self._verify_runtime_observation(
-                        self.session.read_runtime_observation()
-                    )
+                    self._wait_for_runtime_configuration()
                     if self.checkpoint is not None:
                         self._advance_setup_menus()
                 except Exception as error:
@@ -549,7 +554,8 @@ class LiveSluggersExecutor:
         for index, expected in enumerate(configuration.rules):
             if expected != 0xFF and observation.rules[index] != expected:
                 raise AttemptExecutionError(
-                    f"Dolphin rule byte {index} failed runtime read-back",
+                    f"Dolphin rule byte {index} failed runtime read-back: "
+                    f"expected {expected}, observed {observation.rules[index]}",
                     "bridge-failure",
                 )
         expected_values = {
@@ -567,9 +573,30 @@ class LiveSluggersExecutor:
         for label, (actual, expected) in expected_values.items():
             if actual != expected:
                 raise AttemptExecutionError(
-                    f"Dolphin {label} failed runtime read-back",
+                    f"Dolphin {label} failed runtime read-back: "
+                    f"expected {expected}, observed {actual}",
                     "bridge-failure",
                 )
+
+    def _wait_for_runtime_configuration(self) -> None:
+        if self.session is None:
+            raise AttemptExecutionError(
+                "Dolphin session is not running", "runner-crash"
+            )
+
+        def matches(observation: RuntimeGameObservation) -> bool:
+            try:
+                self._verify_runtime_observation(observation)
+            except AttemptExecutionError:
+                return False
+            return True
+
+        observation = self.session.wait_for_runtime_observation(
+            matches,
+            "the immutable rules, stadium, and captain configuration",
+            timeout_seconds=self.timeout_seconds,
+        )
+        self._verify_runtime_observation(observation)
 
     def _advance_setup_menus(self) -> None:
         if self.session is None:
@@ -584,46 +611,101 @@ class LiveSluggersExecutor:
 
     def _select_stadium(self) -> None:
         assert self.session is not None
-        # The checkpoint cursor begins between parks. Select one stable menu
-        # target to advance; the bridge continuously enforces the scheduled
-        # stadium byte and the runner verifies it again after transition.
-        self.session.move_stick(0, 1)
-        self.sleep(0.25)
+        configuration = self.runtime_configuration
+        if configuration is None:
+            raise AttemptExecutionError(
+                "Runtime configuration was not prepared", "build-failure"
+            )
+        stadium = self.session.wait_for_menu(
+            lambda observation: observation.is_stadium_ready,
+            "input-ready stadium selector",
+            timeout_seconds=self.timeout_seconds,
+        )
+        assert stadium.stadium_selection is not None
+        current = stadium.stadium_selection
+        entry = stadium_entry_step(current)
+        if entry is not None:
+            button, expected = entry
+            self.session.tap_button(button)
+            stadium = self.session.wait_for_menu(
+                lambda observation, expected=expected: (
+                    observation.is_stadium_ready
+                    and observation.stadium_selection == expected
+                ),
+                f"stadium selector entry value {expected}",
+                timeout_seconds=self.timeout_seconds,
+            )
+            current = expected
+        target = selector_target_for_stadium(configuration.stadium_id)
+        try:
+            path = shortest_stadium_path(current, target)
+        except ValueError as error:
+            raise AttemptExecutionError(str(error), "bridge-failure") from error
+        for button, expected in path:
+            self.session.tap_button(button)
+            self.session.wait_for_menu(
+                lambda observation, expected=expected: (
+                    observation.is_stadium_ready
+                    and observation.stadium_selection == expected
+                ),
+                f"stadium selector value {expected}",
+                timeout_seconds=self.timeout_seconds,
+            )
         self.session.tap_button("A")
-        self.sleep(0.75)
+        self.session.wait_for_menu(
+            lambda observation: observation.is_stadium_confirmation_ready,
+            "stadium confirmation",
+            timeout_seconds=self.timeout_seconds,
+        )
         self.session.tap_button("A")
-        self.sleep(0.75)
-        self._verify_runtime_observation(self.session.read_runtime_observation())
+        self.session.wait_for_menu(
+            lambda observation: observation.scene is MenuScene.EXHIBITION,
+            "Exhibition setup",
+            timeout_seconds=self.timeout_seconds,
+        )
+        self._wait_for_runtime_configuration()
         self.live_stage = "stadium-confirmed"
 
     def _confirm_captains(self) -> None:
         assert self.session is not None
+        self.session.wait_for_captain_state(2, timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
-        self.sleep(1.5)
+        self.session.wait_for_captain_state(3, timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
+        self.session.wait_for_captain_state(4, timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
-        self.sleep(4.0)
-        self._verify_runtime_observation(self.session.read_runtime_observation())
+        self.session.wait_for_cpu_level(timeout_seconds=self.timeout_seconds)
+        self._wait_for_runtime_configuration()
         self.live_stage = "captains-confirmed"
 
     def _select_cpu_level(self) -> None:
         assert self.session is not None
-        self.session.move_stick(1, 0)
-        self.session.move_stick(1, 0)
+        level = self.session.wait_for_cpu_level(timeout_seconds=self.timeout_seconds)
+        if not 0 <= level.selection <= CPU_LEVEL_4_SELECTION:
+            raise AttemptExecutionError(
+                f"Dolphin reported invalid CPU-level selection {level.selection}",
+                "bridge-failure",
+            )
+        while level.selection < CPU_LEVEL_4_SELECTION:
+            expected = level.selection + 1
+            self.session.move_stick(1, 0)
+            level = self.session.wait_for_cpu_level(
+                expected,
+                timeout_seconds=self.timeout_seconds,
+            )
         self.session.tap_button("A")
-        self.sleep(2.5)
         self.live_stage = "cpu-level-confirmed"
 
     def _fill_and_inject_lineups(self) -> None:
         assert self.session is not None
-        # Level four is now confirmed and the roster cursor starts on Dixie
-        # Kong. Move onto Random Fill, fill both teams, then advance through
-        # the reviewed hook. CPU activation remains dormant so the runner keeps
-        # control of the final setup screens.
-        for _ in range(4):
-            self.session.move_stick(1, 0)
+        # Member-selection state 2 with cursor 0xFF is the live-proven Random
+        # Fill boundary. Directional input here selects a character instead.
+        self.session.wait_for_random_fill(timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
-        self.sleep(0.75)
+        # Give the game one bounded animation interval to allocate both roster
+        # buffers. The following bridge receipt remains the authoritative
+        # postcondition for the second A press.
+        self.session.wait_for_bridge_frames(45, timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
         self._wait_for_lineup_receipt()
         self.session.wait_for_bridge_frames(120, timeout_seconds=self.timeout_seconds)
@@ -632,16 +714,12 @@ class LiveSluggersExecutor:
 
     def _start_game(self) -> None:
         assert self.session is not None
-        # The reviewed team hook leaves the cursor on a player in the custom
-        # lineup. Three independently mapped right transitions move from the
-        # deterministic Luigi cursor through Mario and Peach to Next. A reaches
-        # the final rules screen, then the adapter recognizes Minus+A at Begin
-        # and owns the CPU transition itself; no Gecko code is installed.
-        for _ in range(3):
-            self.session.move_stick(1, 0)
+        # The untouched order screen opens on Next. Directional inputs move
+        # into the roster, so wait for its game-owned ready state and press A.
+        self.session.wait_for_order_next(timeout_seconds=self.timeout_seconds)
         self.session.tap_button("A")
-        self.sleep(1.0)
-        self._verify_runtime_observation(self.session.read_runtime_observation())
+        self.session.wait_for_game_begin(timeout_seconds=self.timeout_seconds)
+        self._wait_for_runtime_configuration()
         self.live_stage = "rules-confirmed"
         self.session.hold_then_tap_buttons("Z", "A", hold_seconds=0.08)
         self._wait_for_game_start()

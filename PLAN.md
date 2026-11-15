@@ -6,7 +6,7 @@ The existing Sluggers Super Draft, Sluggers Stat Editor, Sluggers Stat Tracker, 
 
 ## Current state
 
-**Last verified:** 2026-08-12 on `codex/starworks-platform`
+**Last verified:** 2026-08-18 on `codex/starworks-platform`
 
 Starworks has a substantial platform and runner foundation, but it is not yet a
 playable alpha. Status claims use three separate meanings:
@@ -21,12 +21,12 @@ playable alpha. Status claims use three separate meanings:
 | Multi-tenant leagues, Discord invitations, drafts, rosters, lineups, trades, schedules, and results | Application/data layer implemented; the league home is now a legacy-aligned standings/player-leaders page, while Matches, Teams, Results, and Admin have focused routes and read models; lineup revisions use a portrait-first captain/batting/fielding editor | Continue user acceptance and connect a live healthy game to the Results workflow |
 | Web/runner contracts | One strict, evolving pre-release contract set; dummy `schemaVersion` fields, `.v1.schema.json` artifacts, and `/api/v1` routing have been removed | Add compatibility versions only when the first real external-consumer boundary exists |
 | Runner registration, leases, attempts, build verification, and local event spool | Implemented; web-to-native registration, claim, actionable failure detail, and one fresh retry are live proven; retryable API outages now keep a running executor alive in automated coverage | Live-accept outage spooling, reattach, and exact orphan teardown |
-| Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and native frame diagnostics on macOS arm64 | Live proven | Clean-station acceptance |
+| Exact `RMBE01` build, stock Dolphin 2606, DME transport, Pipe control, and semantic menu observation on macOS arm64 | Live proven through a cold boot, known-complete File 1, game-owned Exhibition selection, and the stadium task; deleting `.starworks` and running `npm run demo:setup` recreated the pinned tools, managed build, DME-enabled Dolphin copy, unlocked seed profile, and exact-build checkpoint | Complete a scheduled game from that rebuilt station and automate the same checkpoint lifecycle for newly published stat builds |
 | Complete CPU-vs-CPU game | Live proven in normal-speed, server-scheduled one- and seven-inning games with adapter-owned CPU control | Produce a healthy score-consistent result from the same path |
 | Runtime rules, stadium, captains, rosters, batting order, fielding, and CPU control | Live proven through a complete scheduled game | Repeat on clean-station acceptance runs while telemetry work continues |
 | Full Stat Editor v4 profile | Lossless 507-line import/export and focused editing implemented; the local demo imports the trusted v4.1 stock profile instead of synthetic values; known encoded character fields use domain-aware controls; all 16,406 guarded cells match the exact stock DOL and representative mutations for all 24 patterns are build- and Dolphin/DME-live-proven | User-accept the editor, then repeat the scheduled path with a visibly changed published value |
 | Sluggers league rules | Supported rules use typed controls for innings, mercy, stars, items, and the web draft timer; unsupported imported settings are preserved read-only | Live-accept each supported runtime rule and add a target only when the adapter supports it |
-| Semantic game telemetry and box-score derivation | Partial; complete scheduled runs are contiguous, and the trusted Stat Tracker's runner-destination fields now resolve ordinary scorer/RBI identity with live evidence; a complete score-consistent run is still pending | Finish the conservative DME slice and use a game hook only for a specific semantic value that cannot be observed reliably |
+| Semantic game telemetry and box-score derivation | Partial; a current-build scheduled run emitted 34 contiguous events, ended 3–1, and derived the same 3–1 box score; the server correctly kept it provisional because the stream is still labelled read-only memory observation | Replace the blanket observation-source rejection only after the exact DME reader/reducer health evidence is sufficient, or add a narrow hook for a specifically unobservable value |
 | Health-gated automatic result confirmation and one-retry recovery | Partial; review routing and one fresh retry are live proven, while a web restart exposed and drove fixes for runner exit and orphan-Dolphin teardown | Prove healthy auto-confirmation, live reattach, and the full server/runner fault matrix |
 | Runner operator UI and local recording | Implemented | Live operator/capture acceptance during a scheduled match |
 | RTMP/headless broadcast and non-macOS runners | Deferred | Post-alpha decision gates |
@@ -56,14 +56,17 @@ appear as unavailable rather than zero.
    reviewed game hook only when a named value cannot preserve causality or
    attribution through DME; do not require hooks by policy.
 2. Repeat the normal-speed scheduled path until the conservative event stream
-   derives the same final score as the game without a provisional warning.
-   Then replace the blanket `memory-observation` rejection with health checks
+   remains score-consistent across the known scoring shapes. Replace the
+   blanket `memory-observation` rejection with health checks
    tied to exact build, reader, reducer, sequence, and terminal-score evidence.
    Keep unavailable metrics explicit in the parity ledger.
 3. Pass the clean-station happy path, network outage, live reattach, one-retry, and
    commissioner-review matrix repeatedly on macOS arm64.
 4. Repeat the unattended match with a visibly changed server-published Stat
-   Editor value. Continue focused user acceptance of the now-separated Matches, Teams,
+   Editor value. The local setup command can now create an exact-build checkpoint
+   from a cold boot, but attempt execution still needs to select or create the
+   compatible checkpoint automatically for a newly published build. Continue
+   focused user acceptance of the now-separated Matches, Teams,
    Results, and Admin workspaces, following the legacy application's navigation
    and player-first visual language rather than adding dashboard-style
    super-pages.
@@ -76,6 +79,110 @@ because the runner must prove that it can decode the exact binary memory layout;
 that is runtime safety metadata, not a public compatibility promise.
 
 ### Latest acceptance evidence
+
+On 2026-08-18, the current local application state was deleted and rebuilt
+through the new `npm run demo:setup` entry point. The command checksum-installed
+decomp-toolkit, verified the owned exact ISO, reproduced game-build identity
+`5bc023…`, created a private DME-entitled copy of Dolphin 2606, cloned only the
+durable unlocked-save state, cold-booted Sluggers, navigated to the game-owned
+Exhibition stadium boundary, wrote and revalidated the exact checkpoint, seeded
+the website/runner credential, and started the Compose web stack. A second
+checkpoint preparation was a validated cache hit and launched no Dolphin
+process. The first bootstrap attempts also exposed two assumptions now removed:
+a dead research `gdb.sock` is process state rather than seed data, and seed
+profiles must have Dolphin cheats forced off so the old AutoTeam CPU Gecko hook
+can never run beside the Starworks adapter. With the legacy Gecko patch disabled,
+the same cold-boot checkpoint creation completed normally.
+
+On 2026-08-12, Starworks first replaced boot-time native screenshot probing and
+fixed-delay menu assumptions with direct observation of the game's external
+framebuffer through Dolphin Memory Engine. The exact `RMBE01` DOL stores the
+active XFB pointer through `VISetNextFrameBuffer` at `0x805AF54C`; its VI state
+at `0x80731270` supplies the pointer, width, and height. This remains a bounded
+early-Wii-startup oracle and diagnostic fallback. The native screenshot hotkey
+is unsuitable during startup: three macOS crash reports showed `SIGSEGV` in
+`FrameDumper::SaveScreenshot` within a second of launch.
+
+The production cold-boot authority is now game-owned task memory rather than
+frame colour. Exact-DOL constructors and update switches identify
+`Opening::COpeningTask + 0x09` and `Select::CSelectTask + 0x0C` as their state
+bytes. Live Dolphin runs verified Opening state 4 as the intro, state 6 as the
+title, state 9 with `CFileSelTask` state 6 as the file selector, its state 8 as
+the File 1 action menu, and Select state 7 with `CMainSelModeTask` as the main
+mode screen. The file slot comes from the game's own SDA selection word and the
+mode hover comes from `CMainSelModeTask + 0x30`; A commits `hover + 1` to
+`+0x20`, which is the destination result consumed by `CSelectTask`. A clean temporary profile reached
+ready-state Exhibition in about 23.9 seconds with only seven early XFB reads
+followed by 34 small semantic observations. File 1 was selected from the
+game-owned slot word. The complete profile normally begins on Exhibition
+(`mode 0`), while values `2` and `3` are Minigames entry points. The reusable
+cold-boot operation now handles either case: it observes each bounded left move
+and lets the changed carousel selection settle, presses A once, requires the
+committed Exhibition result `1`, and accepts only the `CMainSelStadiumTask`
+postcondition. This guard was corrected after a probe sent inputs while the
+carousel was still oscillating and visibly entered Minigames; that probe is
+invalid evidence. A clean run after the fix reached the stadium boundary in
+24.93 seconds at descriptor `0x806BF350`, state `1`, selection `0`. A native
+frame from the same live process visibly showed the settled Exhibition stadium
+selector. A separate clean run deliberately moved the settled main-menu hover
+through `0 -> 1 -> 2`; a native frame visibly highlighted Minigames at `2`.
+From that exact state the corrected navigator reached a visibly labeled
+Exhibition stadium frame in 3.04 seconds, paired with descriptor `0x806BF350`,
+state `1`, and stadium selection `0`. The
+earlier File 2 selection was caused by Dolphin inheriting the host mouse as Wii
+IR input; the runner now disables that IR cursor, so host focus and mouse
+movement cannot alter unattended menu selections.
+After the first semantic Sluggers task appears, production now permanently
+disables XFB fallback; a transient memory error or unknown descriptor waits and
+fails semantically instead of reviving a later-screen colour guess.
+
+The next task chain is now live-proven through `CMainSelStadiumTask` and the
+separate `CMainSelSetumeiTask` confirmation panel into `CExhiMainTask`. Stadium
+selection exposes its ready substate and live/previous selection words. Its UI
+is a directed graph, not a rectangular grid, and the existing checkpoint
+restores at sentinel `-1`. Against that checkpoint's exact compatible adapter
+build, a live run verified `-1 -> 8 -> 3 -> 0`, the separate affirmative
+confirmation panel, and Select root state `11`, with a memory postcondition
+after every input and no Minigames transition. Savestate restoration relocated
+the stadium task from the main-selection anchor to `0x9032D03C`; resolving the
+active leaf through the bounded NpLib task registry fixed that final static-
+address assumption. The checkpoint has now been regenerated for adapter
+`699c…` and game build `5bc023…`; an independent load accepted its hashes, and
+a fresh scheduled restore reached a live inning with the exact requested home
+and away orders. The same current pair proves the member, order, and
+game-setting gates. Random Fill opens at
+`CMemberSelectTask` state `2` with cursor `0xFF`; directional input moves away
+from it, so two guarded A presses fill the teams and produce receipt mask
+`0x03`. `COrderSelectTask` state `5` already highlights Next, and one A reaches
+`CGameSettingTask` state `2`. A corrected end-to-end run used no roster/order
+directional input and reached game state `4`, inning `1`, score `0-0`. The
+captain task is now guarded through states `2 -> 3 -> 4`; the CPU popup is
+guarded at state `2` and selections `1 -> 2 -> 3` for Level 4. A second live
+run reached the same game state with no setup sleeps. Community reports
+place an RNG/home-away commitment somewhere during lineup selection, so the
+production seed must remain before lineup and Starworks must observe the final
+away/home assignment after that boundary.
+
+The same reverse-engineering found the reusable higher-level primitive for
+later screens: the NpLib task manager pointer at `0x80795A94` owns bounded task
+containers whose nodes point to every registered task object and its class
+descriptor. A live traversal found `CMainSelModeTask` without a RAM scan and
+also exposed parent, child, sibling, completion-result, and active fields. The
+runner has a read-only, guarded task-graph reader and a catalog for the top-level
+Exhibition, Training, Minigames, Challenge, Records, and Grand Prix tasks. This
+is the intended path for semantic stadium/team/order gates; XFB should not grow
+new colour classifiers for them. The current-build checkpoint is pinned before
+roster selection; the repeatable cold-boot route remains the authority for
+recreating it rather than treating the savestate as an unexplained artifact.
+
+The current checkpoint then completed a real website-queued one-inning match:
+the runner claimed attempt `008f6885-9dd1-4782-8475-1b60f3fa800f`, configured
+the scheduled teams, ran unattended, and uploaded sequences `1..34` with a
+terminal 3–1 score. The derivation independently produced the same 3–1 box
+score. It remains in commissioner review, not auto-confirmed, because the
+server's present health policy rejects all `memory-observation` telemetry by
+source label. That is the next acceptance boundary; sequence and score health
+are no longer the blocker.
 
 On 2026-08-12, the pre-release contract surface was flattened across Zod,
 generated JSON Schema, Remix, and Python. Removing the unused `schemaVersion`
@@ -542,6 +649,15 @@ state. Extending game code does not imply replacing DME or forking Dolphin.
 ### Targeted decompilation
 
 Starworks contributes to and consumes the existing `mss-decomp` work instead of starting another competing project by default.
+
+The first focused upstream-ready diff renames 12 exact-RMBE01 update symbols
+for the opening, top-level selection, stadium, captain, member, order, popup,
+and game-setting tasks. Every rename was mechanically checked against the
+class name embedded at descriptor `+0x10` and the update pointer at `+0x08`.
+The nested decomp compiled and linked an exact DOL with the expected SHA-1
+`08236f3164360f08075459f1f7a76b16e25fe734`; its final Ninja checksum action
+only failed because this local generated build uses a temporary output path
+while `build.sha1` names `build/RMBE01/main.dol` literally.
 
 Priority vertical slices are:
 

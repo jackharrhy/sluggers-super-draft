@@ -3,6 +3,11 @@ import { css } from 'remix/ui'
 
 import type { LeagueDetail, SessionIdentity } from '../../platform/model.ts'
 import { AppShell } from '../app-shell.tsx'
+import {
+  emptyStateStyle,
+  mutedTextStyle,
+  sectionHeadingStyle as sharedSectionHeadingStyle,
+} from '../design-system.ts'
 
 export function OperationsShell(handle: Handle<{
   children?: RemixNode
@@ -38,14 +43,8 @@ export function SectionHeading(handle: Handle<{
   )
 }
 
-export const emptyStyle = css({
-  border: '1px dashed var(--border-strong)',
-  borderRadius: '12px',
-  color: 'var(--text-muted)',
-  padding: '20px',
-})
-
-export const mutedStyle = css({ color: 'var(--text-muted)', lineHeight: 1.5 })
+export const emptyStyle = emptyStateStyle
+export const mutedStyle = mutedTextStyle
 export const sectionStyle = css({ marginTop: '44px' })
 
 const pageHeaderStyle = css({
@@ -63,12 +62,4 @@ const pageHeaderStyle = css({
 
 const pageContentStyle = css({ marginTop: '30px' })
 
-const sectionHeadingStyle = css({
-  alignItems: 'end',
-  display: 'flex',
-  gap: '20px',
-  justifyContent: 'space-between',
-  marginBottom: '18px',
-  '& h2': { fontSize: '30px', margin: 0 },
-  '& span': { color: 'var(--text-muted)', fontWeight: 800 },
-})
+const sectionHeadingStyle = sharedSectionHeadingStyle

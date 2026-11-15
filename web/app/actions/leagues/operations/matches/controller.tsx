@@ -38,8 +38,15 @@ export default createController(routes.leagues.operations.matches, {
       let league = context.get(OperationsLeague)
       try {
         let data = context.get(FormData)
+        let scheduleTiming = readString(data, 'scheduleTiming', false) || 'later'
+        if (!['now', 'later'].includes(scheduleTiming)) {
+          throw new PlatformError('Schedule choice is invalid', 'invalid_input')
+        }
         let scheduledValue = readString(data, 'scheduledAt', false)
-        let scheduledAt = scheduledValue ? new Date(scheduledValue) : null
+        if (scheduleTiming === 'later' && !scheduledValue) {
+          throw new PlatformError('Choose a scheduled time or use Schedule now', 'invalid_input')
+        }
+        let scheduledAt = scheduleTiming === 'now' ? new Date() : new Date(scheduledValue)
         if (scheduledAt && Number.isNaN(scheduledAt.getTime())) {
           throw new PlatformError('Scheduled time is invalid', 'invalid_input')
         }
@@ -86,5 +93,5 @@ export default createController(routes.leagues.operations.matches, {
 })
 
 function emptyDashboard(): RunnerMatchDashboard {
-  return { contentPacks: [], matches: [], rulesets: [], seasons: [], statProfiles: [], venues: [] }
+  return { contentPacks: [], defaultGameBuildSha256: null, matches: [], rulesets: [], seasons: [], statProfiles: [], venues: [] }
 }

@@ -5,7 +5,9 @@ import { routes } from '../routes.ts'
 import { Broadcast, Identity, Platform } from '../middleware/platform.ts'
 import { HomePage } from '../ui/home-page.tsx'
 import { BroadcastOverlayPage } from '../ui/broadcast-overlay-page.tsx'
+import { DevKitchenSinkPage } from '../ui/dev-kitchen-sink-page.tsx'
 import { PlatformError } from '../platform/errors.ts'
+import { isLoopbackHostname } from '../platform/local-demo-login.ts'
 
 export default createController(routes, {
   actions: {
@@ -34,6 +36,10 @@ export default createController(routes, {
         return new Response(status === 404 ? 'Overlay not found' : 'Overlay unavailable', { status })
       }
     },
+    async devKitchenSink(context) {
+      if (!developmentUiEnabled(process.env, context.url.hostname)) return new Response('Not Found', { status: 404 })
+      return context.render(<DevKitchenSinkPage />)
+    },
     async home(context) {
       let identity = context.get(Identity)
       let leagues = await context.get(Platform).listVisibleLeagues(identity)
@@ -41,3 +47,8 @@ export default createController(routes, {
     },
   },
 })
+
+function developmentUiEnabled(environment: NodeJS.ProcessEnv, hostname: string): boolean {
+  return environment.NODE_ENV !== 'production'
+    || (environment.STARWORKS_DEV_UI === 'local-only' && isLoopbackHostname(hostname))
+}

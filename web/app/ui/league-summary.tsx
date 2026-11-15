@@ -2,6 +2,7 @@ import type { Handle } from 'remix/ui'
 import { css } from 'remix/ui'
 
 import type { SeasonStatistics } from '../telemetry/statistics.ts'
+import { tableScrollerStyle, tableStyle } from './design-system.ts'
 import { CharacterBadge } from './league-operations/character-badge.tsx'
 
 export function StandingsTable(handle: Handle<{
@@ -10,7 +11,7 @@ export function StandingsTable(handle: Handle<{
 }>) {
   return () => (
     <div mix={tableScrollerStyle}>
-      <table mix={standingsTableStyle}>
+      <table mix={[tableStyle, standingsTableStyle]}>
         <thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>+/-</th><th>RD</th></tr></thead>
         <tbody>{handle.props.standings.slice(0, handle.props.limit).map((row, index) => (
           <tr>
@@ -52,8 +53,7 @@ function signed(value: number): string {
   return value > 0 ? `+${value}` : String(value)
 }
 
-const tableScrollerStyle = css({ overflowX: 'auto' })
-const standingsTableStyle = css({ borderCollapse: 'collapse', minWidth: '100%', textAlign: 'center', '& th, & td': { borderBottom: '1px solid var(--border)', padding: '10px 12px' }, '& th': { color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }, '& th:nth-child(2), & td:nth-child(2)': { textAlign: 'left' } })
+const standingsTableStyle = css({ textAlign: 'center', '& th, & td': { textAlign: 'center' }, '& th:nth-child(2), & td:nth-child(2)': { textAlign: 'left' } })
 const winStyle = css({ color: 'var(--success-text)' })
 const lossStyle = css({ color: 'var(--danger-text)' })
 const leaderListStyle = css({ listStyle: 'none', margin: 0, padding: 0, '& li': { alignItems: 'center', borderTop: '1px solid var(--border)', display: 'grid', gap: '10px', gridTemplateColumns: '24px minmax(0, 1fr) auto auto', padding: '9px 0' }, '& > li > span': { color: 'var(--text-muted)', textAlign: 'center' }, '& small': { color: 'var(--text-muted)' }, '@media (max-width: 520px)': { '& li': { gridTemplateColumns: '20px minmax(0, 1fr) auto' }, '& small': { display: 'none' } } })

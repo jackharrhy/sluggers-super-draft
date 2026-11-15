@@ -16,7 +16,7 @@ from starworks_runner.games.sluggers.content import (
     StaticTargetCatalog,
     StaticValueTarget,
 )
-from starworks_runner.games.sluggers.dolphin import DolphinLauncher
+from starworks_runner.games.sluggers.dolphin import DolphinLaunch, DolphinLauncher
 from starworks_runner.games.sluggers.errors import (
     BuildIntegrityError,
     DolphinLaunchError,
@@ -393,6 +393,29 @@ def test_dolphin_command_uses_isolated_profile_and_rejects_tampering(
     (result.game_directory / "sys/main.dol").write_bytes(b"tampered")
     with pytest.raises(DolphinLaunchError, match="modified managed output"):
         launcher.command_for(result.build_directory, tmp_path / "profile")
+
+
+def test_dolphin_launch_reports_the_exit_code_and_diagnostic_log(
+    tmp_path: Path,
+) -> None:
+    class ExitedProcess:
+        def poll(self) -> int:
+            return 7
+
+    diagnostic = tmp_path / "Logs/starworks-dolphin.log"
+    launch = DolphinLaunch(
+        process=ExitedProcess(),  # type: ignore[arg-type]
+        command=("Dolphin",),
+        profile_directory=tmp_path,
+        diagnostic_log_path=diagnostic,
+        started_at=0,
+    )
+
+    with pytest.raises(
+        DolphinLaunchError,
+        match=r"Dolphin exited during boot observation with exit code 7.*starworks-dolphin.log",
+    ):
+        launch.require_running("boot observation")
 
 
 def test_macos_dme_target_requires_debugger_entitlement(

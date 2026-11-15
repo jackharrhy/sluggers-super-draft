@@ -5,6 +5,7 @@ import {
 } from '@starworks/contracts'
 
 import { PlatformError } from '../platform/errors.ts'
+import { validateSluggersLineup } from '../sluggers/lineups.ts'
 
 type EffectiveLineup = TeamLineupRevision['lineup']
 type FieldingPosition = typeof FieldingPositionSchema.options[number]
@@ -47,7 +48,7 @@ export function parseTeamLineupForm(
     throw new PlatformError('The captain must be in the batting order', 'invalid_input')
   }
   let pitcherCharacterId = fielding.find((selection) => selection.fieldingPosition === 'P')!.characterId
-  return EffectiveLineupSchema.parse({
+  let lineup = EffectiveLineupSchema.parse({
     battingOrder: active
       .toSorted((left, right) => left.battingSlot! - right.battingSlot!)
       .map((selection) => selection.characterId),
@@ -59,6 +60,14 @@ export function parseTeamLineupForm(
     })),
     pitcherCharacterId,
   })
+  let sluggersIssues = validateSluggersLineup(lineup)
+  if (sluggersIssues.includes('unsupported-active-character')) {
+    throw new PlatformError('Only the 71 ordinary Sluggers characters can be active in this runner', 'invalid_input')
+  }
+  if (sluggersIssues.includes('unsupported-captain')) {
+    throw new PlatformError('Choose one of the twelve Sluggers team captains', 'invalid_input')
+  }
+  return lineup
 }
 
 export function battingInputName(index: number): string {

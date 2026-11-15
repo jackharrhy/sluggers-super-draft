@@ -122,6 +122,13 @@ CHARACTER_IDS = (
     "unused-koopa",
 )
 
+# Exact RMBE01 roster indices 0..70 are selectable built-in characters.
+# MSS-AutoTeam's table continues through 76 because the DOL contains six
+# unused records; those records are useful to preserve in the stat catalog but
+# must never enter a live formation. Miis begin at 77 and are profile-local, so
+# they require a separate station identity mapping rather than this table.
+PLAYABLE_CHARACTER_COUNT = 71
+
 CHARACTER_GAME_IDS = {
     **{character_id: index for index, character_id in enumerate(CHARACTER_IDS)},
     **{f"rmbe01-character-{index:03d}": index for index in range(len(CHARACTER_IDS))},
@@ -191,9 +198,9 @@ class TeamSelection:
         batting_slots: set[int] = set()
         fielding_positions: set[int] = set()
         for game_id, batting_slot, fielding_position in self.entries:
-            if not 0 <= game_id < len(CHARACTER_IDS):
+            if not 0 <= game_id < PLAYABLE_CHARACTER_COUNT:
                 raise BridgeProtocolError(
-                    "Lineup contains an unsupported game character"
+                    "Lineup contains a character that is not playable in RMBE01"
                 )
             if not 0 <= batting_slot < 9 or batting_slot in batting_slots:
                 raise BridgeProtocolError(
@@ -382,6 +389,10 @@ def _compile_team(bundle: dict[str, Any]) -> TeamSelection:
         if game_id is None:
             raise BridgeProtocolError(
                 f"Character {character_id} has no reviewed RMBE01 roster mapping"
+            )
+        if game_id >= PLAYABLE_CHARACTER_COUNT:
+            raise BridgeProtocolError(
+                f"Character {character_id} is not playable in RMBE01"
             )
         entries.append((game_id, batting_slot, fielding[character_id]))
     return TeamSelection(captain_brand_id, tuple(entries))

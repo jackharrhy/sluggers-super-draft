@@ -6,6 +6,7 @@ import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { routes } from '../routes.ts'
 import { SLUGGERS_ADAPTER_VERSION } from '../runner/adapter-version.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
+import { secondaryButtonStyle } from './design-system.ts'
 
 export function ContentDashboardPage(
   handle: Handle<{
@@ -19,7 +20,7 @@ export function ContentDashboardPage(
     let canCreate = dashboard.publishedStatProfiles.length && dashboard.publishedRulesets.length
     return <AppShell identity={identity} league={league} title={`Content packs · ${league.name} · Starworks`}>
       <header mix={heroStyle}>
-        <div><p mix={eyebrowStyle}>Local build inputs</p><h1 mix={headingStyle}>{league.name} content</h1></div>
+        <h1 mix={headingStyle}>{league.name} content</h1>
         <p mix={ledeStyle}>Publish hash-only manifests and user-created source images. Patched game builds remain private to each runner.</p>
         <nav mix={navStyle} aria-label="League workspaces">
           <a href={routes.leagues.show.href({ leagueSlug: league.slug })}>League home</a>
@@ -51,7 +52,7 @@ export function ContentDashboardPage(
       </section>
 
       <section mix={sectionStyle} aria-labelledby="packs-heading">
-        <div mix={sectionHeadingStyle}><div><p mix={eyebrowStyle}>Revision ledger</p><h2 id="packs-heading">Content packs</h2></div><span>{dashboard.packs.length} packs</span></div>
+        <div mix={sectionHeadingStyle}><h2 id="packs-heading">Content packs</h2><span>{dashboard.packs.length} packs</span></div>
         <div mix={packGridStyle}>
           {dashboard.packs.map((pack) => <article mix={cardStyle}>
             <h3>{pack.name}</h3><code>{pack.slug}</code>
@@ -76,7 +77,7 @@ export function ContentDashboardPage(
       </section>
 
       <section mix={sectionStyle} aria-labelledby="assets-heading">
-        <div mix={sectionHeadingStyle}><div><p mix={eyebrowStyle}>Garage objects</p><h2 id="assets-heading">Allowed source assets</h2></div><span>{dashboard.assets.length} assets</span></div>
+        <div mix={sectionHeadingStyle}><h2 id="assets-heading">Allowed source assets</h2><span>{dashboard.assets.length} assets</span></div>
         <div mix={assetGridStyle}>{dashboard.assets.map((asset) => <article mix={cardStyle}><strong>{asset.displayName}</strong><small>{asset.mediaType} · {asset.sizeBytes.toLocaleString()} bytes</small><code mix={digestStyle}>{asset.sha256}</code></article>)}</div>
       </section>
     </AppShell>
@@ -92,7 +93,6 @@ function Select(handle: Handle<{ label: string; name: string; options: Array<{ l
 }
 
 const heroStyle = css({ display: 'grid', gap: '18px' })
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
 const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
 const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.6, maxWidth: '760px' })
 const navStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '18px' })
@@ -105,8 +105,7 @@ const sectionHeadingStyle = css({ alignItems: 'end', display: 'flex', gap: '20px
 const packGridStyle = css({ display: 'grid', gap: '20px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 440px), 1fr))' })
 const revisionListStyle = css({ display: 'grid', gap: '16px', marginTop: '18px' })
 const revisionStyle = css({ background: 'var(--surface-deep)', borderRadius: '12px', display: 'grid', gap: '12px', padding: '16px' })
-const revisionHeadingStyle = css({ alignItems: 'center', display: 'flex', justifyContent: 'space-between', '& span': { background: 'var(--surface-strong)', borderRadius: '999px', padding: '5px 9px' } })
+const revisionHeadingStyle = css({ alignItems: 'center', display: 'flex', justifyContent: 'space-between', '& span': { color: 'var(--text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' } })
 const digestStyle = css({ display: 'block', fontSize: '11px', overflowWrap: 'anywhere' })
 const assignmentFormStyle = css({ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', '& label': { display: 'grid', gap: '5px' } })
-const secondaryButtonStyle = css({ background: 'var(--surface-strong)', border: '1px solid var(--border-strong)', borderRadius: '9px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })
 const assetGridStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 280px), 1fr))', '& article': { display: 'grid', gap: '8px' } })

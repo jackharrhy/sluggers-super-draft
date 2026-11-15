@@ -31,6 +31,7 @@ import type { StarworksDatabase } from '../platform/database/connection.ts'
 import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { administrativeRoles } from '../platform/repository.ts'
+import { validateSluggersLineup, type SluggersLineupIssue } from '../sluggers/lineups.ts'
 
 export interface ConfigurationServiceOptions {
   clock?: () => Date
@@ -67,7 +68,7 @@ export interface RulesetRevisionDetail {
 export interface TeamLineupRevisionDetail {
   basedOnRevision: TeamLineupRevision | null
   history: RevisionSummary[]
-  issues: ReturnType<typeof validateTeamLineupRevision>
+  issues: Array<ReturnType<typeof validateTeamLineupRevision>[number] | SluggersLineupIssue>
   revision: TeamLineupRevision
   teamName: string
 }
@@ -468,7 +469,16 @@ export class ConfigurationService {
         ? this.#loadLineupRevision(leagueId, teamId, revision.basedOnLineupRevisionId)
         : Promise.resolve(null),
     ])
-    return { basedOnRevision, revision, history: history.map(summary), issues: validateTeamLineupRevision(revision), teamName: team.name }
+    return {
+      basedOnRevision,
+      revision,
+      history: history.map(summary),
+      issues: [
+        ...validateTeamLineupRevision(revision),
+        ...validateSluggersLineup(revision.lineup),
+      ],
+      teamName: team.name,
+    }
   }
 
   async updateTeamLineupDraft(
@@ -504,7 +514,10 @@ export class ConfigurationService {
     await this.#requireTeamAdmin(identity, leagueId, teamId)
     let revision = await this.#loadLineupRevision(leagueId, teamId, revisionId)
     if (!revision) throw new PlatformError('Lineup revision was not found', 'not_found')
-    let issues = validateTeamLineupRevision(revision)
+    let issues = [
+      ...validateTeamLineupRevision(revision),
+      ...validateSluggersLineup(revision.lineup),
+    ]
     if (issues.length) throw new PlatformError(`Lineup is invalid: ${issues.join(', ')}`, 'invalid_input')
     let now = this.#clock()
     await this.database.transaction(async (transaction) => {
@@ -585,7 +598,10 @@ export class ConfigurationService {
     if (base.status !== 'published') {
       throw new PlatformError('A match override requires a published lineup', 'conflict')
     }
-    let issues = validateTeamLineupRevision({ ...base, lineup: input.effectiveLineup })
+    let issues = [
+      ...validateTeamLineupRevision({ ...base, lineup: input.effectiveLineup }),
+      ...validateSluggersLineup(input.effectiveLineup),
+    ]
     if (issues.length) {
       throw new PlatformError(`Match lineup is invalid: ${issues.join(', ')}`, 'invalid_input')
     }
@@ -632,6 +648,10 @@ export class ConfigurationService {
       this.#loadLineupRevision(input.leagueId, input.teamId, input.lineupRevisionId),
     ])
     if (!profile || !ruleset || !lineup) throw new PlatformError('Published configuration was not found', 'not_found')
+    let lineupIssues = validateSluggersLineup(lineup.lineup)
+    if (lineupIssues.length) {
+      throw new PlatformError(`Published lineup is not supported by the Sluggers runner: ${lineupIssues.join(', ')}`, 'conflict')
+    }
     return compileAdapterOperations({
       adapterVersion: input.adapterVersion,
       generatedAt: this.#clock().toISOString(),

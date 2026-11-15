@@ -89,7 +89,9 @@ export function getAppRuntime(): AppRuntime & { close(): Promise<void> } {
       minimumRunnerVersion: process.env.RUNNER_MINIMUM_VERSION,
       recommendedRunnerVersion: process.env.RUNNER_RECOMMENDED_VERSION,
     }),
-    runnerAdmin: new RunnerAdminService(connection.database),
+    runnerAdmin: new RunnerAdminService(connection.database, {
+      defaultGameBuildSha256: process.env.STARWORKS_DEFAULT_GAME_BUILD_SHA256,
+    }),
     sessionCookie: createCookie('starworks_session', {
       ...cookieOptions,
       maxAge: 30 * 24 * 60 * 60,

@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import plistlib
+import signal
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,47 @@ from starworks_runner.games.sluggers.hashing import sha256_tree
 class DolphinLaunch:
     process: subprocess.Popen[bytes]
     command: tuple[str, ...]
+    profile_directory: Path
+    diagnostic_log_path: Path | None
+    started_at: float
+
+    def require_running(self, stage: str) -> None:
+        return_code = self.process.poll()
+        if return_code is None:
+            return
+        outcome = f"exit code {return_code}"
+        if return_code < 0:
+            try:
+                outcome = f"signal {-return_code} ({signal.Signals(-return_code).name})"
+            except ValueError:
+                outcome = f"signal {-return_code}"
+        log = (
+            f"; Dolphin output: {self.diagnostic_log_path}"
+            if self.diagnostic_log_path is not None
+            else ""
+        )
+        raise DolphinLaunchError(f"Dolphin exited during {stage} with {outcome}{log}")
+
+    def wait_for_native_capture_safety(
+        self,
+        *,
+        timeout_seconds: float,
+        minimum_uptime_seconds: float = 3.0,
+        monotonic=time.monotonic,
+        sleep=time.sleep,
+    ) -> None:
+        """Avoid Dolphin 2606's uninitialized FrameDumper crash at startup."""
+
+        deadline = monotonic() + timeout_seconds
+        safe_at = self.started_at + minimum_uptime_seconds
+        while monotonic() < safe_at:
+            self.require_running("native screenshot startup guard")
+            if monotonic() >= deadline:
+                raise DolphinLaunchError(
+                    "Dolphin renderer was not ready for native screenshots "
+                    "before the timeout"
+                )
+            sleep(min(0.05, safe_at - monotonic()))
 
 
 class DolphinLauncher:
@@ -185,13 +228,29 @@ class DolphinLauncher:
             save_state=save_state,
             quiet_output=quiet_output,
         )
+        profile = user_directory.expanduser().resolve()
+        diagnostic_log_path: Path | None = None
+        diagnostic_stream = None
         try:
+            if quiet_output:
+                diagnostic_log_path = profile / "Logs" / "starworks-dolphin.log"
+                diagnostic_log_path.parent.mkdir(parents=True, exist_ok=True)
+                diagnostic_stream = diagnostic_log_path.open("ab")
             process = subprocess.Popen(
                 command,
                 start_new_session=os.name != "nt",
-                stdout=subprocess.DEVNULL if quiet_output else None,
-                stderr=subprocess.DEVNULL if quiet_output else None,
+                stdout=diagnostic_stream,
+                stderr=subprocess.STDOUT if quiet_output else None,
             )
         except OSError as error:
             raise DolphinLaunchError(f"Unable to launch Dolphin: {error}") from error
-        return DolphinLaunch(process=process, command=command)
+        finally:
+            if diagnostic_stream is not None:
+                diagnostic_stream.close()
+        return DolphinLaunch(
+            process=process,
+            command=command,
+            profile_directory=profile,
+            diagnostic_log_path=diagnostic_log_path,
+            started_at=time.monotonic(),
+        )

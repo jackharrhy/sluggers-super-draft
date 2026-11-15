@@ -12,7 +12,6 @@ export function AdminLeaguePage(
     <AppShell identity={handle.props.identity} title="Create a league · Starworks">
       <section mix={contentStyle}>
         <div>
-          <p mix={eyebrowStyle}>Site administration</p>
           <h1 mix={headingStyle}>Create a league</h1>
           <p mix={ledeStyle}>
             The league begins private. Its first administrator joins through a one-time Discord
@@ -49,7 +48,6 @@ export function InvitationCreatedPage(
       <AppShell identity={identity} title="League created · Starworks">
         <section mix={contentStyle}>
           <div>
-            <p mix={eyebrowStyle}>League created</p>
             <h1 mix={headingStyle}>{provisioned.league.name}</h1>
             <p mix={ledeStyle}>Private by default. Share the invitation below with its first administrator.</p>
           </div>
@@ -68,7 +66,6 @@ export function InvitationCreatedPage(
 }
 
 const contentStyle = css({ display: 'grid', gap: '36px', gridTemplateColumns: 'minmax(0, 1fr) minmax(320px, 480px)', '@media (max-width: 800px)': { gridTemplateColumns: '1fr' } })
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 10px', textTransform: 'uppercase' })
 const headingStyle = css({ fontFamily: 'var(--font-display)', fontSize: 'clamp(34px, 5vw, 48px)', lineHeight: 1.08, margin: 0 })
 const ledeStyle = css({ color: 'var(--text-soft)', fontSize: '18px', lineHeight: 1.65, maxWidth: '620px' })
 const formStyle = css({ alignSelf: 'start', display: 'grid', gap: '20px' })

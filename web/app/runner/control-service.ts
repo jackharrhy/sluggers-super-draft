@@ -1,6 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 
-import { and, asc, eq, lte } from 'drizzle-orm'
+import { and, asc, eq, isNull, lte, or } from 'drizzle-orm'
 
 import {
   RunEnvelopeSchema,
@@ -50,6 +50,7 @@ import { PlatformError } from '../platform/errors.ts'
 import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
 import type { RunnerCredentialScope } from '../platform/model.ts'
 import { createOpaqueToken, hashSecret } from '../platform/security.ts'
+import { validateSluggersLineup } from '../sluggers/lineups.ts'
 import { failAttemptWithRecovery } from './recovery.ts'
 
 const RUNNER_CREDENTIAL_PATTERN = /^starworks_runner_([0-9a-f-]{36})\.([A-Za-z0-9_-]{32,128})$/i
@@ -303,12 +304,17 @@ export class RunnerControlService {
       let [attempt] = await transaction
         .select({ id: matchAttempts.id, matchId: matchAttempts.matchId })
         .from(matchAttempts)
+        .innerJoin(matches, and(
+          eq(matches.leagueId, matchAttempts.leagueId),
+          eq(matches.id, matchAttempts.matchId),
+        ))
         .where(and(
           eq(matchAttempts.leagueId, authenticated.leagueId),
           eq(matchAttempts.status, 'queued'),
+          or(isNull(matches.scheduledAt), lte(matches.scheduledAt, now)),
         ))
         .orderBy(asc(matchAttempts.createdAt), asc(matchAttempts.attemptNumber))
-        .for('update', { skipLocked: true })
+        .for('update', { of: matchAttempts, skipLocked: true })
         .limit(1)
       if (!attempt) return null
       let leaseId = this.#createId()
@@ -548,6 +554,13 @@ export class RunnerControlService {
     let contentPack = contentPackRows[0]
     if (!profile || !ruleset || !home || !away || (execution.attempt.contentPackRevisionId && !contentPack?.manifest)) {
       throw new PlatformError('Published attempt configuration is incomplete', 'conflict')
+    }
+    let unsupportedLineups = [home, away].flatMap((lineup) => validateSluggersLineup(lineup.lineup))
+    if (unsupportedLineups.length) {
+      throw new PlatformError(
+        `Published attempt lineup is not supported by the Sluggers runner: ${[...new Set(unsupportedLineups)].join(', ')}`,
+        'conflict',
+      )
     }
     let rulesetDocument = RulesetRevisionSchema.safeParse({
       basedOnRevisionId: ruleset.basedOnRevisionId,

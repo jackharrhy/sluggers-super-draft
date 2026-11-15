@@ -5,6 +5,7 @@ import type { LeagueOperationsDashboard } from '../../league-operations/service.
 import type { LeagueDetail, SessionIdentity } from '../../platform/model.ts'
 import { routes } from '../../routes.ts'
 import { buttonStyle, cardStyle, inputStyle } from '../app-shell.tsx'
+import { dangerButtonStyle, secondaryButtonStyle } from '../design-system.ts'
 import { CharacterBadge } from './character-badge.tsx'
 import { OperationsShell } from './workspace-page.tsx'
 
@@ -83,7 +84,7 @@ export function LeagueTeamsPage(handle: Handle<{
                 {mayReview ? <form action={routes.leagues.operations.teams.reviewTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post" mix={reviewFormStyle}>
                   <input name="reason" placeholder="Optional decision note" mix={inputStyle} />
                   <button name="decision" value="approved" mix={buttonStyle}>Approve and apply</button>
-                  <button name="decision" value="rejected" mix={dangerStyle}>Reject</button>
+                  <button name="decision" value="rejected" mix={dangerButtonStyle}>Reject</button>
                 </form> : null}
                 {mayCancel ? <form action={routes.leagues.operations.teams.cancelTrade.href({ leagueSlug: league.slug, proposalId: trade.id })} method="post"><button mix={secondaryButtonStyle}>Cancel offer</button></form> : null}
               </div> : null}
@@ -130,7 +131,7 @@ const twoColumnStyle = css({ display: 'grid', gap: '24px', gridTemplateColumns: 
 const formStyle = css({ display: 'grid', gap: '14px', marginTop: '18px', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })
 const rosterGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))' })
 const rosterHeadingStyle = css({ alignItems: 'center', display: 'flex', gap: '12px', justifyContent: 'space-between', '& h3': { fontSize: '24px', margin: 0 } })
-const managedStyle = css({ background: 'var(--success-surface)', borderRadius: '999px', color: 'var(--success-text)', fontSize: '11px', fontWeight: 900, padding: '5px 8px', textTransform: 'uppercase' })
+const managedStyle = css({ color: 'var(--success-text)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' })
 const characterListStyle = css({ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '14px' })
 const characterChoicesStyle = css({ border: '1px solid var(--border)', borderRadius: '10px', display: 'grid', gap: '16px', margin: 0, padding: '14px', '& legend': { fontWeight: 800, padding: '0 6px' }, '& > div': { display: 'grid', gap: '8px' } })
 const choiceGridStyle = css({ display: 'grid', gap: '7px', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', '& label': { alignItems: 'center', background: 'var(--surface-deep)', borderRadius: '8px', cursor: 'pointer', display: 'flex', gap: '8px', padding: '7px' } })
@@ -138,9 +139,7 @@ const deadlineListStyle = css({ display: 'grid', gap: '10px', listStyle: 'none',
 const tradeListStyle = css({ display: 'grid', gap: '18px' })
 const tradeCardStyle = css({ display: 'grid', gap: '18px' })
 const tradeHeadingStyle = css({ alignItems: 'start', display: 'flex', gap: '20px', justifyContent: 'space-between', '& h3': { fontSize: '23px', margin: '8px 0 0' }, '& small': { color: 'var(--text-muted)' } })
-const statusStyle = css({ background: 'var(--surface-strong)', borderRadius: '999px', padding: '6px 10px', whiteSpace: 'nowrap' })
+const statusStyle = css({ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', whiteSpace: 'nowrap' })
 const tradeSidesStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', '& div': { background: 'var(--surface-deep)', borderRadius: '10px', display: 'grid', gap: '8px', padding: '14px' }, '@media (max-width: 600px)': { gridTemplateColumns: '1fr' } })
 const tradeActionsStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '12px' })
 const reviewFormStyle = css({ alignItems: 'center', display: 'flex', flex: '1 1 600px', flexWrap: 'wrap', gap: '8px', '& input': { flex: '1 1 220px' } })
-const secondaryButtonStyle = css({ background: 'var(--surface-strong)', border: '1px solid var(--border-strong)', borderRadius: '9px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })
-const dangerStyle = css({ background: 'var(--danger-button)', border: '1px solid var(--danger-border)', borderRadius: '9px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })

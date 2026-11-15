@@ -41,9 +41,7 @@ class AttemptExecutor(Protocol):
 
 @dataclass(frozen=True)
 class RunOnceResult:
-    status: Literal[
-        "no-work", "running", "offline", "completed", "cancelled", "failed"
-    ]
+    status: Literal["no-work", "running", "offline", "completed", "cancelled", "failed"]
     attempt_id: str | None
     detail: str | None = None
 
@@ -106,9 +104,7 @@ class RunnerStation:
         registration = self._registration()
         active = self.state.load_active_run()
         sync_error = self._retryable_sync(self.flush_pending_updates)
-        if sync_error is not None and (
-            active is None or active.stage != "running"
-        ):
+        if sync_error is not None and (active is None or active.stage != "running"):
             raise sync_error
         active = self.state.load_active_run()
         if active is None:
@@ -284,9 +280,7 @@ class RunnerStation:
 
     @staticmethod
     def _offline(attempt_id: str, error: RunnerApiError) -> RunOnceResult:
-        return RunOnceResult(
-            status="offline", attempt_id=attempt_id, detail=str(error)
-        )
+        return RunOnceResult(status="offline", attempt_id=attempt_id, detail=str(error))
 
     def flush_pending_telemetry(self, active: ActiveRun, runner_id: str) -> None:
         while pending := self.state.list_pending_telemetry(

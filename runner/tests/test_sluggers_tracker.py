@@ -122,9 +122,7 @@ def test_memory_reader_uses_bounded_read_only_blocks() -> None:
     memory.values[(GAME_TIMER_ADDRESS, 4)] = (12345).to_bytes(4, "big")
     memory.values[(BASES_ADVANCED_ADDRESS, 1)] = (2).to_bytes(1, "big", signed=True)
     memory.values[(HOME_RUN_ADDRESS, 1)] = b"\x01"
-    memory.values[(BASERUNNER_BLOCK_ADDRESS, len(baserunners))] = bytes(
-        baserunners
-    )
+    memory.values[(BASERUNNER_BLOCK_ADDRESS, len(baserunners))] = bytes(baserunners)
 
     value = SluggersMemoryReader(memory).read()
 

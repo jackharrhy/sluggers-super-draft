@@ -40,6 +40,7 @@ describe('league matches controller', () => {
           awayTeamId: '44444444-4444-4444-8444-444444444444',
           homeTeamId: '55555555-5555-4555-8555-555555555555',
           scheduledAt: '2026-08-10T19:30',
+          scheduleTiming: 'later',
           seasonId: '66666666-6666-4666-8666-666666666666',
         }),
         headers: { cookie: session, origin: 'http://localhost' },
@@ -58,5 +59,36 @@ describe('league matches controller', () => {
       },
       leagueId: league.id,
     })
+  })
+
+  it('schedules a match for the current time without a datetime value', async () => {
+    let received: { input: { scheduledAt: Date } } | undefined
+    let runtime = createOperationsRuntime({
+      runnerAdmin: createRunnerAdmin({
+        async scheduleMatch(_identity, _leagueId, input) {
+          received = { input: input as { scheduledAt: Date } }
+          return { id: '33333333-3333-4333-8333-333333333333' }
+        },
+      }),
+    })
+    let session = await runtime.sessionCookie.serialize('test-session')
+    let before = Date.now()
+    let response = await createAppRouter({ logging: { sink: () => {} }, runtime }).fetch(
+      new Request('http://localhost' + routes.leagues.operations.matches.schedule.href({ leagueSlug: league.slug }), {
+        body: new URLSearchParams({
+          awayTeamId: '44444444-4444-4444-8444-444444444444',
+          homeTeamId: '55555555-5555-4555-8555-555555555555',
+          scheduleTiming: 'now',
+          seasonId: '66666666-6666-4666-8666-666666666666',
+        }),
+        headers: { cookie: session, origin: 'http://localhost' },
+        method: 'POST',
+      }),
+    )
+
+    assert.equal(response.status, 303)
+    assert.ok(received)
+    assert.ok(received.input.scheduledAt.getTime() >= before)
+    assert.ok(received.input.scheduledAt.getTime() <= Date.now())
   })
 })

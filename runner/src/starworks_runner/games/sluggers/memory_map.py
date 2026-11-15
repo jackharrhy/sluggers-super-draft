@@ -106,9 +106,7 @@ class MemoryMap:
             None,
         )
         if bridge is None:
-            raise BuildIntegrityError(
-                "Memory map has no starworks-bridge reservation"
-            )
+            raise BuildIntegrityError("Memory map has no starworks-bridge reservation")
         if bridge.start != BRIDGE_BASE_ADDRESS or bridge.size != BRIDGE_REGION_SIZE:
             raise BuildIntegrityError(
                 "Bridge protocol constants disagree with the memory-map reservation"

@@ -174,10 +174,12 @@ game frames. It:
 
 Starworks can reuse the reviewed game addresses and behavioral ideas, but a fixed
 timed macro is not sufficient for an unattended runner that must fail closed.
-One concrete navigation idea was retained and independently mapped with native
-frames: after CPU level selection, four right transitions move the checkpoint's
-Dixie Kong cursor onto Random Fill. Starworks then requires the bridge's
-two-roster receipt instead of assuming the timed macro succeeded.
+One concrete navigation idea was retained and then corrected through native
+frames and task memory. At `CMemberSelectTask` state `2`, cursor value `0xFF`
+already highlights Random Fill. Four right transitions instead land on
+Toadsworth, so the executor must not move the cursor. Starworks presses A only
+after observing that exact boundary, then requires the bridge's two-roster
+receipt instead of assuming the action succeeded.
 The first A fills both random rosters and changes the button to Next; the second A
 crosses the reviewed team-selection hook. Live paused inspection observed receipt
 mask `0x07`: both roster hooks and adapter-owned CPU control ran. A later read of
@@ -185,6 +187,15 @@ the game-owned batting-order and field-position structures showed that the
 remaining menus reordered the formations. The receipt therefore cannot be
 called lineup acceptance. The runner now performs independent game-owned
 read-back and fails closed on this mismatch.
+
+Follow-up task-state work removed the remaining setup macro. The retained
+`CExhiCaptainTask` anchor exposes states `2`, `3`, and `4` around its three A
+actions. `CMenuPopUpTask` state `2` exposes CPU selections `1`, `2`, and `3`
+for Levels 2, 3, and 4. `CMemberSelectTask` state `2`/cursor `0xFF` already
+highlights Random Fill, `COrderSelectTask` state `5` already highlights Next,
+and `CGameSettingTask` state `2` already highlights Begin. A live run using
+those observations reached game state `4`, inning `1`, score `0-0` with no
+wall-clock setup sleeps.
 
 The DME-first proof used stock Dolphin 2606 with no GDB endpoint configured. On
 macOS arm64, Python DME 1.3.1 attached, read game ID `RMBE01`, found bridge entry
