@@ -4,7 +4,10 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "setup": "npm ci --prefix apps/sluggers-super-draft && npm --prefix experiments/starworks-platform run setup",
+    "setup": "npm ci && npm ci --prefix apps/sluggers-super-draft && npm --prefix experiments/starworks-platform run setup",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "lint": "vp lint",
     "dev": "npm --prefix apps/sluggers-super-draft run dev",
     "start": "npm --prefix apps/sluggers-super-draft start",
     "build": "npm --prefix apps/sluggers-super-draft run build",
@@ -16,5 +19,8 @@
   },
   "engines": {
     "node": ">=24.3.0"
+  },
+  "devDependencies": {
+    "vite-plus": "1.6.0"
   }
 }
