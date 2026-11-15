@@ -9,8 +9,9 @@ a game image or materialized game build.
 
 ## Install a release wheel
 
-Each `v*` Git tag creates a GitHub release containing a platform-independent
-runner wheel and `SHA256SUMS`. Download both from the
+Runner releases contain a platform-independent wheel and `SHA256SUMS`.
+Tag-triggered release automation is disabled; releases must be built and
+published manually. For an existing release, download both files from the
 [Starworks releases page](https://github.com/jackharrhy/sluggers-super-draft/releases),
 verify the checksum, and install the native UI with `uv`:
 
