@@ -1,0 +1,27 @@
+.venv/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.tsbuildinfo
+.react-router/
+build/
+dist/
+data/
+backups/
+tmp/
+.starworks/
+public/images/
+/deploy/prod/garage.toml
+
+# Owned game images and local emulator state.
+*.iso
+*.rvz
+*.wbfs
+*.gcm
+*.sav
+*.sqlite
+*.sqlite3
+*.sqlite*-shm
+*.sqlite*-wal
