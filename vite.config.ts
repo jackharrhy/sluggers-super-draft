@@ -1,8 +1,10 @@
 import { defineConfig } from "vite-plus";
 
 const ignored = [
+  "apps/**",
   "experiments/**",
-  "docs/archive/**",
+  "docs/**",
+  "PRIOR_ART.md",
   "research/**",
   ".starworks/**",
   "**/node_modules/**",
