@@ -19,9 +19,7 @@ class RunnerApiError(RuntimeError):
     @property
     def retryable(self) -> bool:
         return (
-            self.status is None
-            or self.status in {408, 425, 429}
-            or self.status >= 500
+            self.status is None or self.status in {408, 425, 429} or self.status >= 500
         )
 
 

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 
 import { and, desc, eq } from 'drizzle-orm'
 
@@ -20,13 +21,29 @@ import {
 import { PostgresPlatformRepository } from '../app/platform/database/postgres-repository.ts'
 import { RunnerAdminService } from '../app/runner/admin-service.ts'
 
-const DEMO_GAME_BUILD_SHA256 = '1016a24051e66c309b6399692acf1c50601d9b3c49c0ec467a55d24d62743d00'
+// Exact managed build accepted with the current adapter and pre-roster
+// checkpoint. This is an immutable build identity, not a public protocol
+// version; refresh it only after the live checkpoint acceptance run.
+const DEMO_GAME_BUILD_SHA256 = process.env.STARWORKS_DEFAULT_GAME_BUILD_SHA256
+  ?? '5bc0232095a87d64fee0c42110705b14991a73621669ca911fa17c4949f530f5'
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const { positionals, values } = parseArgs({
+  allowPositionals: true,
+  options: { innings: { short: 'i', type: 'string' } },
+})
+if (positionals.length > 1) throw new Error('Expected at most one demo match file')
 const configurationPath = path.resolve(
-  process.argv[2] ?? path.join(repositoryRoot, 'demo/sluggers-match.json'),
+  positionals[0] ?? path.join(repositoryRoot, 'demo/sluggers-match.json'),
 )
+let configurationDocument: unknown = JSON.parse(await readFile(configurationPath, 'utf8'))
+if (values.innings !== undefined) {
+  if (!configurationDocument || typeof configurationDocument !== 'object' || Array.isArray(configurationDocument)) {
+    throw new Error('Demo match file must contain an object')
+  }
+  configurationDocument = { ...configurationDocument, innings: Number(values.innings) }
+}
 const configuration = parseLocalDemoMatch(
-  JSON.parse(await readFile(configurationPath, 'utf8')),
+  configurationDocument,
 )
 const databaseUrl = process.env.DATABASE_URL
   ?? 'postgres://starworks:starworks@127.0.0.1:5432/starworks'
@@ -167,6 +184,7 @@ try {
       team: configuration.away.team,
     },
     queuedAttemptsInLeague: queuedAttempts.length,
+    innings: configuration.innings,
     stadium: configuration.stadium,
   }, null, 2))
 } finally {

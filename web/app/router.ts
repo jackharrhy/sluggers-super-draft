@@ -56,7 +56,10 @@ export interface AppRouterOptions {
 export function createAppRouter(options: AppRouterOptions = {}) {
   let router = createRouter<AppContext>({
     middleware: [
-      staticFiles('./public', { index: false }),
+      staticFiles('./public', {
+        index: false,
+        ...(process.env.NODE_ENV === 'development' ? { cacheControl: 'no-store' } : {}),
+      }),
       requestLogging(options.logging),
       platform(() => options.runtime ?? getAppRuntime()),
       sameOrigin(),

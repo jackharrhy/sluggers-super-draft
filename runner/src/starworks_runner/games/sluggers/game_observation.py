@@ -104,9 +104,7 @@ class SluggersMemoryReader:
             BASES_ADVANCED_ADDRESS, BASES_ADVANCED_ADDRESS + 1
         )
         home_run = self._read_block(HOME_RUN_ADDRESS, HOME_RUN_ADDRESS + 1)
-        baserunners = self._read_block(
-            BASERUNNER_BLOCK_ADDRESS, BASERUNNER_BLOCK_END
-        )
+        baserunners = self._read_block(BASERUNNER_BLOCK_ADDRESS, BASERUNNER_BLOCK_END)
         return GameSnapshot(
             frame=int.from_bytes(timer, "big"),
             state=gameplay[0x181],

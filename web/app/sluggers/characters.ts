@@ -105,7 +105,30 @@ export const SLUGGERS_CHARACTER_IDS = [
   'black-mii-f',
 ] as const
 
+// Exact RMBE01 indices 0..70 are ordinary selectable characters. Slots 71..76
+// are unused game records and 77..100 are machine-local Mii appearances.
+export const SLUGGERS_PLAYABLE_CHARACTER_IDS = SLUGGERS_CHARACTER_IDS.slice(0, 71)
+
+// These are the twelve captain-brand values accepted by Exhibition. A roster
+// may contain any playable character, but only one of these can captain a team.
+export const SLUGGERS_CAPTAIN_CHARACTER_IDS = [
+  'mario',
+  'luigi',
+  'donkey-kong',
+  'diddy-kong',
+  'peach',
+  'daisy',
+  'yoshi',
+  'bowser',
+  'wario',
+  'waluigi',
+  'birdo',
+  'bowser-jr',
+] as const
+
 let characterIndexById = new Map<string, number>(SLUGGERS_CHARACTER_IDS.map((id, index) => [id, index]))
+let playableCharacterIds = new Set<string>(SLUGGERS_PLAYABLE_CHARACTER_IDS)
+let captainCharacterIds = new Set<string>(SLUGGERS_CAPTAIN_CHARACTER_IDS)
 
 export type SluggersCharacterKind = 'playable' | 'mii' | 'unused'
 
@@ -145,6 +168,14 @@ export function sluggersCharacterKind(characterId: string): SluggersCharacterKin
   if (canonicalId.startsWith('unused-')) return 'unused'
   if (canonicalId.includes('-mii-')) return 'mii'
   return 'playable'
+}
+
+export function isSluggersPlayableCharacter(characterId: string): boolean {
+  return playableCharacterIds.has(canonicalCharacterId(characterId))
+}
+
+export function isSluggersCaptainCharacter(characterId: string): boolean {
+  return captainCharacterIds.has(canonicalCharacterId(characterId))
 }
 
 function canonicalCharacterId(characterId: string): string {

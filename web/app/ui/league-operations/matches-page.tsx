@@ -4,7 +4,9 @@ import { css } from 'remix/ui'
 import type { LeagueDetail, SessionIdentity } from '../../platform/model.ts'
 import type { RunnerMatchDashboard } from '../../runner/admin-service.ts'
 import { routes } from '../../routes.ts'
+import { SLUGGERS_STADIUMS } from '../../sluggers/stadiums.ts'
 import { buttonStyle, cardStyle, inputStyle } from '../app-shell.tsx'
+import { secondaryButtonStyle } from '../design-system.ts'
 import { emptyStyle, mutedStyle, OperationsShell, SectionHeading, sectionStyle } from './workspace-page.tsx'
 
 export function LeagueMatchesPage(handle: Handle<{
@@ -42,7 +44,10 @@ export function LeagueMatchesPage(handle: Handle<{
                 <option value="">No league venue</option>
                 {dashboard.venues.map((venue) => <option value={venue.id}>{venue.name}</option>)}
               </select></label>
-              <button type="submit" mix={buttonStyle}>Schedule match</button>
+              <div mix={scheduleActionsStyle}>
+                <button type="submit" name="scheduleTiming" value="now" mix={buttonStyle}>Schedule now</button>
+                <button type="submit" name="scheduleTiming" value="later" mix={secondaryButtonStyle}>Schedule for later</button>
+              </div>
             </form>
           </section>
 
@@ -85,8 +90,14 @@ export function LeagueMatchesPage(handle: Handle<{
                           <option value="">Stock assets</option>
                           {dashboard.contentPacks.map((pack) => <option value={pack.id}>{pack.name} · revision {pack.revisionNumber}</option>)}
                         </select></label>
-                        <label>Stadium<input name="gameStadiumId" required defaultValue="mario-stadium" pattern="[a-z0-9][a-z0-9-]{0,63}" mix={inputStyle} /></label>
-                        <label mix={wideStyle}>Game build SHA-256<input name="requiredGameBuildSha256" required pattern="[a-f0-9]{64}" defaultValue={match.attempts.at(-1)?.requiredGameBuildSha256} mix={inputStyle} /></label>
+                        <label>Stadium<select name="gameStadiumId" required defaultValue="mario-stadium" mix={inputStyle}>
+                          {SLUGGERS_STADIUMS.map((stadium) => <option value={stadium.id}>{stadium.name}</option>)}
+                        </select></label>
+                        {dashboard.defaultGameBuildSha256 ? (
+                          <input type="hidden" name="requiredGameBuildSha256" value={dashboard.defaultGameBuildSha256} />
+                        ) : (
+                          <label mix={wideStyle}>Game build SHA-256<input name="requiredGameBuildSha256" required pattern="[a-f0-9]{64}" defaultValue={match.attempts.at(-1)?.requiredGameBuildSha256} mix={inputStyle} /></label>
+                        )}
                         <button type="submit" mix={buttonStyle}>Queue attempt</button>
                       </form>
                     </details>
@@ -104,10 +115,11 @@ export function LeagueMatchesPage(handle: Handle<{
 
 const scheduleStyle = css({ display: 'grid', gap: '18px', maxWidth: '900px', '& h2': { margin: 0 } })
 const formStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 200px), 1fr))', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })
+const scheduleActionsStyle = css({ alignItems: 'end', display: 'flex', flexWrap: 'wrap', gap: '9px' })
 const matchListStyle = css({ display: 'grid', gap: '16px' })
 const matchStyle = css({ display: 'grid', gap: '18px' })
 const matchHeadingStyle = css({ alignItems: 'start', display: 'flex', gap: '18px', justifyContent: 'space-between', '& h3': { fontSize: '23px', margin: 0 }, '& p': { margin: '6px 0 0' } })
-const statusStyle = css({ background: 'var(--surface-strong)', borderRadius: '999px', fontSize: '12px', fontWeight: 800, padding: '6px 10px', textTransform: 'capitalize', whiteSpace: 'nowrap' })
+const statusStyle = css({ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase', whiteSpace: 'nowrap' })
 const attemptListStyle = css({ display: 'grid', gap: '7px', listStyle: 'none', margin: 0, padding: 0, '& li': { alignItems: 'center', background: 'var(--surface-deep)', borderRadius: '8px', display: 'flex', gap: '14px', justifyContent: 'space-between', padding: '9px 11px' }, '& span': { color: 'var(--text-muted)' } })
 const queueFormStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', marginTop: '16px', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })
 const wideStyle = css({ gridColumn: '1 / -1' })

@@ -394,6 +394,7 @@ function operationsDashboard(): RunnerOperationsDashboard {
   return {
     audit: [],
     contentPacks: [],
+    defaultGameBuildSha256: null,
     matches: [{
       attempts: [],
       awayTeamId: AWAY_TEAM_ID,

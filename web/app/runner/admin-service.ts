@@ -34,6 +34,8 @@ import { PlatformError } from '../platform/errors.ts'
 import type { SessionIdentity } from '../platform/model.ts'
 import { runnerOperationRoles } from '../platform/repository.ts'
 import { createOpaqueToken } from '../platform/security.ts'
+import { validateSluggersLineup } from '../sluggers/lineups.ts'
+import { SLUGGERS_STADIUM_IDS } from '../sluggers/stadiums.ts'
 import { SLUGGERS_ADAPTER_VERSION } from './adapter-version.ts'
 import { failAttemptWithRecovery } from './recovery.ts'
 
@@ -51,7 +53,12 @@ const QueueAttemptSchema = z.strictObject({
   dynamicRuleOverrides: z.record(z.string().min(1), z.union([z.string(), z.number().finite(), z.boolean(), z.null()])),
   homeLineupRevisionId: z.uuid(),
   executionMode: z.literal('cpu-vs-cpu').default('cpu-vs-cpu'),
-  gameStadiumId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,63}$/).default('mario-stadium'),
+  // Keep the service input honest: HTTP and import callers provide strings,
+  // while the parsed value is narrowed to the exact adapter catalog.
+  gameStadiumId: z.preprocess(
+    (value) => value,
+    z.enum(SLUGGERS_STADIUM_IDS),
+  ).default('mario-stadium'),
   requiredGameBuildSha256: Sha256Schema,
   rulesetRevisionId: z.uuid(),
   statProfileRevisionId: z.uuid(),
@@ -62,9 +69,11 @@ export interface RunnerAdminServiceOptions {
   clock?: () => Date
   createId?: () => string
   createNonce?: () => string
+  defaultGameBuildSha256?: string
 }
 
 export interface RunnerOperationsDashboard {
+  defaultGameBuildSha256: string | null
   audit: Array<{
     action: string
     actorDisplayName: string | null
@@ -129,6 +138,7 @@ export class RunnerAdminService {
   readonly #adapterVersion: string
   readonly #createId: () => string
   readonly #createNonce: () => string
+  readonly #defaultGameBuildSha256: string | null
 
   constructor(
     readonly database: StarworksDatabase,
@@ -138,6 +148,8 @@ export class RunnerAdminService {
     this.#adapterVersion = options.adapterVersion ?? SLUGGERS_ADAPTER_VERSION
     this.#createId = options.createId ?? randomUUID
     this.#createNonce = options.createNonce ?? createOpaqueToken
+    let defaultBuild = Sha256Schema.safeParse(options.defaultGameBuildSha256)
+    this.#defaultGameBuildSha256 = defaultBuild.success ? defaultBuild.data : null
   }
 
   async matchDashboard(
@@ -148,7 +160,7 @@ export class RunnerAdminService {
     let [seasonRows, teamRows, lineupRows, profileRows, rulesetRows, contentPackRows, venueRows, matchRows, attemptRows] = await Promise.all([
       this.database.select({ id: seasons.id, name: seasons.name }).from(seasons).where(eq(seasons.leagueId, leagueId)),
       this.database.select({ id: leagueTeams.id, name: leagueTeams.name, seasonId: leagueTeams.seasonId }).from(leagueTeams).where(eq(leagueTeams.leagueId, leagueId)),
-      this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))),
+      this.database.select({ id: lineupRevisions.id, revisionNumber: lineupRevisions.revisionNumber, teamId: lineupRevisions.teamId }).from(lineupRevisions).where(and(eq(lineupRevisions.leagueId, leagueId), eq(lineupRevisions.status, 'published'))).orderBy(desc(lineupRevisions.revisionNumber)),
       this.database.select({ id: statProfileRevisions.id, name: statProfileRevisions.name, revisionNumber: statProfileRevisions.revisionNumber }).from(statProfileRevisions).where(and(eq(statProfileRevisions.leagueId, leagueId), eq(statProfileRevisions.status, 'published'))),
       this.database.select({ id: rulesetRevisions.id, name: rulesetRevisions.name, revisionNumber: rulesetRevisions.revisionNumber }).from(rulesetRevisions).where(and(eq(rulesetRevisions.leagueId, leagueId), eq(rulesetRevisions.status, 'published'))),
       this.database.select({ id: contentPackRevisions.id, name: contentPacks.name, revisionNumber: contentPackRevisions.revisionNumber, rulesetRevisionId: contentPackRevisions.rulesetRevisionId, statProfileRevisionId: contentPackRevisions.statProfileRevisionId }).from(contentPackRevisions).innerJoin(contentPacks, and(eq(contentPacks.leagueId, contentPackRevisions.leagueId), eq(contentPacks.id, contentPackRevisions.contentPackId))).where(and(eq(contentPackRevisions.leagueId, leagueId), eq(contentPackRevisions.status, 'published'))),
@@ -166,11 +178,12 @@ export class RunnerAdminService {
     let teamNames = new Map(teamRows.map((team) => [team.id, team.name]))
     return {
       contentPacks: contentPackRows,
+      defaultGameBuildSha256: this.#defaultGameBuildSha256,
       seasons: seasonRows.map((season) => ({
         ...season,
         teams: teamRows.filter((team) => team.seasonId === season.id).map((team) => ({
           id: team.id,
-          lineups: lineupRows.filter((lineup) => lineup.teamId === team.id).map((lineup) => ({ id: lineup.id, revisionNumber: lineup.revisionNumber })),
+          lineups: lineupRows.filter((lineup) => lineup.teamId === team.id).slice(0, 1).map((lineup) => ({ id: lineup.id, revisionNumber: lineup.revisionNumber })),
           name: team.name,
         })),
       })),
@@ -299,6 +312,13 @@ export class RunnerAdminService {
     ])
     if (!home || home.teamId !== match.homeTeamId || !away || away.teamId !== match.awayTeamId) {
       throw new PlatformError('Attempt lineups must be published for the scheduled teams', 'invalid_input')
+    }
+    let unsupportedLineups = [home, away].flatMap((lineup) => validateSluggersLineup(lineup.lineup))
+    if (unsupportedLineups.length) {
+      throw new PlatformError(
+        `Attempt lineup is not supported by the Sluggers runner: ${[...new Set(unsupportedLineups)].join(', ')}`,
+        'invalid_input',
+      )
     }
     let [[profile], [ruleset]] = await Promise.all([
       this.database

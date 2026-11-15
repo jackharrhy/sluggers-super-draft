@@ -118,6 +118,32 @@ test(
           assert.equal(nextLineup.rosterRevisionNumber, 2)
           assert.equal(nextLineup.status, 'draft')
 
+          let unsupportedCaptain = {
+            ...nextLineup.lineup,
+            captainCharacterId: 'toad',
+          }
+          await service.updateTeamLineupDraft(
+            fixture.identity,
+            fixture.leagueId,
+            fixture.teamId,
+            nextLineup.lineupRevisionId,
+            {
+              lineup: unsupportedCaptain,
+              rosterCharacterIds: nextLineup.rosterCharacterIds,
+            },
+          )
+          await assert.rejects(
+            service.publishTeamLineup(
+              fixture.identity,
+              fixture.leagueId,
+              fixture.teamId,
+              nextLineup.lineupRevisionId,
+            ),
+            (error: unknown) => error instanceof PlatformError
+              && error.code === 'invalid_input'
+              && error.message.includes('unsupported-captain'),
+          )
+
           let operationBundle = await service.compilePublishedConfiguration({
             adapterVersion: '0.1.0-test',
             identity: fixture.identity,

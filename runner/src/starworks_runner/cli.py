@@ -58,11 +58,11 @@ from starworks_runner.games.sluggers.tools import (
     install_dtk,
     load_dtk_release,
 )
+from starworks_runner.state import RunnerStateInUse
 from starworks_runner.station import (
     SluggersStationConfig,
     create_sluggers_station_service,
 )
-from starworks_runner.state import RunnerStateInUse
 from starworks_runner.support import create_support_bundle
 
 
@@ -91,6 +91,17 @@ def create_parser() -> argparse.ArgumentParser:
         "install-dtk", help="install the pinned decomp-toolkit release"
     )
     install_parser.add_argument("--tool-directory", type=Path, required=True)
+
+    checkpoint_parser = subparsers.add_parser(
+        "prepare-sluggers-checkpoint",
+        help="cold boot and create the exact local pre-roster checkpoint",
+    )
+    checkpoint_parser.add_argument("--build-directory", type=Path, required=True)
+    checkpoint_parser.add_argument("--dolphin", type=Path, required=True)
+    checkpoint_parser.add_argument("--source-profile", type=Path, required=True)
+    checkpoint_parser.add_argument("--seed-profile", type=Path, required=True)
+    checkpoint_parser.add_argument("--checkpoint-directory", type=Path, required=True)
+    checkpoint_parser.add_argument("--timeout-seconds", type=float, default=90.0)
 
     build_parser = subparsers.add_parser(
         "build-sluggers", help="verify a user-owned image and create a managed build"
@@ -320,6 +331,21 @@ def run(arguments: argparse.Namespace) -> int:
     if arguments.command == "install-dtk":
         installed = install_dtk(arguments.tool_directory)
         print(json.dumps({"installed": str(installed)}, sort_keys=True))
+        return 0
+    if arguments.command == "prepare-sluggers-checkpoint":
+        from starworks_runner.games.sluggers.checkpoint_creation import (
+            prepare_seed_checkpoint,
+        )
+
+        prepared = prepare_seed_checkpoint(
+            build_directory=arguments.build_directory,
+            dolphin_executable=arguments.dolphin,
+            source_profile_directory=arguments.source_profile,
+            target_profile_directory=arguments.seed_profile,
+            checkpoint_directory=arguments.checkpoint_directory,
+            timeout_seconds=arguments.timeout_seconds,
+        )
+        print(json.dumps(prepared.report_value(), sort_keys=True))
         return 0
     if arguments.command == "build-sluggers":
         cache = arguments.cache.expanduser().resolve()

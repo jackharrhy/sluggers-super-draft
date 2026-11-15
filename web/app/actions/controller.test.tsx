@@ -53,6 +53,28 @@ describe('root controller', () => {
     assert.equal(record.status, 200)
   })
 
+  it('renders the development kitchen sink from the typed route', async () => {
+    let previousMode = process.env.STARWORKS_DEV_UI
+    process.env.STARWORKS_DEV_UI = 'local-only'
+    try {
+      let response = await createAppRouter({
+        logging: { sink: () => {} },
+        runtime: createTestRuntime(),
+      }).fetch(new Request('http://127.0.0.1' + routes.devKitchenSink.href()))
+
+      assert.equal(response.status, 200)
+      let html = await response.text()
+      assert.match(html, /Starworks kitchen sink/)
+      assert.match(html, /General action/)
+      assert.match(html, /Mario Fireballs/)
+      assert.match(html, /Trade proposal/)
+      assert.match(html, /Mushroom League · Week 4/)
+    } finally {
+      if (previousMode === undefined) delete process.env.STARWORKS_DEV_UI
+      else process.env.STARWORKS_DEV_UI = previousMode
+    }
+  })
+
   it('renders a public league as real standings instead of an advertorial workspace', async () => {
     let publicLeague: LeagueDetail = {
       id: '22222222-2222-4222-8222-222222222222',

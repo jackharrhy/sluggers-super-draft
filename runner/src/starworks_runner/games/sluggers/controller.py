@@ -4,6 +4,7 @@ import errno
 import os
 import stat
 import time
+from collections.abc import Callable
 from configparser import ConfigParser
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,11 @@ Buttons/1 = `Button X`
 Buttons/2 = `Button Y`
 Buttons/- = `Button Z`
 Buttons/+ = `Button START`
+# Unattended matches must not inherit Dolphin's host-mouse IR cursor. Sluggers'
+# setup flow is fully operable through buttons and the Nunchuk stick, so hide
+# the emulated pointer instead of allowing window focus or mouse position to
+# change the selected file or menu item.
+IR/Hide = 1.0
 Extension = Nunchuk
 Nunchuk/Buttons/C = `Button L`
 Nunchuk/Buttons/Z = `Button R`
@@ -118,6 +124,7 @@ class DolphinPipeController:
             encoding="utf-8",
         )
         self._configure_profile(configuration / "Dolphin.ini")
+        self._configure_graphics_profile(configuration / "GFX.ini")
 
     @staticmethod
     def _configure_profile(path: Path) -> None:
@@ -135,6 +142,10 @@ class DolphinPipeController:
         dolphin.set("Interface", "ConfirmStop", "False")
         if not dolphin.has_section("Core"):
             dolphin.add_section("Core")
+        # Seed profiles can come from AutoTeam/Gecko research. Production
+        # Starworks builds already contain their reviewed adapter hooks and
+        # must never execute a second, profile-owned patch set beside them.
+        dolphin.set("Core", "EnableCheats", "False")
         # Menu timing, bridge polling, and telemetry frame deadlines are all
         # defined against real-time 100% emulation. Research seed profiles may
         # have disabled throttling, but an application-managed match must not
@@ -150,12 +161,28 @@ class DolphinPipeController:
         with path.open("w", encoding="utf-8") as stream:
             dolphin.write(stream)
 
+    @staticmethod
+    def _configure_graphics_profile(path: Path) -> None:
+        graphics = ConfigParser(interpolation=None, strict=False)
+        graphics.optionxform = str
+        if path.is_file():
+            graphics.read(path, encoding="utf-8")
+        if not graphics.has_section("Hacks"):
+            graphics.add_section("Hacks")
+        # DME can only read guest RAM. Dolphin's default virtual-XFB path keeps
+        # the rendered pixels solely in host VRAM; this stock setting also
+        # materializes the 640x448 YUYV XFB at the address selected by the game.
+        graphics.set("Hacks", "XFBToTextureEnable", "False")
+        with path.open("w", encoding="utf-8") as stream:
+            graphics.write(stream)
+
     def connect(
         self,
         *,
         timeout_seconds: float = 10.0,
         monotonic=time.monotonic,
         sleep=time.sleep,
+        health_check: Callable[[], None] | None = None,
     ) -> None:
         if self.descriptor is not None or self.hotkey_descriptor is not None:
             raise DolphinLaunchError("Dolphin controller pipe is already connected")
@@ -166,12 +193,14 @@ class DolphinPipeController:
                 deadline=deadline,
                 monotonic=monotonic,
                 sleep=sleep,
+                health_check=health_check,
             )
             self.hotkey_descriptor = self._connect_pipe(
                 self.hotkey_pipe_path,
                 deadline=deadline,
                 monotonic=monotonic,
                 sleep=sleep,
+                health_check=health_check,
             )
         except Exception:
             self.close()
@@ -184,8 +213,11 @@ class DolphinPipeController:
         deadline: float,
         monotonic,
         sleep,
+        health_check: Callable[[], None] | None = None,
     ) -> int:
         while True:
+            if health_check is not None:
+                health_check()
             try:
                 return os.open(path, os.O_WRONLY | os.O_NONBLOCK)
             except OSError as error:
@@ -221,18 +253,36 @@ class DolphinPipeController:
         timeout_seconds: float = 5.0,
         monotonic=time.monotonic,
         sleep=time.sleep,
+        health_check: Callable[[], None] | None = None,
     ) -> Path:
         """Capture Dolphin's rendered XFB through its native GPU readback path."""
 
         if timeout_seconds <= 0:
             raise DolphinLaunchError("Dolphin screenshot timeout must be positive")
+        if health_check is not None:
+            health_check()
         directory = self.screenshot_directory
-        before = set(directory.glob("*.png")) if directory.is_dir() else set()
-        self._write_command(self.hotkey_descriptor, "PRESS X", label="hotkey")
+        before: dict[Path, tuple[int, int]] = {}
+        if directory.is_dir():
+            for path in directory.glob("*.png"):
+                status = path.stat()
+                before[path] = (status.st_mtime_ns, status.st_size)
+        deadline = monotonic() + timeout_seconds
+        try:
+            self._write_command(self.hotkey_descriptor, "PRESS X", label="hotkey")
+        except DolphinLaunchError:
+            self._reconnect_hotkey(
+                deadline=deadline,
+                monotonic=monotonic,
+                sleep=sleep,
+                health_check=health_check,
+            )
+            self._write_command(self.hotkey_descriptor, "PRESS X", label="hotkey")
         sleep(0.08)
         self._write_command(self.hotkey_descriptor, "RELEASE X", label="hotkey")
-        deadline = monotonic() + timeout_seconds
         while True:
+            if health_check is not None:
+                health_check()
             candidates = (
                 sorted(
                     directory.glob("*.png"), key=lambda path: path.stat().st_mtime_ns
@@ -241,7 +291,8 @@ class DolphinPipeController:
                 else []
             )
             for candidate in reversed(candidates):
-                if candidate not in before and candidate.stat().st_size >= 24:
+                current = (candidate.stat().st_mtime_ns, candidate.stat().st_size)
+                if before.get(candidate) != current and current[1] >= 24:
                     with candidate.open("rb") as stream:
                         if stream.read(8) == b"\x89PNG\r\n\x1a\n":
                             return candidate.resolve()
@@ -250,6 +301,27 @@ class DolphinPipeController:
                     "Dolphin did not produce a native screenshot before the timeout"
                 )
             sleep(0.05)
+
+    def _reconnect_hotkey(
+        self, *, deadline, monotonic, sleep, health_check=None
+    ) -> None:
+        """Reconnect Dolphin's boot-time hotkey FIFO without dropping input.
+
+        Dolphin may recreate the hotkey controller while its renderer starts.
+        The gameplay controller must stay open: closing that FIFO is treated as
+        a device removal for the remainder of the current emulation session.
+        """
+
+        if self.hotkey_descriptor is not None:
+            os.close(self.hotkey_descriptor)
+            self.hotkey_descriptor = None
+        self.hotkey_descriptor = self._connect_pipe(
+            self.hotkey_pipe_path,
+            deadline=deadline,
+            monotonic=monotonic,
+            sleep=sleep,
+            health_check=health_check,
+        )
 
     def save_state_slot_one(
         self,

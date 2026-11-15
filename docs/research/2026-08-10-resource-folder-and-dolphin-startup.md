@@ -268,8 +268,9 @@ stadium selection. The current local manifest pins bridge artifact
 save-state `a9ca3037…9cc6`. It restored, negotiated, and produced a native
 game-only frame without window focus.
 
-From that state, the observed runner flow selected Level 4, moved the known Dixie
-Kong cursor four positions right to Random Fill, filled both rosters, and advanced
+From that state, the observed runner flow selected Level 4, waited for
+`CMemberSelectTask` state `2` with cursor `0xFF` already on Random Fill, filled
+both rosters, and advanced
 through the reviewed team-selection hook, then reached Begin and activated the
 adapter-owned CPU path with the reviewed Minus+A chord. Receipt mask `0x07`
 proves both roster hook calls and CPU activation. The first acceptance run then

@@ -43,6 +43,17 @@ describe('team lineup forms', () => {
     fielder.set(fieldingInputName(9), 'RF')
     assert.throws(() => parseTeamLineupForm(fielder, roster))
   })
+
+  it('rejects game slots and captains the runner cannot execute', () => {
+    let unsupportedCaptain = validForm()
+    unsupportedCaptain.set('captain', 'toad')
+    assert.throws(() => parseTeamLineupForm(unsupportedCaptain, roster), /twelve/)
+
+    let unsupportedRoster = [...roster]
+    unsupportedRoster[8] = 'unused-koopa'
+    let unused = validForm()
+    assert.throws(() => parseTeamLineupForm(unused, unsupportedRoster), /71 ordinary/)
+  })
 })
 
 function validForm(): FormData {

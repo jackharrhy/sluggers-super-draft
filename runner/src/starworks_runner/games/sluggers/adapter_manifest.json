@@ -12,7 +12,7 @@
   },
   "bridgeSource": {
     "path": "bridge/bridge.c",
-    "sha256": "901b9eaf7163e01724285855ea5e6fe23cefafb0d9f4619da1663f347e112491",
+    "sha256": "a1247f8bf5c49a6f6705f582772759c2153d67a7f1b9af47ba5e745a56810248",
     "license": "MIT",
     "status": "reviewed-and-compiled"
   },
@@ -39,15 +39,15 @@
   "artifacts": [
     {
       "path": "artifacts/bridge-rmbe01.bin",
-      "sha256": "b5a9a75c5836c62741927bb8ab67d568e887be88ab6062a8736f0cd7c81f9161",
-      "sizeBytes": 5912,
+      "sha256": "699c581f13077a62011d20a57e524d066bec624118c2ccf1dc2cf49495d3d4f2",
+      "sizeBytes": 5916,
       "license": "MIT"
     }
   ],
   "patchPlans": [
     {
       "path": "patches/bridge-rmbe01.json",
-      "sha256": "366e7520fbbc9c2b3dae96ed38bcdf98a7a097d0ef6f8c28574d56ad3a38ebcf"
+      "sha256": "d9ad7143396a86fc5e794c472500c1731cb0c7ecfa6836166e7fcd605e4e118e"
     }
   ],
   "staticTargetCatalog": {
@@ -84,6 +84,15 @@
       "expectedInstructionHex": "88080018",
       "resumeAddress": "0x80063D50",
       "bridgeEntry": "0x8000280C"
+    },
+    {
+      "kind": "guarded-batting-order-selection",
+      "address": "0x802CEAA4",
+      "fileOffset": "0x0026E7A4",
+      "expectedInstructionHex": "546007fe",
+      "replacementInstructionHex": "38000000",
+      "researchLead": "Maintainer-authorized Sluggers resource folder Always away team code",
+      "independentCheck": "Mapped against the exact RMBE01 DOL and adopted as a guarded adapter patch after live scheduled matches proved the game roulette could invert the requested away/home sides."
     },
     {
       "kind": "stat-editor-v4-profile-patterns",

@@ -7,7 +7,7 @@ cd "$repository_root"
 
 demo_environment=".starworks/demo.env"
 if [[ ! -f "$demo_environment" ]]; then
-  echo "Missing $demo_environment. Run 'npm run demo:seed' first." >&2
+  echo "Missing $demo_environment. Run 'npm run demo:setup' first." >&2
   exit 1
 fi
 
@@ -17,7 +17,7 @@ source "$demo_environment"
 set +a
 
 if [[ -z "${STARWORKS_RUNNER_CREDENTIAL:-}" ]]; then
-  echo "STARWORKS_RUNNER_CREDENTIAL is missing. Run 'npm run demo:seed' again." >&2
+  echo "STARWORKS_RUNNER_CREDENTIAL is missing. Run 'npm run demo:setup' again." >&2
   exit 1
 fi
 

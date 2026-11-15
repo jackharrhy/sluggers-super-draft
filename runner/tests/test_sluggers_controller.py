@@ -34,7 +34,11 @@ def test_controller_prepares_a_private_fifo_and_deterministic_wiimote_mapping(
     assert "PermissionAsked = True" in dolphin
     assert "UsePanicHandlers = False" in dolphin
     assert "ConfirmStop = False" in dolphin
+    assert "EnableCheats = False" in dolphin
     assert "EmulationSpeed = 1.0" in dolphin
+    graphics = (tmp_path / "Config/GFX.ini").read_text(encoding="utf-8")
+    assert "XFBToTextureEnable = False" in graphics
+    assert "IR/Hide = 1.0" in configuration
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Dolphin FIFO backend is POSIX-only")
@@ -109,6 +113,45 @@ def test_controller_collects_a_native_dolphin_screenshot(tmp_path: Path) -> None
 
 
 @pytest.mark.skipif(os.name != "posix", reason="Dolphin FIFO backend is POSIX-only")
+def test_controller_accepts_a_screenshot_overwritten_within_the_same_second(
+    tmp_path: Path,
+) -> None:
+    controller = DolphinPipeController(tmp_path)
+    controller.prepare()
+    controller_reader = os.open(controller.pipe_path, os.O_RDONLY | os.O_NONBLOCK)
+    hotkey_reader = os.open(controller.hotkey_pipe_path, os.O_RDONLY | os.O_NONBLOCK)
+    screenshot = controller.screenshot_directory / "RMBE01_same-second.png"
+    screenshot.parent.mkdir(parents=True)
+    screenshot.write_bytes(b"old screenshot contents that are long enough")
+    original_mtime = screenshot.stat().st_mtime_ns
+    wrote_screenshot = False
+
+    def overwrite_screenshot(_: float) -> None:
+        nonlocal wrote_screenshot
+        if wrote_screenshot:
+            return
+        wrote_screenshot = True
+        screenshot.write_bytes(b"\x89PNG\r\n\x1a\n" + bytes(32))
+        os.utime(screenshot, ns=(original_mtime + 1, original_mtime + 1))
+
+    try:
+        controller.connect(timeout_seconds=0.1)
+
+        captured = controller.capture_screenshot(
+            timeout_seconds=0.1,
+            monotonic=iter((0.0, 0.0, 0.01)).__next__,
+            sleep=overwrite_screenshot,
+        )
+
+        assert captured == screenshot.resolve()
+        assert os.read(hotkey_reader, 4096) == b"PRESS X\nRELEASE X\n"
+    finally:
+        controller.close()
+        os.close(controller_reader)
+        os.close(hotkey_reader)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="Dolphin FIFO backend is POSIX-only")
 def test_controller_collects_a_native_dolphin_save_state(tmp_path: Path) -> None:
     controller = DolphinPipeController(tmp_path)
     controller.prepare()
@@ -156,7 +199,8 @@ def test_controller_preserves_existing_dolphin_profile_settings(tmp_path: Path) 
     configuration.parent.mkdir(parents=True)
     configuration.write_text(
         "[General]\nWirelessMac = 00:17:ab:00:00:01\n\n"
-        "[Analytics]\nID = existing-id\n\n[Core]\nEmulationSpeed = 0.0\n",
+        "[Analytics]\nID = existing-id\n\n"
+        "[Core]\nEmulationSpeed = 0.0\nEnableCheats = True\n",
         encoding="utf-8",
     )
 
@@ -169,5 +213,7 @@ def test_controller_preserves_existing_dolphin_profile_settings(tmp_path: Path) 
     assert "PermissionAsked = True" in contents
     assert "UsePanicHandlers = False" in contents
     assert "ConfirmStop = False" in contents
+    assert "EnableCheats = False" in contents
+    assert "EnableCheats = True" not in contents
     assert "EmulationSpeed = 1.0" in contents
     assert "EmulationSpeed = 0.0" not in contents

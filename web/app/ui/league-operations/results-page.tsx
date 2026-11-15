@@ -14,6 +14,7 @@ import type { CharacterBoxScore } from '../../telemetry/model.ts'
 import type { TelemetryAttemptSummary } from '../../telemetry/service.ts'
 import type { SeasonStatistics } from '../../telemetry/statistics.ts'
 import { buttonStyle, cardStyle, inputStyle } from '../app-shell.tsx'
+import { secondaryButtonStyle } from '../design-system.ts'
 import { PlayerLeaderList, StandingsTable } from '../league-summary.tsx'
 import { emptyStyle, mutedStyle, OperationsShell, SectionHeading, sectionStyle } from './workspace-page.tsx'
 
@@ -210,12 +211,11 @@ const leaderGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns:
 const reviewListStyle = css({ display: 'grid', gap: '16px' })
 const reviewCardStyle = css({ display: 'grid', gap: '16px' })
 const reviewHeadingStyle = css({ alignItems: 'start', display: 'flex', gap: '16px', justifyContent: 'space-between', '& h3': { fontSize: '22px', margin: 0 }, '& p': { margin: '6px 0 0' } })
-const problemStyle = css({ background: 'var(--danger-surface)', borderRadius: '999px', color: 'var(--danger-text)', fontSize: '11px', fontWeight: 900, padding: '5px 8px', textTransform: 'uppercase' })
-const pendingStyle = css({ background: 'var(--surface-strong)', borderRadius: '999px', fontSize: '11px', fontWeight: 900, padding: '5px 8px', textTransform: 'uppercase' })
+const problemStyle = css({ color: 'var(--danger-text)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' })
+const pendingStyle = css({ color: 'var(--text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' })
 const compactScoreStyle = css({ alignItems: 'center', background: 'var(--surface-deep)', borderRadius: '10px', display: 'flex', gap: '12px', justifyContent: 'center', padding: '13px' })
 const issueListStyle = css({ background: 'var(--danger-surface)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--danger-text)', display: 'grid', gap: '6px', margin: 0, padding: '14px 14px 14px 34px' })
 const actionRowStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '10px' })
-const secondaryButtonStyle = css({ background: 'var(--surface-strong)', border: '1px solid var(--border-strong)', borderRadius: '7px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })
 const correctionFormStyle = css({ display: 'grid', gap: '12px', gridTemplateColumns: 'minmax(0, 2fr) minmax(120px, 1fr)', marginTop: '14px', '& label': { display: 'grid', gap: '6px', fontWeight: 700 }, '@media (max-width: 620px)': { gridTemplateColumns: '1fr' } })
 const wideStyle = css({ gridColumn: '1 / -1' })
 const correctionListStyle = css({ borderTop: '1px solid var(--border)', display: 'grid', gap: '8px', listStyle: 'none', margin: 0, padding: '14px 0 0', '& li': { display: 'grid', gap: '4px' }, '& span': { color: 'var(--accent-yellow)', fontWeight: 800 }, '& small': { color: 'var(--text-muted)' } })

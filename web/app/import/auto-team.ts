@@ -2,7 +2,10 @@ import { TeamLineupRevisionSchema, validateTeamLineupRevision, type TeamLineupRe
 import { z } from 'zod'
 
 import { PlatformError } from '../platform/errors.ts'
-import { sluggersCharacterIdAt } from '../sluggers/characters.ts'
+import {
+  isSluggersCaptainCharacter,
+  sluggersCharacterIdAt,
+} from '../sluggers/characters.ts'
 
 const LegacyPlayerSchema = z.tuple([
   z.number().int().nonnegative(),
@@ -36,8 +39,8 @@ export function importAutoTeamSnapshot(input: unknown, teamName: string): AutoTe
   let sourceTeamIndex = snapshot.team_names.indexOf(teamName)
   if (sourceTeamIndex === -1) throw new PlatformError(`AutoTeam team ${teamName} was not found`, 'not_found')
   let source = snapshot.teams[sourceTeamIndex]!
-  if (source.some(([characterIndex]) => characterIndex >= 77)) {
-    throw new PlatformError('AutoTeam Mii slots depend on a local RFL_DB.dat and must be resolved before import', 'invalid_input')
+  if (source.some(([characterIndex]) => characterIndex >= 71)) {
+    throw new PlatformError('AutoTeam unused and Mii slots cannot be used by the current Sluggers runner', 'invalid_input')
   }
   let battingSlots = source.map(([, battingSlot]) => battingSlot)
   let fieldingSlots = source.map(([, , fieldingSlot]) => fieldingSlot)
@@ -72,6 +75,9 @@ export function importAutoTeamSnapshot(input: unknown, teamName: string): AutoTe
     warnings: [
       'AutoTeam keyboard macros, raw Dolphin addresses, and Gecko assembly were intentionally not imported.',
       'AutoTeam numeric slots were translated to stable Starworks character IDs.',
+      ...(isSluggersCaptainCharacter(players[0]!.characterId)
+        ? []
+        : ['Choose one of the twelve Sluggers team captains before publishing this lineup.']),
     ],
   }
   let semanticFixture = TeamLineupRevisionSchema.parse({

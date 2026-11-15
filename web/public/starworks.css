@@ -55,17 +55,107 @@
   --blue-950: oklch(29.533% 0.109 264.06);
   --cell-gray: oklch(0.57 0.07 262.2);
 
+  /*
+    Tailwind-shaped OKLCH ramps anchored at 500 by colors sampled from the
+    North American Mario Super Sluggers logo and official Mario wallpaper.
+  */
+  --sluggers-red-50: oklch(97% 0.013 19);
+  --sluggers-red-100: oklch(93% 0.032 19.3);
+  --sluggers-red-200: oklch(87% 0.062 19.9);
+  --sluggers-red-300: oklch(79% 0.113 21.2);
+  --sluggers-red-400: oklch(69% 0.189 23.8);
+  --sluggers-red-500: oklch(60.26% 0.2351 26.91);
+  --sluggers-red-600: oklch(54.3% 0.243 28.9);
+  --sluggers-red-700: oklch(47.1% 0.211 29.1);
+  --sluggers-red-800: oklch(41% 0.176 28.5);
+  --sluggers-red-900: oklch(36.2% 0.14 27.3);
+  --sluggers-red-950: oklch(22.4% 0.091 27.6);
+
+  --mario-blue-50: oklch(97% 0.008 246.6);
+  --mario-blue-100: oklch(93% 0.018 247.6);
+  --mario-blue-200: oklch(87% 0.033 246.1);
+  --mario-blue-300: oklch(79% 0.059 243.8);
+  --mario-blue-400: oklch(68% 0.093 246.6);
+  --mario-blue-500: oklch(55.28% 0.1201 251.8);
+  --mario-blue-600: oklch(47.6% 0.138 254.9);
+  --mario-blue-700: oklch(41.8% 0.136 256.4);
+  --mario-blue-800: oklch(35.4% 0.112 257.6);
+  --mario-blue-900: oklch(30.9% 0.082 257.5);
+  --mario-blue-950: oklch(21.2% 0.051 259.9);
+
+  --luigi-green-50: oklch(98% 0.023 123.9);
+  --luigi-green-100: oklch(96% 0.05 125.4);
+  --luigi-green-200: oklch(92% 0.094 127.4);
+  --luigi-green-300: oklch(87% 0.145 129.8);
+  --luigi-green-400: oklch(80% 0.176 132);
+  --luigi-green-500: oklch(72.96% 0.1726 133.96);
+  --luigi-green-600: oklch(61% 0.148 134.8);
+  --luigi-green-700: oklch(49.4% 0.116 134.7);
+  --luigi-green-800: oklch(41.5% 0.092 134);
+  --luigi-green-900: oklch(36.7% 0.075 134.2);
+  --luigi-green-950: oklch(23.6% 0.053 135.2);
+
+  --daisy-yellow-50: oklch(98.5% 0.024 101);
+  --daisy-yellow-100: oklch(97% 0.05 99);
+  --daisy-yellow-200: oklch(94% 0.09 97);
+  --daisy-yellow-300: oklch(90% 0.13 95);
+  --daisy-yellow-400: oklch(87% 0.16 94);
+  --daisy-yellow-500: oklch(83.81% 0.1669 93.21);
+  --daisy-yellow-600: oklch(72.4% 0.147 83);
+  --daisy-yellow-700: oklch(59.7% 0.122 73.6);
+  --daisy-yellow-800: oklch(51.9% 0.103 69.1);
+  --daisy-yellow-900: oklch(46.4% 0.086 64.9);
+  --daisy-yellow-950: oklch(32.9% 0.06 61);
+
+  --baseball-50: oklch(99% 0.003 70);
+  --baseball-100: oklch(97.8% 0.005 70);
+  --baseball-200: oklch(96.4% 0.008 70);
+  --baseball-300: oklch(94.7% 0.012 70);
+  --baseball-400: oklch(93% 0.016 70);
+  --baseball-500: oklch(91.22% 0.0201 69.98);
+  --baseball-600: oklch(80% 0.018 70);
+  --baseball-700: oklch(67% 0.014 70);
+  --baseball-800: oklch(52% 0.01 55);
+  --baseball-900: oklch(36% 0.008 30);
+  --baseball-950: oklch(24.42% 0.0064 0.59);
+
+  /* Compatibility aliases while product styles move to the named ramps. */
+  --sluggers-red: var(--sluggers-red-500);
+  --sluggers-red-action: var(--sluggers-red-600);
+  --sluggers-red-deep: var(--sluggers-red-900);
+  --sluggers-blue: var(--mario-blue-500);
+  --sluggers-blue-action: var(--mario-blue-600);
+  --sluggers-green: var(--luigi-green-500);
+  --sluggers-yellow: var(--daisy-yellow-500);
+  --sluggers-cream: var(--baseball-500);
+  --sluggers-ink: var(--baseball-950);
+
+  /* Legacy Sluggers application colors retained for supporting ranges. */
+  --muted-red-500: oklch(57.553% 0.13862 22.422);
+  --muted-red-700: oklch(46.224% 0.12083 21.134);
+  --muted-teal-500: oklch(71.913% 0.10687 237.35);
+  --muted-teal-700: oklch(58.314% 0.12018 240.44);
+  --paper: #fff;
+  --paper-soft: var(--baseball-200);
+  --paper-blue: var(--sluggers-cream);
+  --paper-border: var(--baseball-600);
+  --ink: var(--sluggers-ink);
+  --ink-soft: var(--baseball-900);
+  --ink-muted: var(--baseball-800);
+  --positive: var(--luigi-green-700);
+  --negative: var(--sluggers-red-deep);
+
   --text-primary: #fff;
   --text-soft: rgb(229 231 235 / 0.92);
   --text-muted: rgb(209 213 219 / 0.76);
   --link: rgb(219 234 254);
-  --surface: color-mix(in oklch, var(--cell-gray) 40%, transparent);
-  --surface-soft: color-mix(in oklch, var(--cell-gray) 25%, transparent);
-  --surface-strong: color-mix(in oklch, var(--cell-gray) 60%, transparent);
-  --surface-deep: color-mix(in oklch, var(--blue-950) 72%, transparent);
-  --border: color-mix(in oklch, var(--cell-gray) 50%, transparent);
-  --border-strong: color-mix(in oklch, var(--blue-50) 52%, transparent);
-  --accent-yellow: rgb(253 224 71);
+  --surface: var(--blue-800);
+  --surface-soft: var(--blue-700);
+  --surface-strong: var(--blue-900);
+  --surface-deep: var(--blue-950);
+  --border: color-mix(in oklch, var(--blue-50) 44%, transparent);
+  --border-strong: var(--blue-50);
+  --accent-yellow: var(--sluggers-yellow);
   --warning-surface: rgb(161 98 7 / 0.34);
   --warning-border: rgb(250 204 21 / 0.48);
   --warning-text: rgb(254 240 138);

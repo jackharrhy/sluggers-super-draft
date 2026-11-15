@@ -14,5 +14,5 @@ export const assetServer = createAssetServer({
   allow: ['app/assets/**', 'node_modules/**'],
   sourceMaps: isDevelopment ? 'external' : undefined,
   minify: !isDevelopment,
-  watch: false,
+  watch: isDevelopment,
 })

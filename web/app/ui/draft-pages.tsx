@@ -7,6 +7,7 @@ import { administrativeRoles } from '../platform/repository.ts'
 import { routes } from '../routes.ts'
 import { characterHeadshotPath } from '../sluggers/characters.ts'
 import { AppShell, buttonStyle, cardStyle, inputStyle } from './app-shell.tsx'
+import { dangerButtonStyle, secondaryButtonStyle } from './design-system.ts'
 
 interface DraftDashboardPageProps {
   dashboard: DraftSetupOptions
@@ -260,7 +261,7 @@ const sectionHeadingStyle = css({ alignItems: 'end', display: 'flex', gap: '20px
 const countStyle = css({ color: 'var(--text-muted)', fontWeight: 800 })
 const cardGridStyle = css({ display: 'grid', gap: '18px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 270px), 1fr))' })
 const draftLinkStyle = css({ color: 'var(--text-primary) !important', display: 'grid', gap: '8px', textDecoration: 'none', '& h3': { fontSize: '24px', margin: 0 }, '& p, & small': { color: 'var(--text-muted)', margin: 0 }, '&:hover': { borderColor: 'var(--link)', transform: 'translateY(-2px)' } })
-const statusStyle = css({ background: 'var(--surface-strong)', borderRadius: '999px', color: 'var(--text-soft)', fontSize: '12px', fontWeight: 900, justifySelf: 'start', padding: '5px 9px', textTransform: 'uppercase' })
+const statusStyle = css({ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 900, justifySelf: 'start', textTransform: 'uppercase' })
 const emptyStyle = css({ border: '1px dashed var(--border-strong)', borderRadius: '14px', color: 'var(--text-muted)', padding: '22px' })
 const createCardStyle = css({ display: 'grid', gap: '24px', marginBottom: '20px' })
 const formStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 220px), 1fr))', '& label': { display: 'grid', gap: '7px', fontWeight: 700 } })
@@ -268,8 +269,6 @@ const wideStyle = css({ gridColumn: '1 / -1' })
 const slotFieldsetStyle = css({ border: '1px solid var(--border-strong)', borderRadius: '12px', display: 'grid', gap: '12px', gridColumn: '1 / -1', padding: '18px', '& legend': { fontWeight: 900, padding: '0 8px' } })
 const clockCardStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '28px', justifyContent: 'space-between', marginTop: '36px', '& h2': { fontSize: '32px', margin: '0 0 6px' } })
 const controlStyle = css({ alignItems: 'center', display: 'flex', flexWrap: 'wrap', gap: '10px' })
-const secondaryButtonStyle = css({ background: 'var(--surface-strong)', border: '1px solid var(--border-strong)', borderRadius: '10px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '10px 14px' })
-const dangerButtonStyle = css({ background: 'var(--danger-button)', border: '1px solid var(--danger-border)', borderRadius: '10px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '10px 14px' })
 const reverseFormStyle = css({ display: 'flex', flex: '1 1 360px', gap: '8px' })
 const slotListStyle = css({ display: 'grid', gap: '10px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', listStyle: 'none', margin: 0, padding: 0 })
 const slotStyle = css({ alignItems: 'center', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', display: 'grid', gap: '8px', gridTemplateColumns: '28px 1fr', padding: '14px', '& > span': { color: 'var(--accent-yellow)', fontWeight: 900 }, '& small': { color: 'var(--text-muted)', gridColumn: '2' } })

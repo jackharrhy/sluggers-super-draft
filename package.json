@@ -11,8 +11,12 @@
     "test": "npm --prefix contracts test && npm --prefix web test && uv run --project runner --group test pytest runner/tests",
     "contracts:generate": "npm --prefix contracts run generate",
     "contracts:check": "npm --prefix contracts run check && uv run --project runner --group test pytest runner/tests",
+    "demo:clean": "./scripts/clean-local-demo.sh",
+    "demo:setup": "./scripts/setup-local-sluggers-demo.sh",
     "demo:seed": "npm --prefix web run demo:seed",
     "demo:queue": "npm --prefix web run demo:queue --",
+    "demo:queue:smoke": "npm --prefix web run demo:queue -- --innings 1",
+    "demo:play": "npm run demo:queue:smoke && npm run demo:runner",
     "demo:runner": "./scripts/run-local-sluggers-demo.sh"
   },
   "engines": {

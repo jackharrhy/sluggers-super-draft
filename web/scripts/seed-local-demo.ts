@@ -45,7 +45,8 @@ import { displayCharacterName, SLUGGERS_CHARACTER_IDS } from '../app/sluggers/ch
 import type { CharacterBoxScore, MatchBoxScore } from '../app/telemetry/model.ts'
 
 const DEMO_SLUG = 'mushroom-league'
-const DEMO_GAME_BUILD_SHA256 = '1016a24051e66c309b6399692acf1c50601d9b3c49c0ec467a55d24d62743d00'
+const DEMO_GAME_BUILD_SHA256 = process.env.STARWORKS_DEFAULT_GAME_BUILD_SHA256
+  ?? '5bc0232095a87d64fee0c42110705b14991a73621669ca911fa17c4949f530f5'
 const ids = {
   awayLineup: '10000000-0000-4000-8000-000000000602',
   awayRoster: '10000000-0000-4000-8000-000000000502',
@@ -475,6 +476,7 @@ try {
     `STARWORKS_DEMO_SESSION_TOKEN=${sessionToken}`,
     `STARWORKS_DEMO_RUNNER_SECRET=${runnerSecret}`,
     `STARWORKS_DEMO_LEAGUE_SLUG=${DEMO_SLUG}`,
+    `STARWORKS_DEFAULT_GAME_BUILD_SHA256=${DEMO_GAME_BUILD_SHA256}`,
     `STARWORKS_RUNNER_CREDENTIAL=${runnerCredential}`,
     'STARWORKS_URL=http://127.0.0.1:3000',
     '',

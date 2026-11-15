@@ -6,6 +6,7 @@ import type { LeagueDetail, SessionIdentity } from '../../platform/model.ts'
 import type { RunnerStationDashboard } from '../../runner/admin-service.ts'
 import { routes } from '../../routes.ts'
 import { buttonStyle, cardStyle, inputStyle } from '../app-shell.tsx'
+import { dangerButtonStyle, secondaryButtonStyle } from '../design-system.ts'
 import { emptyStyle, mutedStyle, OperationsShell, SectionHeading, sectionStyle } from './workspace-page.tsx'
 
 export function LeagueAdminPage(handle: Handle<{
@@ -78,7 +79,7 @@ export function LeagueAdminPage(handle: Handle<{
                   {Object.entries(station.componentHealth).map(([component, state]) => <li><span>{component}</span><strong>{state}</strong></li>)}
                 </ul> : null}
                 {station.status === 'active' ? <form action={routes.leagues.operations.admin.revokeStation.href({ leagueSlug: league.slug, stationId: station.id })} method="post">
-                  <button type="submit" mix={dangerStyle}>Revoke station</button>
+                  <button type="submit" mix={dangerButtonStyle}>Revoke station</button>
                 </form> : null}
               </article>
             ))}
@@ -122,10 +123,8 @@ const adminGridStyle = css({ display: 'grid', gap: '20px', gridTemplateColumns: 
 const formStyle = css({ display: 'grid', gap: '12px', marginTop: '18px', '& label:not([data-checkbox])': { display: 'grid', gap: '7px', fontWeight: 700 } })
 const checkboxStyle = css({ alignItems: 'center', display: 'flex', fontWeight: 500, gap: '9px' })
 const warningStyle = css({ color: 'var(--warning-text)' })
-const secondaryButtonStyle = css({ background: 'var(--surface-strong)', border: '1px solid var(--border-strong)', borderRadius: '7px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, marginTop: '12px', padding: '9px 12px' })
 const stationGridStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))' })
 const stationStyle = css({ display: 'grid', gap: '12px' })
-const stationHeadingStyle = css({ alignItems: 'center', display: 'flex', gap: '12px', justifyContent: 'space-between', '& h3': { fontSize: '21px', margin: 0 }, '& span': { background: 'var(--surface-strong)', borderRadius: '999px', fontSize: '11px', fontWeight: 800, padding: '5px 8px', textTransform: 'uppercase' } })
+const stationHeadingStyle = css({ alignItems: 'center', display: 'flex', gap: '12px', justifyContent: 'space-between', '& h3': { fontSize: '21px', margin: 0 }, '& span': { color: 'var(--text-muted)', fontSize: '11px', fontWeight: 900, textTransform: 'uppercase' } })
 const healthListStyle = css({ display: 'grid', gap: '7px', listStyle: 'none', margin: 0, padding: 0, '& li': { alignItems: 'center', background: 'var(--surface-deep)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', padding: '7px 9px' }, '& span': { color: 'var(--text-muted)', textTransform: 'capitalize' }, '& strong': { color: 'var(--success-text)', fontSize: '11px', textTransform: 'uppercase' } })
-const dangerStyle = css({ background: 'var(--danger-button)', border: '1px solid var(--danger-border)', borderRadius: '7px', color: 'var(--text-primary)', cursor: 'pointer', font: 'inherit', fontWeight: 800, padding: '9px 12px' })
 const activityListStyle = css({ borderTop: '1px solid var(--border)', listStyle: 'none', margin: 0, padding: 0, '& li': { borderBottom: '1px solid var(--border)', display: 'grid', gap: '4px', padding: '12px 4px' }, '& span': { color: 'var(--text-muted)', fontSize: '14px' } })

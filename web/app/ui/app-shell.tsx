@@ -5,6 +5,15 @@ import type { LeagueDetail, SessionIdentity } from '../platform/model.ts'
 import { administrativeRoles } from '../platform/repository.ts'
 import { routes } from '../routes.ts'
 import { Document } from './document.tsx'
+import {
+  cardStyle,
+  inputStyle,
+  linkButtonStyle,
+  primaryButtonStyle,
+} from './design-system.ts'
+
+export { cardStyle, inputStyle } from './design-system.ts'
+export const buttonStyle = primaryButtonStyle
 
 export function AppShell(
   handle: Handle<{
@@ -60,45 +69,14 @@ export function AppShell(
   }
 }
 
-export const cardStyle = css({
-  background: 'var(--surface)',
-  border: '1px solid var(--border)',
-  borderRadius: '12px',
-  boxShadow: '0 8px 24px rgb(15 23 42 / 0.12)',
-  padding: '20px',
-})
-
-export const buttonStyle = css({
-  background: 'var(--blue-950)',
-  border: '1px solid var(--blue-800)',
-  borderRadius: '7px',
-  color: 'var(--text-primary)',
-  cursor: 'pointer',
-  fontFamily: 'var(--font-bolt)',
-  fontWeight: 700,
-  padding: '10px 15px',
-  '&:hover': { background: 'var(--blue-900)', borderColor: 'var(--blue-50)' },
-  '&:focus-visible': { outline: '3px solid var(--blue-50)', outlineOffset: '2px' },
-})
-
-export const inputStyle = css({
-  background: 'var(--surface-soft)',
-  border: '1px solid var(--border)',
-  borderRadius: '7px',
-  color: 'var(--text-primary)',
-  font: 'inherit',
-  padding: '9px 11px',
-  width: '100%',
-  '&:focus': { borderColor: 'var(--blue-50)', outline: '2px solid var(--blue-200)' },
-  '&::placeholder': { color: 'var(--text-muted)' },
-})
-
 const pageStyle = css({
   background: 'linear-gradient(to bottom, var(--blue-600), transparent 72vh)',
   color: 'var(--text-primary)',
   fontFamily: 'var(--font-sans)',
   minHeight: '100vh',
-  '& a': { color: 'var(--link)' },
+  '& a': { color: 'var(--link)', fontWeight: 800, textDecoration: 'none' },
+  '& a:hover': { color: 'var(--accent-yellow)' },
+  '& a:focus-visible': { outline: '2px solid currentColor', outlineOffset: '3px' },
 })
 
 const headerStyle = css({
@@ -129,7 +107,7 @@ const leagueNavStyle = css({
   gap: '10px 20px',
   minWidth: 0,
   '& a': { color: 'var(--text-soft)', textDecoration: 'none' },
-  '& a:hover': { color: 'var(--text-primary)', textDecoration: 'underline' },
+  '& a:hover': { color: 'var(--text-primary)' },
 })
 
 const brandStyle = css({
@@ -148,16 +126,6 @@ const navStyle = css({
   gap: '16px',
   justifyContent: 'flex-end',
   '& > span': { maxWidth: '190px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-})
-
-const linkButtonStyle = css({
-  background: 'transparent',
-  border: 0,
-  color: 'var(--link)',
-  cursor: 'pointer',
-  font: 'inherit',
-  padding: 0,
-  textDecoration: 'underline',
 })
 
 const mainStyle = css({

@@ -65,6 +65,45 @@ def seed_profile_sha256(profile_directory: Path) -> str:
     return sha256_json(files)
 
 
+def clone_seed_profile(source_directory: Path, target_directory: Path) -> Path:
+    """Clone only durable Dolphin state into a new checkpoint seed profile."""
+
+    source = source_directory.expanduser().resolve()
+    target = target_directory.expanduser().resolve()
+    if not source.is_dir():
+        raise BuildIntegrityError(f"Dolphin seed source is not a directory: {source}")
+    if target.exists():
+        raise BuildIntegrityError(
+            f"Dolphin seed target already exists and will not be overwritten: {target}"
+        )
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        relative = Path(directory).resolve().relative_to(source)
+        ignored: set[str] = set()
+        for name in names:
+            child = relative / name
+            candidate = source / child
+            if _excluded(child):
+                ignored.add(name)
+            elif candidate.is_symlink():
+                raise BuildIntegrityError(
+                    f"Dolphin seed source contains a symbolic link: {child}"
+                )
+            elif not candidate.is_file() and not candidate.is_dir():
+                # Old research profiles can retain dead GDB sockets or named
+                # pipes at their root. They are process state, never seed data.
+                ignored.add(name)
+        return ignored
+
+    target.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copytree(source, target, copy_function=shutil.copy2, ignore=ignore)
+    except Exception:
+        shutil.rmtree(target, ignore_errors=True)
+        raise
+    return target
+
+
 def _excluded(relative: Path) -> bool:
     if relative.parts and relative.parts[0] in _EXCLUDED_PROFILE_DIRECTORIES:
         return True

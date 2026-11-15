@@ -32,7 +32,6 @@ export function OperationPreviewPage(
       <AppShell identity={identity} league={league} title={`Adapter preview · ${league.name} · Starworks`}>
         <header mix={headerStyle}>
           <div>
-            <p mix={eyebrowStyle}>Game build preview</p>
             <h1>Ready for the runner</h1>
             <p mix={mutedStyle}>{bundle.operations.length} validated steps for this published configuration.</p>
           </div>
@@ -82,7 +81,6 @@ function SummaryCard(handle: Handle<{ detail: string; heading: string; value: st
 }
 
 const headerStyle = css({ alignItems: 'start', display: 'flex', gap: '32px', justifyContent: 'space-between', '& h1': { margin: 0 }, '@media(max-width: 640px)': { flexDirection: 'column', gap: '14px' } })
-const eyebrowStyle = css({ color: 'var(--text-soft)', fontFamily: 'var(--font-aurea)', fontSize: '14px', letterSpacing: '0.06em', margin: '0 0 8px', textTransform: 'uppercase' })
 const mutedStyle = css({ color: 'var(--text-soft)', marginBottom: 0 })
 const summaryGridStyle = css({ display: 'grid', gap: '16px', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', marginTop: '32px', '@media(max-width: 760px)': { gridTemplateColumns: '1fr' } })
 const summaryStyle = css({ display: 'grid', gap: '5px', '& > span': { color: 'var(--text-soft)' }, '& > strong': { fontFamily: 'var(--font-display)', fontSize: '24px' }, '& > small': { color: 'var(--text-soft)', lineHeight: 1.4 } })

@@ -16,11 +16,13 @@ BRIDGE_REGION_SIZE = 0x1700
 MAIN_LOOP_HOOK_ADDRESS = 0x8039A688
 TEAM_SELECTION_HOOK_ADDRESS = 0x8006AED4
 CPU_CONTROL_HOOK_ADDRESS = 0x80063D4C
+BATTING_ORDER_ROULETTE_ADDRESS = 0x802CEAA4
 DOL_SECTION_FILE_OFFSET = 0x00716F20
 BASE_DOL_SHA256 = "3018e262480ccbf0daa04fc96f1c3dfb340dc4007a13f007f9423751c1346151"
 MAIN_LOOP_HOOK_FILE_OFFSET = 0x0033A388
 TEAM_SELECTION_HOOK_FILE_OFFSET = 0x0000ABD4
 CPU_CONTROL_HOOK_FILE_OFFSET = 0x00003A4C
+BATTING_ORDER_ROULETTE_FILE_OFFSET = 0x0026E7A4
 DOL_SECTION_OFFSET_FIELD = 0x3C
 DOL_SECTION_ADDRESS_FIELD = 0x84
 DOL_SECTION_SIZE_FIELD = 0xCC
@@ -32,6 +34,11 @@ EXPECTED_HOOK_BYTES = (
         BRIDGE_REGION_SIZE + 4,
     ),
     (CPU_CONTROL_HOOK_FILE_OFFSET, bytes.fromhex("88080018"), BRIDGE_REGION_SIZE + 8),
+    (
+        BATTING_ORDER_ROULETTE_FILE_OFFSET,
+        bytes.fromhex("546007fe"),
+        BRIDGE_REGION_SIZE + 12,
+    ),
 )
 
 
@@ -107,6 +114,10 @@ def main() -> int:
         artifact.extend(branch(MAIN_LOOP_HOOK_ADDRESS, BRIDGE_ENTRY_ADDRESS, link=True))
         artifact.extend(branch(TEAM_SELECTION_HOOK_ADDRESS, team_hook, link=False))
         artifact.extend(branch(CPU_CONTROL_HOOK_ADDRESS, cpu_hook, link=False))
+        # Sluggers normally chooses the first batting team with a roulette.
+        # Force team one to bat first so the scheduled away/home distinction is
+        # deterministic and can be verified against the immutable match.
+        artifact.extend(bytes.fromhex("38000000"))
         artifact.extend(
             struct.pack(
                 ">III",
@@ -199,19 +210,19 @@ def build_patch_plan(base_dol: bytes, artifact: bytes) -> dict[str, object]:
     writes = [
         {
             "targetOffset": DOL_SECTION_OFFSET_FIELD,
-            "artifactOffset": BRIDGE_REGION_SIZE + 12,
-            "sizeBytes": 4,
-            "expectedBytesHex": "00000000",
-        },
-        {
-            "targetOffset": DOL_SECTION_ADDRESS_FIELD,
             "artifactOffset": BRIDGE_REGION_SIZE + 16,
             "sizeBytes": 4,
             "expectedBytesHex": "00000000",
         },
         {
-            "targetOffset": DOL_SECTION_SIZE_FIELD,
+            "targetOffset": DOL_SECTION_ADDRESS_FIELD,
             "artifactOffset": BRIDGE_REGION_SIZE + 20,
+            "sizeBytes": 4,
+            "expectedBytesHex": "00000000",
+        },
+        {
+            "targetOffset": DOL_SECTION_SIZE_FIELD,
+            "artifactOffset": BRIDGE_REGION_SIZE + 24,
             "sizeBytes": 4,
             "expectedBytesHex": "00000000",
         },

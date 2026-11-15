@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-from starworks_runner.orchestrator import ExecutionOutcome, RunnerStation
 from starworks_runner.control import RunnerApiError
+from starworks_runner.orchestrator import ExecutionOutcome, RunnerStation
 from starworks_runner.state import RunnerStateStore
 from starworks_runner.station import StationService
 from test_orchestrator import FakeControlClient, execution_fixtures

@@ -9,9 +9,13 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, Self
+from typing import Any, Protocol, Self, TypeVar
 
 from starworks_runner.contracts import validate_contract
+from starworks_runner.games.sluggers.boot import (
+    BootNavigationResult,
+    SluggersBootNavigator,
+)
 from starworks_runner.games.sluggers.bridge.client import BridgeClient
 from starworks_runner.games.sluggers.bridge.configuration import (
     RuntimeConfigurationBlock,
@@ -32,11 +36,31 @@ from starworks_runner.games.sluggers.bridge.memory import (
 )
 from starworks_runner.games.sluggers.controller import DolphinPipeController
 from starworks_runner.games.sluggers.dolphin import DolphinLaunch, DolphinLauncher
-from starworks_runner.games.sluggers.errors import BuildIntegrityError
+from starworks_runner.games.sluggers.errors import (
+    BuildIntegrityError,
+    DolphinLaunchError,
+)
 from starworks_runner.games.sluggers.game_observation import (
     GameSnapshot,
     SluggersMemoryReader,
 )
+from starworks_runner.games.sluggers.menu_observation import (
+    MenuObservation,
+    SluggersMenuObserver,
+)
+from starworks_runner.games.sluggers.setup_observation import (
+    CaptainSelectionObservation,
+    CpuLevelObservation,
+    GameSettingObservation,
+    MemberSelectionObservation,
+    OrderSelectionObservation,
+    SluggersSetupObserver,
+)
+from starworks_runner.games.sluggers.task_graph import (
+    SluggersTaskGraphReader,
+    TaskObservation,
+)
+from starworks_runner.games.sluggers.xfb import XfbFrameReader
 
 
 class LiveMemoryTransport(MemoryTransport, Protocol):
@@ -62,16 +86,36 @@ class RuntimeLineupObservation:
     defense_by_position: tuple[int, ...]
 
 
-# MSS-AutoTeam reads this word as the home-team formation-buffer address after
-# its menu path. The value is not populated on every Starworks path, so it is a
-# validated hint before the bounded fallback search below. Starworks uses the
-# same narrow buffer boundary through DME instead of installing transient code.
-FINAL_FORMATION_POINTER_ADDRESS = 0x806D121E
 FORMATION_SLOT_SIZE = 0x10
 FORMATION_TEAM_SIZE = 9 * FORMATION_SLOT_SIZE
 MEM2_START = 0x90000000
 MEM2_END = 0x94000000
-FORMATION_SCAN_CHUNK_SIZE = 0x100000
+
+# Exact-RMBE01 runtime fields. MSS-AutoTeam supplied the rules/stadium/captain
+# leads and Sluggers Stat Tracker supplied the two post-start team-order arrays
+# (see PRIOR_ART.md). Starworks independently read each field back in Dolphin
+# 2606 using the current DOL before treating it as an acceptance boundary.
+RUNTIME_RULES_ADDRESS = 0x80794328
+RUNTIME_STADIUM_ADDRESS = 0x811F769D
+RUNTIME_CAPTAIN_BRANDS_ADDRESS = 0x811F76AC
+RUNTIME_TEAM_ORDER_ADDRESSES = (0x8131B4B9, 0x8131B9B7)
+RUNTIME_TEAM_ORDER_STRIDE = 0x8E
+# These adjacent flags identify which order array is currently batting (0) or
+# fielding (1); live reads are required to contain exactly one of each.
+RUNTIME_TEAM_SIDE_FLAGS_ADDRESS = 0x900D5C22
+# The nine active defender records are spaced 0x2EC bytes apart in the same
+# Stat Tracker player-state family. Character ID is byte +2 in each record.
+RUNTIME_DEFENDER_RECORD_ADDRESSES = tuple(
+    0x900D9B45 + index * 0x2EC for index in range(9)
+)
+SetupObservation = TypeVar(
+    "SetupObservation",
+    CaptainSelectionObservation,
+    CpuLevelObservation,
+    MemberSelectionObservation,
+    OrderSelectionObservation,
+    GameSettingObservation,
+)
 
 
 def _formation_ids(value: bytes, offset: int) -> set[int]:
@@ -287,10 +331,17 @@ class LiveSluggersSession:
             save_state=self.initial_save_state,
             quiet_output=True,
         )
-        self.process_identity_sha256 = process_identity_sha256(self.launch.process.pid)
         try:
+            self.process_identity_sha256 = process_identity_sha256(
+                self.launch.process.pid
+            )
             if self.controller is not None:
-                self.controller.connect(timeout_seconds=timeout_seconds)
+                self.controller.connect(
+                    timeout_seconds=timeout_seconds,
+                    health_check=lambda: self._require_running_process(
+                        "controller connection"
+                    ),
+                )
             self.transport = self.transport_factory(timeout_seconds)
             self._attach_transport(timeout_seconds=timeout_seconds)
             if self.initial_save_state is not None:
@@ -359,6 +410,8 @@ class LiveSluggersSession:
         deadline = time.monotonic() + timeout_seconds
         last_error: BridgeProtocolError | None = None
         while time.monotonic() <= deadline:
+            if self.launch is not None:
+                self.launch.require_running("memory transport attachment")
             try:
                 self.transport.attach()
                 return
@@ -437,12 +490,193 @@ class LiveSluggersSession:
             raise BridgeProtocolError("Live Sluggers session is not started")
         return SluggersMemoryReader(self.transport).read()
 
+    def read_menu_observation(self) -> MenuObservation:
+        if self.transport is None:
+            raise BridgeProtocolError("Live Sluggers session is not started")
+        return SluggersMenuObserver(self.transport).read()
+
+    def wait_for_menu(
+        self,
+        predicate: Callable[[MenuObservation], bool],
+        label: str,
+        *,
+        timeout_seconds: float = 10.0,
+    ) -> MenuObservation:
+        """Wait for one verified game-owned menu state while checking Dolphin."""
+
+        if timeout_seconds <= 0:
+            raise BridgeProtocolError("Menu wait timeout must be positive")
+        deadline = time.monotonic() + timeout_seconds
+        last: MenuObservation | None = None
+        while True:
+            self._require_running_process(f"menu wait: {label}")
+            last = self.read_menu_observation()
+            if predicate(last):
+                return last
+            if time.monotonic() >= deadline:
+                raise BridgeProtocolError(
+                    f"Dolphin did not reach {label} before timeout; last menu "
+                    f"observation was {last}"
+                )
+            time.sleep(0.02)
+
+    def wait_for_runtime_observation(
+        self,
+        predicate: Callable[[RuntimeGameObservation], bool],
+        label: str,
+        *,
+        timeout_seconds: float = 10.0,
+    ) -> RuntimeGameObservation:
+        """Require a game-owned runtime value on two distinct bridge frames.
+
+        The main-loop bridge reasserts immutable setup bytes once per frame,
+        while a menu task can rewrite the same bytes later in that frame. A
+        single asynchronous DME read can therefore land outside the bridge's
+        write window. Two consecutive matching observations with advancing
+        bridge heartbeats prove that the requested value is being reasserted;
+        one lucky sub-frame sample is not sufficient.
+        """
+
+        if timeout_seconds <= 0:
+            raise BridgeProtocolError("Runtime observation timeout must be positive")
+        deadline = time.monotonic() + timeout_seconds
+        matching_heartbeat: int | None = None
+        last: RuntimeGameObservation | None = None
+        while True:
+            self._require_running_process(f"runtime observation: {label}")
+            last = self.read_runtime_observation()
+            heartbeat = self.read_control().heartbeat
+            if predicate(last):
+                if matching_heartbeat is not None and heartbeat > matching_heartbeat:
+                    return last
+                matching_heartbeat = heartbeat
+            else:
+                matching_heartbeat = None
+            if time.monotonic() >= deadline:
+                raise BridgeProtocolError(
+                    f"Dolphin did not stably expose {label} before timeout; "
+                    f"last runtime observation was {last}"
+                )
+            time.sleep(0.01)
+
+    def read_task_graph(self) -> tuple[TaskObservation, ...]:
+        if self.transport is None:
+            raise BridgeProtocolError("Live Sluggers session is not started")
+        return SluggersTaskGraphReader(self.transport).read()
+
+    def wait_for_random_fill(
+        self, *, timeout_seconds: float = 10.0
+    ) -> MemberSelectionObservation:
+        """Wait for the member screen's live-proven Random Fill boundary."""
+
+        observer = self._setup_observer()
+        return self._wait_for_setup(
+            observer.read_member_selection,
+            lambda observation: observation.is_random_fill_ready,
+            "input-ready Random Fill",
+            timeout_seconds=timeout_seconds,
+        )
+
+    def wait_for_captain_state(
+        self, expected_state: int, *, timeout_seconds: float = 10.0
+    ) -> CaptainSelectionObservation:
+        """Wait for one exact captain-selection input boundary."""
+
+        observer = self._setup_observer()
+        return self._wait_for_setup(
+            observer.read_captain_selection,
+            lambda observation: observation.state == expected_state,
+            f"captain state {expected_state}",
+            timeout_seconds=timeout_seconds,
+        )
+
+    def wait_for_cpu_level(
+        self,
+        expected_selection: int | None = None,
+        *,
+        timeout_seconds: float = 10.0,
+    ) -> CpuLevelObservation:
+        """Wait for the CPU-level popup and optionally one exact selection."""
+
+        observer = self._setup_observer()
+        return self._wait_for_setup(
+            observer.read_cpu_level,
+            lambda observation: (
+                observation.is_input_ready
+                and (
+                    expected_selection is None
+                    or observation.selection == expected_selection
+                )
+            ),
+            (
+                "input-ready CPU level"
+                if expected_selection is None
+                else f"CPU level selection {expected_selection}"
+            ),
+            timeout_seconds=timeout_seconds,
+        )
+
+    def wait_for_order_next(
+        self, *, timeout_seconds: float = 10.0
+    ) -> OrderSelectionObservation:
+        """Wait until the untouched batting-order screen highlights Next."""
+
+        observer = self._setup_observer()
+        return self._wait_for_setup(
+            observer.read_order_selection,
+            lambda observation: observation.is_next_ready,
+            "input-ready order Next",
+            timeout_seconds=timeout_seconds,
+        )
+
+    def wait_for_game_begin(
+        self, *, timeout_seconds: float = 10.0
+    ) -> GameSettingObservation:
+        """Wait until the final game-setting screen accepts Begin."""
+
+        observer = self._setup_observer()
+        return self._wait_for_setup(
+            observer.read_game_setting,
+            lambda observation: observation.is_begin_ready,
+            "input-ready game Begin",
+            timeout_seconds=timeout_seconds,
+        )
+
+    def _setup_observer(self) -> SluggersSetupObserver:
+        if self.transport is None:
+            raise BridgeProtocolError("Live Sluggers session is not started")
+        return SluggersSetupObserver(self.transport)
+
+    def _wait_for_setup(
+        self,
+        read: Callable[[], SetupObservation | None],
+        predicate: Callable[[SetupObservation], bool],
+        label: str,
+        *,
+        timeout_seconds: float,
+    ) -> SetupObservation:
+        if timeout_seconds <= 0:
+            raise BridgeProtocolError("Setup wait timeout must be positive")
+        deadline = time.monotonic() + timeout_seconds
+        last: SetupObservation | None = None
+        while True:
+            self._require_running_process(f"setup wait: {label}")
+            last = read()
+            if last is not None and predicate(last):
+                return last
+            if time.monotonic() >= deadline:
+                raise BridgeProtocolError(
+                    f"Dolphin did not reach {label} before timeout; "
+                    f"last setup observation was {last}"
+                )
+            time.sleep(0.02)
+
     def read_runtime_observation(self) -> RuntimeGameObservation:
         if self.transport is None:
             raise BridgeProtocolError("Live Sluggers session is not started")
-        rules = self.transport.read(0x80794328, 4)
-        stadium = self.transport.read(0x811F769D, 3)
-        captains = self.transport.read(0x811F76AC, 2)
+        rules = self.transport.read(RUNTIME_RULES_ADDRESS, 4)
+        stadium = self.transport.read(RUNTIME_STADIUM_ADDRESS, 3)
+        captains = self.transport.read(RUNTIME_CAPTAIN_BRANDS_ADDRESS, 2)
         return RuntimeGameObservation(
             rules=tuple(rules),  # type: ignore[arg-type]
             stadium_id=stadium[0],
@@ -452,32 +686,33 @@ class LiveSluggersSession:
         )
 
     def apply_final_formation(self, configuration: RuntimeConfigurationBlock) -> None:
-        """Apply both immutable teams at AutoTeam's final formation boundary.
+        """Apply both immutable teams at the task-owned formation boundary.
 
         Random Fill is still the reliable way to make the game allocate and
         initialize both team buffers. The earlier selection hook replaces the
         roster sets, but Sluggers subsequently shuffles batting and fielding.
         This final DME write changes only the character and position bytes in
-        the two initialized 9x16-byte buffers, then reads them back before the
-        runner advances to Begin.
+        the two initialized 9x16-byte buffers owned by the active
+        COrderSelectTask, then reads them back before the runner advances.
         """
 
         if self.transport is None:
             raise BridgeProtocolError("Live Sluggers session is not started")
-        pointer_bytes = self.transport.read(FINAL_FORMATION_POINTER_ADDRESS, 4)
-        if len(pointer_bytes) != 4:
-            raise BridgeProtocolError("Final formation pointer read was short")
-        home_address = int.from_bytes(pointer_bytes, "big")
-        away_address = home_address - FORMATION_TEAM_SIZE
-        pointer_is_valid = (
-            away_address >= 0x80000000
+        order = self.wait_for_order_next()
+        away_address = order.away_formation_address
+        home_address = order.home_formation_address
+        if not (
+            MEM2_START <= away_address
+            and home_address == away_address + FORMATION_TEAM_SIZE
             and home_address + FORMATION_TEAM_SIZE <= MEM2_END
-        )
-        if not pointer_is_valid or not self._formation_pair_matches(
-            away_address, configuration
         ):
-            away_address, home_address = self._discover_final_formation_pair(
-                configuration
+            raise BridgeProtocolError(
+                "COrderSelectTask formation pointers are invalid: "
+                f"away=0x{away_address:08X}, home=0x{home_address:08X}"
+            )
+        if not self._formation_pair_matches(away_address, configuration):
+            raise BridgeProtocolError(
+                "COrderSelectTask formation buffers do not contain the scheduled rosters"
             )
         self._write_formation_team(away_address, configuration.away)
         self._write_formation_team(home_address, configuration.home)
@@ -487,57 +722,16 @@ class LiveSluggersSession:
     ) -> bool:
         assert self.transport is not None
         value = self.transport.read(away_address, FORMATION_TEAM_SIZE * 2)
-        return _formation_ids(value, 0) == {
-            entry[0] for entry in configuration.away.entries
-        } and _formation_ids(value, FORMATION_TEAM_SIZE) == {
-            entry[0] for entry in configuration.home.entries
-        }
-
-    def _discover_final_formation_pair(
-        self, configuration: RuntimeConfigurationBlock
-    ) -> tuple[int, int]:
-        """Locate AutoTeam's adjacent final buffers in the initialized MEM2 heap.
-
-        The pointer lead used by AutoTeam is not populated in every menu path.
-        The buffers themselves are unambiguous at this boundary: two adjacent
-        nine-slot arrays contain the exact away and home roster sets, and each
-        has one of every fielding position. Search is bounded to MEM2 and runs
-        once per fresh match setup.
-        """
-
-        assert self.transport is not None
-        away_ids = {entry[0] for entry in configuration.away.entries}
-        home_ids = {entry[0] for entry in configuration.home.entries}
-        anchor = bytes((next(iter(away_ids)),))
-        overlap = FORMATION_TEAM_SIZE * 2
-        candidates: set[int] = set()
-        for address in range(MEM2_START, MEM2_END, FORMATION_SCAN_CHUNK_SIZE):
-            size = min(FORMATION_SCAN_CHUNK_SIZE + overlap, MEM2_END - address)
-            value = self.transport.read(address, size)
-            search_from = 0
-            while (found := value.find(anchor, search_from)) != -1:
-                for slot in range(9):
-                    base = found - 1 - slot * FORMATION_SLOT_SIZE
-                    if base < 0 or base + overlap > len(value):
-                        continue
-                    if (
-                        _formation_ids(value, base) == away_ids
-                        and _formation_ids(value, base + FORMATION_TEAM_SIZE)
-                        == home_ids
-                        and _formation_positions(value, base) == set(range(9))
-                        and _formation_positions(value, base + FORMATION_TEAM_SIZE)
-                        == set(range(9))
-                    ):
-                        candidates.add(address + base)
-                search_from = found + 1
-        if len(candidates) != 1:
-            rendered = ", ".join(f"0x{value:08X}" for value in sorted(candidates))
-            raise BridgeProtocolError(
-                "Final formation buffers were not uniquely discoverable in MEM2"
-                + (f": {rendered}" if rendered else "")
-            )
-        away_address = candidates.pop()
-        return away_address, away_address + FORMATION_TEAM_SIZE
+        if len(value) != FORMATION_TEAM_SIZE * 2:
+            raise BridgeProtocolError("Final formation pair read was short")
+        return (
+            _formation_ids(value, 0)
+            == {entry[0] for entry in configuration.away.entries}
+            and _formation_ids(value, FORMATION_TEAM_SIZE)
+            == {entry[0] for entry in configuration.home.entries}
+            and _formation_positions(value, 0) == set(range(9))
+            and _formation_positions(value, FORMATION_TEAM_SIZE) == set(range(9))
+        )
 
     def _write_formation_team(self, address: int, team: TeamSelection) -> None:
         assert self.transport is not None
@@ -574,17 +768,17 @@ class LiveSluggersSession:
             raise BridgeProtocolError(
                 "Runtime lineups can only be verified during a live batting state"
             )
-        team_orders = (
-            tuple(
-                self.transport.read(0x8131B4B9 + index * 0x8E, 1)[0]
+
+        def read_team_order(address: int) -> tuple[int, ...]:
+            return tuple(
+                self.transport.read(address + index * RUNTIME_TEAM_ORDER_STRIDE, 1)[0]
                 for index in range(9)
-            ),
-            tuple(
-                self.transport.read(0x8131B9B7 + index * 0x8E, 1)[0]
-                for index in range(9)
-            ),
+            )
+
+        team_orders = tuple(
+            read_team_order(address) for address in RUNTIME_TEAM_ORDER_ADDRESSES
         )
-        team_states = tuple(self.transport.read(0x900D5C22, 2))
+        team_states = tuple(self.transport.read(RUNTIME_TEAM_SIDE_FLAGS_ADDRESS, 2))
         if sorted(team_states) != [0, 1]:
             raise BridgeProtocolError(
                 "Game-owned team batting/fielding flags are inconsistent"
@@ -599,23 +793,13 @@ class LiveSluggersSession:
             home_order = team_orders[batting_team]
             away_order = team_orders[fielding_team]
             defense_side = "away"
-        position_bases = (
-            0x900D9B45,
-            0x900D9E31,
-            0x900DA11D,
-            0x900DA409,
-            0x900DA6F5,
-            0x900DA9E1,
-            0x900DACCD,
-            0x900DAFB9,
-            0x900DB2A5,
-        )
         return RuntimeLineupObservation(
             away_batting_order=away_order,
             home_batting_order=home_order,
             defense_side=defense_side,
             defense_by_position=tuple(
-                self.transport.read(address + 2, 1)[0] for address in position_bases
+                self.transport.read(address + 2, 1)[0]
+                for address in RUNTIME_DEFENDER_RECORD_ADDRESSES
             ),
         )
 
@@ -625,6 +809,54 @@ class LiveSluggersSession:
                 "This runner platform has no automated Dolphin controller backend"
             )
         self.controller.tap(button)
+
+    def navigate_cold_boot_to_main_menu(
+        self,
+        *,
+        has_existing_save: bool,
+        timeout_seconds: float = 60.0,
+        diagnostic_directory: Path | None = None,
+    ) -> BootNavigationResult:
+        if self.controller is None or self.transport is None:
+            raise BridgeProtocolError(
+                "Cold-boot navigation requires live controller and DME connections"
+            )
+        return SluggersBootNavigator(
+            frame_reader=XfbFrameReader(self.transport),
+            controller=self.controller,
+            has_existing_save=has_existing_save,
+            menu_observer=SluggersMenuObserver(self.transport),
+            health_check=lambda: self._require_running_process("cold-boot navigation"),
+        ).navigate_to_main_menu(
+            timeout_seconds=timeout_seconds,
+            diagnostic_directory=diagnostic_directory,
+        )
+
+    def navigate_cold_boot_to_exhibition_stadium(
+        self,
+        *,
+        has_existing_save: bool,
+        timeout_seconds: float = 75.0,
+        diagnostic_directory: Path | None = None,
+    ) -> BootNavigationResult:
+        """Reach the verified Exhibition stadium selector from a cold boot."""
+
+        if self.controller is None or self.transport is None:
+            raise BridgeProtocolError(
+                "Cold-boot navigation requires live controller and DME connections"
+            )
+        return SluggersBootNavigator(
+            frame_reader=XfbFrameReader(self.transport),
+            controller=self.controller,
+            has_existing_save=has_existing_save,
+            menu_observer=SluggersMenuObserver(self.transport),
+            health_check=lambda: self._require_running_process(
+                "cold-boot Exhibition navigation"
+            ),
+        ).navigate_to_exhibition_stadium(
+            timeout_seconds=timeout_seconds,
+            diagnostic_directory=diagnostic_directory,
+        )
 
     def chord_buttons(self, *buttons: str) -> None:
         if self.controller is None:
@@ -662,7 +894,21 @@ class LiveSluggersSession:
             raise BridgeProtocolError(
                 "This runner platform has no native Dolphin screenshot backend"
             )
-        return self.controller.capture_screenshot(timeout_seconds=timeout_seconds)
+        if self.launch is not None:
+            self.launch.wait_for_native_capture_safety(timeout_seconds=timeout_seconds)
+        return self.controller.capture_screenshot(
+            timeout_seconds=timeout_seconds,
+            health_check=lambda: self._require_running_process(
+                "native screenshot capture"
+            ),
+        )
+
+    def _require_running_process(self, stage: str) -> None:
+        if self.launch is not None:
+            self.launch.require_running(stage)
+            return
+        if not self.is_running:
+            raise DolphinLaunchError(f"Dolphin exited during {stage}")
 
     def save_state_slot_one(self, *, timeout_seconds: float = 10.0) -> Path:
         if self.controller is None:

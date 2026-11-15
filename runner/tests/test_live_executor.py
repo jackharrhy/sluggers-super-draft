@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, ClassVar
 
 import pytest
@@ -23,6 +24,14 @@ from starworks_runner.games.sluggers.hashing import sha256_file
 from starworks_runner.games.sluggers.live_executor import (
     LiveSluggersExecutor,
     resolve_managed_build,
+)
+from starworks_runner.games.sluggers.menu_observation import (
+    MAIN_STADIUM_CONFIRM_TASK_DESCRIPTOR,
+    MAIN_STADIUM_TASK_DESCRIPTOR,
+    SELECT_TASK_DESCRIPTOR,
+    MenuObservation,
+    MenuScene,
+    SelectState,
 )
 from starworks_runner.games.sluggers.session import (
     RuntimeGameObservation,
@@ -71,6 +80,7 @@ class FakeLiveSession:
         self.bridge_frame_waits: list[tuple[int, float]] = []
         self.final_formations: list[RuntimeConfigurationBlock] = []
         self.screenshots: list[Path] = []
+        self.cpu_level_selection = 1
         self.snapshot = GameSnapshot(
             frame=0,
             state=0,
@@ -89,6 +99,8 @@ class FakeLiveSession:
             runs_this_play=0,
             outs_this_play=0,
         )
+        self.menu_stage = "stadium"
+        self.stadium_selection = -1
         self.__class__.instances.append(self)
 
     def start(self, attempt_nonce: str, *, timeout_seconds: float) -> None:
@@ -159,6 +171,18 @@ class FakeLiveSession:
             home_captain_brand_id=self.configuration.home.captain_brand_id,
         )
 
+    def wait_for_runtime_observation(
+        self,
+        predicate: Any,
+        label: str,
+        *,
+        timeout_seconds: float,
+    ) -> RuntimeGameObservation:
+        del label, timeout_seconds
+        observation = self.read_runtime_observation()
+        assert predicate(observation)
+        return observation
+
     def read_runtime_lineups(self, snapshot: GameSnapshot) -> RuntimeLineupObservation:
         assert self.configuration is not None
         home_by_position = [0] * 9
@@ -177,10 +201,25 @@ class FakeLiveSession:
 
     def move_stick(self, x: int, y: int) -> None:
         self.movements.append((x, y))
+        if (x, y) == (1, 0):
+            self.cpu_level_selection = min(self.cpu_level_selection + 1, 3)
 
     def tap_button(self, button: str) -> None:
         self.tapped.append(button)
-        if len(self.tapped) == 8 and self.configuration is not None:
+        if button == "D_UP" and self.menu_stage == "stadium":
+            self.stadium_selection = 8
+        elif button == "D_DOWN" and self.menu_stage == "stadium":
+            self.stadium_selection = 3
+        elif button == "D_LEFT" and self.menu_stage == "stadium":
+            self.stadium_selection = {
+                3: 0,
+                8: 4,
+            }.get(self.stadium_selection, self.stadium_selection)
+        if button == "A" and self.menu_stage == "stadium":
+            self.menu_stage = "stadium-confirmation"
+        elif button == "A" and self.menu_stage == "stadium-confirmation":
+            self.menu_stage = "exhibition"
+        if self.tapped.count("A") == 8 and self.configuration is not None:
             self.configuration = RuntimeConfigurationBlock(
                 **{
                     **self.configuration.__dict__,
@@ -188,6 +227,44 @@ class FakeLiveSession:
                     "lineup_applied_mask": self.configuration.lineup_applied_mask | 3,
                 }
             )
+
+    def wait_for_menu(
+        self,
+        predicate: Any,
+        label: str,
+        *,
+        timeout_seconds: float,
+    ) -> MenuObservation:
+        del label, timeout_seconds
+        if self.menu_stage == "stadium":
+            observation = MenuObservation(
+                scene=MenuScene.STADIUM_SELECT,
+                root_descriptor=SELECT_TASK_DESCRIPTOR,
+                root_active=True,
+                root_state=SelectState.MAIN_MODE,
+                child_descriptor=MAIN_STADIUM_TASK_DESCRIPTOR,
+                child_state=1,
+                stadium_selection=self.stadium_selection,
+            )
+        elif self.menu_stage == "stadium-confirmation":
+            observation = MenuObservation(
+                scene=MenuScene.STADIUM_CONFIRM,
+                root_descriptor=SELECT_TASK_DESCRIPTOR,
+                root_active=True,
+                root_state=SelectState.MAIN_MODE,
+                child_descriptor=MAIN_STADIUM_CONFIRM_TASK_DESCRIPTOR,
+                child_state=2,
+                stadium_confirmation_selection=0,
+            )
+        else:
+            observation = MenuObservation(
+                scene=MenuScene.EXHIBITION,
+                root_descriptor=SELECT_TASK_DESCRIPTOR,
+                root_active=True,
+                root_state=SelectState.EXHIBITION,
+            )
+        assert predicate(observation)
+        return observation
 
     def hold_then_tap_buttons(
         self, held_button: str, tapped_button: str, *, hold_seconds: float
@@ -211,6 +288,31 @@ class FakeLiveSession:
 
     def wait_for_bridge_frames(self, frames: int, *, timeout_seconds: float) -> None:
         self.bridge_frame_waits.append((frames, timeout_seconds))
+
+    def wait_for_random_fill(self, *, timeout_seconds: float) -> None:
+        del timeout_seconds
+
+    def wait_for_captain_state(
+        self, expected_state: int, *, timeout_seconds: float
+    ) -> None:
+        del expected_state, timeout_seconds
+
+    def wait_for_cpu_level(
+        self,
+        expected_selection: int | None = None,
+        *,
+        timeout_seconds: float,
+    ) -> SimpleNamespace:
+        del timeout_seconds
+        if expected_selection is not None:
+            assert self.cpu_level_selection == expected_selection
+        return SimpleNamespace(selection=self.cpu_level_selection)
+
+    def wait_for_order_next(self, *, timeout_seconds: float) -> None:
+        del timeout_seconds
+
+    def wait_for_game_begin(self, *, timeout_seconds: float) -> None:
+        del timeout_seconds
 
     def apply_final_formation(self, configuration: RuntimeConfigurationBlock) -> None:
         self.final_formations.append(configuration)
@@ -346,18 +448,13 @@ def test_live_executor_materializes_and_loads_the_exact_seed_checkpoint(
     ).read_bytes() == b"unlocked"
     assert FakeLiveSession.instances[0].values["initial_save_state"] == save_state
     assert FakeLiveSession.instances[0].movements == [
-        (0, 1),
-        (1, 0),
-        (1, 0),
-        (1, 0),
-        (1, 0),
-        (1, 0),
-        (1, 0),
-        (1, 0),
         (1, 0),
         (1, 0),
     ]
     assert FakeLiveSession.instances[0].tapped == [
+        "D_UP",
+        "D_DOWN",
+        "D_LEFT",
         "A",
         "A",
         "A",
@@ -369,7 +466,10 @@ def test_live_executor_materializes_and_loads_the_exact_seed_checkpoint(
         "A",
     ]
     assert FakeLiveSession.instances[0].chords == [("Z", "A", 0.08)]
-    assert FakeLiveSession.instances[0].bridge_frame_waits == [(120, 10.0)]
+    assert FakeLiveSession.instances[0].bridge_frame_waits == [
+        (45, 10.0),
+        (120, 10.0),
+    ]
     assert len(FakeLiveSession.instances[0].final_formations) == 1
     assert FakeLiveSession.instances[0].final_formations[0].away.entries[0][0] == 10
     assert FakeLiveSession.instances[0].final_formations[0].home.entries[0][0] == 0

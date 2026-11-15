@@ -31,7 +31,7 @@ describe('AutoTeam importer', () => {
     assert.equal(result.rosterCharacterIds.length, 9)
   })
 
-  it('refuses machine-local Mii indices', () => {
+  it('refuses unused and machine-local Mii indices', () => {
     assert.throws(
       () => importAutoTeamSnapshot({
         team_names: ['Mii Team'],
@@ -40,7 +40,17 @@ describe('AutoTeam importer', () => {
           [5, 5, 5], [6, 6, 6], [7, 7, 7], [8, 8, 8],
         ]],
       }, 'Mii Team'),
-      (error: unknown) => error instanceof PlatformError && /RFL_DB/.test(error.message),
+      (error: unknown) => error instanceof PlatformError && /unused and Mii/.test(error.message),
+    )
+    assert.throws(
+      () => importAutoTeamSnapshot({
+        team_names: ['Unused Team'],
+        teams: [[
+          [71, 0, 0], [1, 1, 1], [2, 2, 2], [3, 3, 3], [4, 4, 4],
+          [5, 5, 5], [6, 6, 6], [7, 7, 7], [8, 8, 8],
+        ]],
+      }, 'Unused Team'),
+      (error: unknown) => error instanceof PlatformError && /unused and Mii/.test(error.message),
     )
   })
 })

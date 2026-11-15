@@ -54,8 +54,8 @@ export function StatProfileCharacterPage(handle: Handle<StatProfileCharacterPage
         <header mix={headerStyle}>
           <img src={characterHeadshotPath(character.characterId)} alt="" />
           <div>
-            <p mix={eyebrowStyle}>{profileName}</p>
             <h1>{displayCharacterName(character.characterId)}</h1>
+            <p mix={contextStyle}>{profileName}</p>
           </div>
           <a href={routes.leagues.configuration.statProfiles.revision.characters.href({ leagueSlug: league.slug, revisionId })}>Back to characters</a>
         </header>
@@ -164,7 +164,7 @@ function groupDefinitions(definitions: StatDefinition[]) {
 }
 
 const headerStyle = css({ alignItems: 'center', display: 'grid', gap: '18px', gridTemplateColumns: '84px minmax(0, 1fr) auto', '& > img': { height: '84px', objectFit: 'contain', width: '84px' }, '& h1': { fontFamily: 'var(--font-happiness)', fontSize: 'clamp(34px, 6vw, 52px)', margin: 0 }, '@media (max-width: 620px)': { gridTemplateColumns: '68px minmax(0, 1fr)', '& > img': { height: '68px', width: '68px' }, '& > a': { gridColumn: '1 / -1' } } })
-const eyebrowStyle = css({ color: 'var(--text-muted)', margin: '0 0 6px' })
+const contextStyle = css({ color: 'var(--text-muted)', margin: '6px 0 0' })
 const formStyle = css({ display: 'grid', gap: '20px', marginTop: '32px' })
 const fieldsetStyle = css({ display: 'grid', gap: '16px', margin: 0, '& legend, & h2': { fontFamily: 'var(--font-display)', fontSize: '22px', margin: 0, padding: '0 8px' } })
 const fieldGridStyle = css({ display: 'grid', gap: '14px', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' })

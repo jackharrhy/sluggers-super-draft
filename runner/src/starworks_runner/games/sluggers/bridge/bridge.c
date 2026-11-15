@@ -50,6 +50,11 @@ typedef unsigned long long sw_u64;
 #define SW_STADIUM_ID_ADDRESS 0x811F769Du
 #define SW_STADIUM_TIME_ADDRESS 0x811F769Eu
 #define SW_STADIUM_TIME_COPY_ADDRESS 0x811F769Fu
+/* Exact-RMBE01 menu-owned settings. MSS-AutoTeam supplied the address leads;
+ * Starworks independently guarded and read them back in Dolphin 2606. */
+#define SW_RUNTIME_RULES_ADDRESS 0x80794328u
+#define SW_AWAY_CAPTAIN_ADDRESS 0x811F76ACu
+#define SW_HOME_CAPTAIN_ADDRESS 0x811F76ADu
 
 typedef struct {
     volatile sw_u64 sequence;
@@ -219,20 +224,20 @@ static void StarworksWriteRuntimeConfiguration(
 
     rules = configuration + SW_CONFIGURATION_RULES;
     if (rules[0] != SW_UNSET_RULE) {
-        *(volatile sw_u8 *)0x80794328u = rules[0];
+        *(volatile sw_u8 *)(SW_RUNTIME_RULES_ADDRESS + 0u) = rules[0];
     }
     if (rules[1] != SW_UNSET_RULE) {
-        *(volatile sw_u8 *)0x80794329u = rules[1];
+        *(volatile sw_u8 *)(SW_RUNTIME_RULES_ADDRESS + 1u) = rules[1];
     }
     if (rules[2] != SW_UNSET_RULE) {
-        *(volatile sw_u8 *)0x8079432Au = rules[2];
+        *(volatile sw_u8 *)(SW_RUNTIME_RULES_ADDRESS + 2u) = rules[2];
     }
     if (rules[3] != SW_UNSET_RULE) {
-        *(volatile sw_u8 *)0x8079432Bu = rules[3];
+        *(volatile sw_u8 *)(SW_RUNTIME_RULES_ADDRESS + 3u) = rules[3];
     }
-    *(volatile sw_u8 *)0x811F76ACu =
+    *(volatile sw_u8 *)SW_AWAY_CAPTAIN_ADDRESS =
         configuration[SW_CONFIGURATION_AWAY_CAPTAIN];
-    *(volatile sw_u8 *)0x811F76ADu =
+    *(volatile sw_u8 *)SW_HOME_CAPTAIN_ADDRESS =
         configuration[SW_CONFIGURATION_HOME_CAPTAIN];
     *(volatile sw_u8 *)SW_STADIUM_ID_ADDRESS =
         configuration[SW_CONFIGURATION_STADIUM_ID];
